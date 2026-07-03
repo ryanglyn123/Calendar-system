@@ -204,7 +204,7 @@ const destroy = () => {
                                 </div>
                             </TableCell>
                             <TableCell>
-                                {{ calendar.division?.name ?? '—' }}
+                                {{ calendar.division?.name ?? '-' }}
                             </TableCell>
                             <TableCell>
                                 <Star
@@ -213,7 +213,7 @@ const destroy = () => {
                                     aria-label="Default calendar"
                                 />
                                 <span v-else class="text-muted-foreground">
-                                    —
+                                    -
                                 </span>
                             </TableCell>
                             <TableCell>

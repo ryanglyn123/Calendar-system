@@ -137,7 +137,7 @@ const destroy = () => {
                     />
                 </CardTitle>
                 <CardDescription>
-                    Bypasses every permission check. Cannot be edited —
+                    Bypasses every permission check. It cannot be edited, so
                     assign it sparingly.
                     {{ superAdmin.users_count ?? 0 }} user(s) hold it.
                 </CardDescription>

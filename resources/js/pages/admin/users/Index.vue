@@ -222,7 +222,7 @@ const paginationLabel = (label: string) =>
                                 />
                                 {{ user.division.acronym ?? user.division.name }}
                             </span>
-                            <span v-else class="text-muted-foreground">—</span>
+                            <span v-else class="text-muted-foreground">-</span>
                         </TableCell>
                         <TableCell>
                             <div class="flex flex-wrap gap-1">

@@ -18,16 +18,28 @@ class CalendarAccessService
      * Every calendar the user may read events from. Complete user isolation:
      * other users' personal calendars are never part of this set.
      *
+     * Only the ID list is cached (models don't survive cache serialization
+     * safely); the models themselves are one indexed query away.
+     *
      * @return Collection<int, Calendar>
      */
     public function accessibleCalendars(User $user): Collection
     {
-        /** @var Collection<int, Calendar> */
-        return Cache::remember(
+        /** @var list<int> $ids */
+        $ids = Cache::remember(
             $this->cacheKey($user),
             self::CACHE_TTL_SECONDS,
-            fn () => $this->query($user)->get(),
+            fn () => array_values(
+                array_map('intval', $this->query($user)->pluck('id')->all()),
+            ),
         );
+
+        return Calendar::query()
+            ->whereIn('id', $ids)
+            ->with('shares')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
     }
 
     /**

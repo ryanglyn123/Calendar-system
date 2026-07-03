@@ -151,7 +151,7 @@ const destroy = () => {
                             </span>
                         </TableCell>
                         <TableCell class="max-w-md truncate text-muted-foreground">
-                            {{ eventType.description ?? '—' }}
+                            {{ eventType.description ?? '-' }}
                         </TableCell>
                         <TableCell>
                             <Badge

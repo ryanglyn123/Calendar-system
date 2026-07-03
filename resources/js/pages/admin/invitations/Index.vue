@@ -125,7 +125,7 @@ const paginationLabel = (label: string) =>
                             {{ invitation.email }}
                         </TableCell>
                         <TableCell>
-                            {{ invitation.division?.name ?? '—' }}
+                            {{ invitation.division?.name ?? '-' }}
                         </TableCell>
                         <TableCell>
                             <Badge variant="outline">

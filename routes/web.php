@@ -2,10 +2,13 @@
 
 use App\Http\Controllers\Api\CalendarListController;
 use App\Http\Controllers\Api\CalendarPreferenceController;
+use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\EventWindowController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\InvitationAcceptanceController;
 use App\Http\Controllers\Calendar\CalendarShareController;
 use App\Http\Controllers\Calendar\PersonalCalendarController;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -30,7 +33,7 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth', 'verified', 'approved'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     // Personal calendar management + person-to-person sharing (Inertia forms).
     Route::post('calendars', [PersonalCalendarController::class, 'store'])->name('calendars.store');
@@ -45,6 +48,11 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::prefix('api/v1')->name('api.')->middleware('throttle:calendar-data')->group(function () {
         Route::get('calendars', CalendarListController::class)->name('calendars.index');
         Route::put('calendars/{calendar}/preference', [CalendarPreferenceController::class, 'update'])->name('calendars.preference');
+
+        Route::get('events', EventWindowController::class)->name('events.index');
+        Route::post('events', [EventController::class, 'store'])->name('events.store');
+        Route::patch('events/{event}', [EventController::class, 'update'])->name('events.update');
+        Route::delete('events/{event}', [EventController::class, 'destroy'])->name('events.destroy');
     });
 });
 
