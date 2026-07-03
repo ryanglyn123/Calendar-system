@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DivisionController;
+use App\Http\Controllers\Admin\EventTypeController;
 use App\Http\Controllers\Admin\InvitationController;
+use App\Http\Controllers\Admin\ManagedCalendarController;
 use App\Http\Controllers\Admin\PendingRegistrationController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
@@ -38,4 +40,14 @@ Route::prefix('admin')
         Route::post('roles', [RoleController::class, 'store'])->name('roles.store');
         Route::patch('roles/{role}', [RoleController::class, 'update'])->name('roles.update');
         Route::delete('roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+
+        Route::get('calendars', [ManagedCalendarController::class, 'index'])->name('calendars.index');
+        Route::post('calendars', [ManagedCalendarController::class, 'store'])->name('calendars.store');
+        Route::patch('calendars/{calendar}', [ManagedCalendarController::class, 'update'])->name('calendars.update');
+        Route::delete('calendars/{calendar}', [ManagedCalendarController::class, 'destroy'])->name('calendars.destroy');
+
+        Route::get('event-types', [EventTypeController::class, 'index'])->name('event-types.index');
+        Route::post('event-types', [EventTypeController::class, 'store'])->name('event-types.store');
+        Route::patch('event-types/{event_type}', [EventTypeController::class, 'update'])->name('event-types.update');
+        Route::delete('event-types/{event_type}', [EventTypeController::class, 'destroy'])->name('event-types.destroy');
     });

@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class,
             DivisionSeeder::class,
+            CalendarSeeder::class,
+            EventTypeSeeder::class,
         ]);
 
         $superAdmin = User::query()->firstOrCreate(

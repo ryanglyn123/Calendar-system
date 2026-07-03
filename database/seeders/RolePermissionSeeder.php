@@ -53,7 +53,6 @@ class RolePermissionSeeder extends Seeder
             'admin.access',
             'users.approve',
             'events.create-org',
-            'calendars.manage',
         ]);
 
         $staff = Role::findOrCreate('staff');

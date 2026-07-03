@@ -3,9 +3,11 @@ import { Link } from '@inertiajs/vue3';
 import {
     Building2,
     CalendarDays,
+    CalendarRange,
     LayoutGrid,
     MailPlus,
     ShieldCheck,
+    Tags,
     UserCheck,
     Users,
 } from '@lucide/vue';
@@ -25,7 +27,9 @@ import {
 import { useAuth } from '@/composables/useAuth';
 import { dashboard } from '@/routes';
 import admin from '@/routes/admin';
+import adminCalendars from '@/routes/admin/calendars';
 import adminDivisions from '@/routes/admin/divisions';
+import adminEventTypes from '@/routes/admin/event-types';
 import adminInvitations from '@/routes/admin/invitations';
 import adminPending from '@/routes/admin/pending-registrations';
 import adminRoles from '@/routes/admin/roles';
@@ -83,6 +87,22 @@ const adminNavItems = computed<NavItem[]>(() => {
             title: 'Divisions',
             href: adminDivisions.index(),
             icon: Building2,
+        });
+    }
+
+    if (hasPermission('calendars.manage')) {
+        items.push({
+            title: 'Calendars',
+            href: adminCalendars.index(),
+            icon: CalendarRange,
+        });
+    }
+
+    if (hasPermission('event-types.manage')) {
+        items.push({
+            title: 'Event Types',
+            href: adminEventTypes.index(),
+            icon: Tags,
         });
     }
 

@@ -45,6 +45,34 @@ export type Invitation = {
     created_at: string;
 };
 
+export type CalendarItem = {
+    id: number;
+    type: 'organization' | 'division' | 'resource' | 'personal';
+    name: string;
+    description: string | null;
+    color: string;
+    effective_color: string;
+    icon: string | null;
+    is_default: boolean;
+    is_active: boolean;
+    is_owner: boolean;
+    is_visible: boolean;
+    sort_order: number;
+    division?: Division | null;
+    can_write_events: boolean;
+    can_manage: boolean;
+};
+
+export type EventTypeItem = {
+    id: number;
+    name: string;
+    color: string;
+    icon: string | null;
+    description: string | null;
+    is_active: boolean;
+    sort_order: number;
+};
+
 export type PaginationLink = {
     url: string | null;
     label: string;

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Observers\DivisionObserver;
 use Database\Factories\DivisionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +24,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property int $sort_order
  */
 #[Fillable(['name', 'acronym', 'description', 'color', 'is_active', 'sort_order'])]
+#[ObservedBy(DivisionObserver::class)]
 class Division extends Model
 {
     /** @use HasFactory<DivisionFactory> */
