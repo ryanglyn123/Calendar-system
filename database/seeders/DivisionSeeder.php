@@ -10,7 +10,7 @@ class DivisionSeeder extends Seeder
     public function run(): void
     {
         $divisions = [
-            ['name' => 'Office of the Chairperson and CEO', 'acronym' => 'OCC', 'color' => '#CC8500'],
+            ['name' => 'Office of the Chairperson and CEO', 'acronym' => 'OCC', 'color' => '#EEE621'],
             ['name' => 'Administrative Division', 'acronym' => 'ADMIN', 'color' => '#0096E2'],
             ['name' => 'Finance Division', 'acronym' => 'FIN', 'color' => '#10B981'],
             ['name' => 'Legal Division', 'acronym' => 'LEGAL', 'color' => '#580076'],

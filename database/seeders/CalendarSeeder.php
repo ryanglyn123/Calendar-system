@@ -16,7 +16,7 @@ class CalendarSeeder extends Seeder
             [
                 'name' => 'FDCP Events',
                 'description' => 'Organization-wide events, festivals and activities.',
-                'color' => '#CC8500',
+                'color' => '#EEE621',
                 'icon' => 'clapperboard',
                 'is_default' => true,
                 'sort_order' => 0,

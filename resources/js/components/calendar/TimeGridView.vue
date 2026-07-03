@@ -4,6 +4,7 @@ import { toast } from 'vue-sonner';
 import { layoutWeekLanes } from '@/components/calendar/monthLanes';
 import {
     addDays,
+    eventInk,
     format,
     isMultiDay,
     isSameDay,
@@ -212,8 +213,7 @@ let touchHoldTimer: ReturnType<typeof setTimeout> | undefined;
 const snap = (minutes: number) =>
     Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
 
-const clampMinutes = (minutes: number) =>
-    Math.min(1440, Math.max(0, minutes));
+const clampMinutes = (minutes: number) => Math.min(1440, Math.max(0, minutes));
 
 function pointerPosition(event: PointerEvent): {
     dayIndex: number;
@@ -492,13 +492,11 @@ function onSlotClick(day: Date, event: MouseEvent): void {
         return;
     }
 
-    const bounds = (
-        event.currentTarget as HTMLElement
-    ).getBoundingClientRect();
+    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
 
     const minutes =
         Math.floor(
-            ((event.clientY - bounds.top) / HOUR_HEIGHT) * 60 / SNAP_MINUTES,
+            (((event.clientY - bounds.top) / HOUR_HEIGHT) * 60) / SNAP_MINUTES,
         ) * SNAP_MINUTES;
 
     const start = startOfDay(day);
@@ -681,7 +679,7 @@ const draggingEventId = computed(() =>
                     :key="segment.occurrence.occurrence_id + segment.startCol"
                     type="button"
                     data-event
-                    class="absolute z-10 truncate rounded-md px-2 text-left text-xs leading-5 font-medium text-white hover:opacity-90"
+                    class="absolute z-10 truncate rounded-md px-2 text-left text-xs leading-5 font-medium hover:opacity-90"
                     :class="{
                         'rounded-l-none': segment.continuesBefore,
                         'rounded-r-none': segment.continuesAfter,
@@ -692,6 +690,7 @@ const draggingEventId = computed(() =>
                         top: `${4 + segment.lane * 24}px`,
                         height: '20px',
                         backgroundColor: segment.occurrence.color,
+                        color: eventInk(segment.occurrence.color),
                     }"
                     @click="emit('open', segment.occurrence)"
                 >
@@ -763,9 +762,7 @@ const draggingEventId = computed(() =>
                             backgroundColor: box.occurrence.color + '26',
                             borderLeftColor: box.occurrence.color,
                         }"
-                        @pointerdown="
-                            (e) => onEventPointerDown(e, box, d)
-                        "
+                        @pointerdown="(e) => onEventPointerDown(e, box, d)"
                     >
                         <button
                             type="button"
@@ -797,9 +794,7 @@ const draggingEventId = computed(() =>
                                 backgroundColor: box.occurrence.color + '55',
                             }"
                             aria-hidden="true"
-                            @pointerdown="
-                                (e) => onResizePointerDown(e, box, d)
-                            "
+                            @pointerdown="(e) => onResizePointerDown(e, box, d)"
                         />
                     </div>
 
@@ -811,7 +806,7 @@ const draggingEventId = computed(() =>
                             top: `${ghost.top}px`,
                             height: `${ghost.height}px`,
                             borderColor: ghost.color ?? 'var(--primary)',
-                            backgroundColor: (ghost.color ?? '#CC8500') + '22',
+                            backgroundColor: (ghost.color ?? '#EEE621') + '22',
                         }"
                         aria-hidden="true"
                     >

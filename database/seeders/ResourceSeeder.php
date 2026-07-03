@@ -51,7 +51,7 @@ class ResourceSeeder extends Seeder
             [$boardRooms, 'Screening Room A', '2F, with projector and 5.1 audio', 30, '#0096E2'],
             [$boardRooms, 'Huddle Room', '3F, quick syncs', 6, '#10B981'],
             [$vehicles, 'Toyota Hiace (SKB 1234)', 'Motor pool', 12, '#E200A9'],
-            [$vehicles, 'Toyota Innova (NEd 5678)', 'Motor pool', 6, '#CC8500'],
+            [$vehicles, 'Toyota Innova (NEd 5678)', 'Motor pool', 6, '#EEE621'],
             [$vehicles, 'Mitsubishi L300 (UAM 9012)', 'Motor pool', 2, '#6B7280'],
         ];
 

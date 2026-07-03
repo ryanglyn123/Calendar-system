@@ -265,12 +265,12 @@ const cancelBooking = async (booking: MyBooking) => {
 
 const statusVariant = (status: MyBooking['status']) =>
     (({
-        approved: 'default',
+        approved: 'success',
         pending: 'secondary',
         rejected: 'destructive',
         cancelled: 'outline',
     })[status] ?? 'outline') as
-        'default' | 'secondary' | 'destructive' | 'outline';
+        'success' | 'secondary' | 'destructive' | 'outline';
 
 const when = (booking: MyBooking) =>
     `${format(new Date(booking.starts_at), 'MMM d, HH:mm')} - ${format(new Date(booking.ends_at), 'HH:mm')}`;

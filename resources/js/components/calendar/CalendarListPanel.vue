@@ -31,7 +31,7 @@ const groups: {
 ];
 
 const swatches = [
-    '#CC8500',
+    '#EEE621',
     '#FFCC00',
     '#580076',
     '#E200A9',

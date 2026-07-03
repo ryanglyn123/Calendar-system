@@ -4,6 +4,7 @@ import { toast } from 'vue-sonner';
 import { layoutWeekLanes } from '@/components/calendar/monthLanes';
 import {
     addDays,
+    eventInk,
     format,
     isMultiDay,
     isSameDay,
@@ -304,11 +305,11 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                     :key="`${segment.occurrence.occurrence_id}-${segment.startCol}`"
                     type="button"
                     data-event
-                    class="absolute z-10 truncate rounded-md px-2 text-left text-xs leading-5 font-medium text-white transition-opacity hover:opacity-90"
+                    class="absolute z-10 truncate rounded-md px-2 text-left text-xs leading-5 font-medium transition-opacity hover:opacity-90"
                     :class="{
                         'rounded-l-none': segment.continuesBefore,
                         'rounded-r-none': segment.continuesAfter,
-                        'opacity-70 line-through':
+                        'line-through opacity-70':
                             segment.occurrence.status === 'cancelled',
                     }"
                     :style="{
@@ -317,6 +318,7 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                         top: `${28 + segment.lane * LANE_HEIGHT}px`,
                         height: '20px',
                         backgroundColor: segment.occurrence.color,
+                        color: eventInk(segment.occurrence.color),
                     }"
                     :aria-label="`${segment.occurrence.title}, ${format(new Date(segment.occurrence.starts_at), 'MMM d')}`"
                     @pointerdown="
@@ -378,7 +380,7 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                             data-event
                             class="flex items-center gap-1 truncate rounded px-1 py-0.5 text-left text-xs hover:bg-muted"
                             :class="{
-                                'opacity-70 line-through':
+                                'line-through opacity-70':
                                     occurrence.status === 'cancelled',
                             }"
                             :aria-label="`${occurrence.title}, ${format(new Date(occurrence.starts_at), 'h:mm a')}`"
@@ -414,9 +416,7 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                             type="button"
                             data-event
                             class="rounded px-1 py-0.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted"
-                            @click="
-                                emit('showDay', day, dayOccurrences(day))
-                            "
+                            @click="emit('showDay', day, dayOccurrences(day))"
                         >
                             +{{ hiddenCount(weekLayouts[w], day) }} more
                         </button>

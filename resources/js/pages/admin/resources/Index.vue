@@ -170,14 +170,10 @@ const destroy = (resource: ResourceRow) =>
                         <TableCell>
                             <Badge
                                 :variant="
-                                    resource.is_active
-                                        ? 'default'
-                                        : 'secondary'
+                                    resource.is_active ? 'success' : 'secondary'
                                 "
                             >
-                                {{
-                                    resource.is_active ? 'Active' : 'Inactive'
-                                }}
+                                {{ resource.is_active ? 'Active' : 'Inactive' }}
                             </Badge>
                         </TableCell>
                         <TableCell class="text-right">
@@ -317,9 +313,7 @@ const destroy = (resource: ResourceRow) =>
                                 />
                             </div>
                         </div>
-                        <Label
-                            class="flex items-center gap-3 pb-1 font-normal"
-                        >
+                        <Label class="flex items-center gap-3 pb-1 font-normal">
                             <Switch v-model="form.is_active" />
                             Active
                         </Label>

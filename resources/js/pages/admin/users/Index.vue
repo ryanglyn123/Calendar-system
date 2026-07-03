@@ -131,12 +131,15 @@ const destroy = () => {
 };
 
 const statusVariant = (value: AdminUser['status']) =>
-    ({ active: 'default', pending: 'secondary', suspended: 'destructive' })[
+    ({ active: 'success', pending: 'secondary', suspended: 'destructive' })[
         value
-    ] as 'default' | 'secondary' | 'destructive';
+    ] as 'success' | 'secondary' | 'destructive';
 
 const paginationLabel = (label: string) =>
-    label.replace('&laquo;', '«').replace('&raquo;', '»').replace('&hellip;', '…');
+    label
+        .replace('&laquo;', '«')
+        .replace('&raquo;', '»')
+        .replace('&hellip;', '…');
 </script>
 
 <template>
@@ -226,7 +229,9 @@ const paginationLabel = (label: string) =>
                                     }"
                                     aria-hidden="true"
                                 />
-                                {{ user.division.acronym ?? user.division.name }}
+                                {{
+                                    user.division.acronym ?? user.division.name
+                                }}
                             </span>
                             <span v-else class="text-muted-foreground">-</span>
                         </TableCell>
@@ -415,10 +420,7 @@ const paginationLabel = (label: string) =>
                     <Button variant="outline" @click="editing = null">
                         Cancel
                     </Button>
-                    <Button
-                        :disabled="editForm.processing"
-                        @click="submitEdit"
-                    >
+                    <Button :disabled="editForm.processing" @click="submitEdit">
                         Save changes
                     </Button>
                 </DialogFooter>

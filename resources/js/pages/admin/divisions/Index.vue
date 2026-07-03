@@ -165,7 +165,7 @@ const destroy = () => {
                         <TableCell>
                             <Badge
                                 :variant="
-                                    division.is_active ? 'default' : 'secondary'
+                                    division.is_active ? 'success' : 'secondary'
                                 "
                             >
                                 {{ division.is_active ? 'Active' : 'Inactive' }}

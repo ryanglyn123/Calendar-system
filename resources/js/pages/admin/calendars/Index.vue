@@ -66,7 +66,7 @@ const form = useForm({
     type: 'organization',
     name: '',
     description: '',
-    color: '#CC8500',
+    color: '#EEE621',
     division_id: null as number | null,
     is_default: false,
     is_active: true,
@@ -222,7 +222,7 @@ const destroy = () => {
                                 <Badge
                                     :variant="
                                         calendar.is_active
-                                            ? 'default'
+                                            ? 'success'
                                             : 'secondary'
                                     "
                                 >
@@ -381,15 +381,11 @@ const destroy = () => {
                         </div>
 
                         <div class="grid gap-3 pb-1">
-                            <Label
-                                class="flex items-center gap-3 font-normal"
-                            >
+                            <Label class="flex items-center gap-3 font-normal">
                                 <Switch v-model="form.is_default" />
                                 Visible to everyone by default
                             </Label>
-                            <Label
-                                class="flex items-center gap-3 font-normal"
-                            >
+                            <Label class="flex items-center gap-3 font-normal">
                                 <Switch v-model="form.is_active" />
                                 Active
                             </Label>
@@ -415,8 +411,8 @@ const destroy = () => {
                     <DialogTitle>Delete {{ deleting?.name }}?</DialogTitle>
                     <DialogDescription>
                         The calendar is archived (soft-deleted) along with its
-                        events. Consider marking it inactive instead if you
-                        only want to hide it.
+                        events. Consider marking it inactive instead if you only
+                        want to hide it.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>

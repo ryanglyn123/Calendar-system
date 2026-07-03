@@ -108,4 +108,35 @@ export function toIso(date: Date): string {
     return date.toISOString();
 }
 
-export { addDays, addMonths, format, isSameDay, isSameMonth, parseISO, startOfDay };
+/**
+ * Pick a readable text ink (near-black or white) for text sitting directly on
+ * an arbitrary event/calendar color, using WCAG relative luminance. Keeps light
+ * colors (e.g. the vivid FDCP yellow) legible instead of forcing white text.
+ */
+export function eventInk(hex: string | null | undefined): string {
+    const c = (hex ?? '').replace('#', '');
+
+    if (c.length < 6) {
+        return '#ffffff';
+    }
+
+    const channel = (v: number) =>
+        v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+
+    const r = channel(parseInt(c.slice(0, 2), 16) / 255);
+    const g = channel(parseInt(c.slice(2, 4), 16) / 255);
+    const b = channel(parseInt(c.slice(4, 6), 16) / 255);
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+    return luminance > 0.45 ? '#1c1c17' : '#ffffff';
+}
+
+export {
+    addDays,
+    addMonths,
+    format,
+    isSameDay,
+    isSameMonth,
+    parseISO,
+    startOfDay,
+};

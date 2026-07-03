@@ -129,7 +129,10 @@ const destroy = () => {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableEmpty v-if="eventTypes.data.length === 0" :colspan="4">
+                    <TableEmpty
+                        v-if="eventTypes.data.length === 0"
+                        :colspan="4"
+                    >
                         No event types yet.
                     </TableEmpty>
                     <TableRow
@@ -153,14 +156,16 @@ const destroy = () => {
                                 </span>
                             </span>
                         </TableCell>
-                        <TableCell class="max-w-md truncate text-muted-foreground">
+                        <TableCell
+                            class="max-w-md truncate text-muted-foreground"
+                        >
                             {{ eventType.description ?? '-' }}
                         </TableCell>
                         <TableCell>
                             <Badge
                                 :variant="
                                     eventType.is_active
-                                        ? 'default'
+                                        ? 'success'
                                         : 'secondary'
                                 "
                             >
@@ -205,8 +210,8 @@ const destroy = () => {
                         }}
                     </DialogTitle>
                     <DialogDescription>
-                        Events using this type inherit its color unless they
-                        set their own.
+                        Events using this type inherit its color unless they set
+                        their own.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -255,9 +260,7 @@ const destroy = () => {
                             </p>
                         </div>
 
-                        <Label
-                            class="flex items-center gap-3 pb-1 font-normal"
-                        >
+                        <Label class="flex items-center gap-3 pb-1 font-normal">
                             <Switch v-model="form.is_active" />
                             Active
                         </Label>
