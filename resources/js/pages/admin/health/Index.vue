@@ -1,13 +1,8 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { RefreshCw } from '@lucide/vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import {
     Table,
     TableBody,
@@ -48,37 +43,66 @@ const retryAll = () =>
 <template>
     <Head title="System Health" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="grid gap-4 md:grid-cols-2">
-            <Card>
-                <CardHeader>
-                    <CardDescription>Jobs waiting in queue</CardDescription>
-                    <CardTitle class="text-3xl">{{ queuedJobs }}</CardTitle>
-                </CardHeader>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardDescription>Recent failed jobs</CardDescription>
-                    <CardTitle class="text-3xl">
-                        {{ failedJobs.length }}
-                    </CardTitle>
-                </CardHeader>
-            </Card>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="System Health"
+            description="Emails and reminders run through the queue; a worker (php artisan queue:work) must stay running in production."
+        >
+            <template #actions>
+                <Button
+                    v-if="failedJobs.length > 0"
+                    variant="outline"
+                    @click="retryAll"
+                >
+                    <RefreshCw aria-hidden="true" />
+                    Retry all failed
+                </Button>
+            </template>
+        </PageHeader>
 
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Emails and reminders run through the queue; a worker
-                (`php artisan queue:work`) must stay running in production.
-            </p>
-            <Button
-                v-if="failedJobs.length > 0"
-                variant="outline"
-                @click="retryAll"
-            >
-                <RefreshCw aria-hidden="true" />
-                Retry all failed
-            </Button>
+        <div
+            class="flex flex-wrap items-center gap-x-10 gap-y-5 rounded-xl border bg-card px-6 py-5"
+        >
+            <div class="flex items-center gap-2.5">
+                <span
+                    class="size-2.5 rounded-full"
+                    :class="
+                        failedJobs.length === 0
+                            ? 'bg-success'
+                            : 'bg-destructive'
+                    "
+                    aria-hidden="true"
+                />
+                <span class="text-sm font-medium">
+                    {{
+                        failedJobs.length === 0
+                            ? 'All systems operational'
+                            : 'Attention needed'
+                    }}
+                </span>
+            </div>
+
+            <div
+                class="hidden h-9 w-px bg-border sm:block"
+                aria-hidden="true"
+            />
+
+            <div class="space-y-0.5">
+                <div class="text-2xl font-semibold tabular-nums">
+                    {{ queuedJobs }}
+                </div>
+                <div class="text-xs text-muted-foreground">Jobs in queue</div>
+            </div>
+
+            <div class="space-y-0.5">
+                <div
+                    class="text-2xl font-semibold tabular-nums"
+                    :class="failedJobs.length > 0 ? 'text-destructive' : ''"
+                >
+                    {{ failedJobs.length }}
+                </div>
+                <div class="text-xs text-muted-foreground">Failed jobs</div>
+            </div>
         </div>
 
         <div class="rounded-xl border">

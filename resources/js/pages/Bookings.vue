@@ -1,8 +1,20 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { CalendarPlus, ClipboardList } from '@lucide/vue';
+import type { LucideIcon } from '@lucide/vue';
+import {
+    Boxes,
+    CalendarPlus,
+    CarFront,
+    ChevronRight,
+    ClipboardList,
+    DoorOpen,
+    MapPin,
+    Projector,
+    Users,
+} from '@lucide/vue';
 import { computed, onMounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,13 +27,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import {
     Table,
@@ -121,11 +126,31 @@ const selectedType = computed(() =>
     types.value.find((t) => t.id === form.value.typeId),
 );
 
-const openCreate = () => {
+const typeIcon = (name: string): LucideIcon => {
+    if (/car|vehicle|van|shuttle|pool|transport/i.test(name)) {
+        return CarFront;
+    }
+
+    if (/room|board|hall|conference|meeting|venue/i.test(name)) {
+        return DoorOpen;
+    }
+
+    if (/equipment|projector|gear|device/i.test(name)) {
+        return Projector;
+    }
+
+    return Boxes;
+};
+
+const openCreate = (typeId?: number) => {
     errors.value = {};
+
+    const type =
+        types.value.find((t) => t.id === typeId) ?? types.value[0] ?? null;
+
     form.value = {
-        typeId: types.value[0]?.id ?? null,
-        resource_id: null,
+        typeId: type?.id ?? null,
+        resource_id: type?.resources.length === 1 ? type.resources[0].id : null,
         title: '',
         date: format(new Date(Date.now() + 86_400_000), 'yyyy-MM-dd'),
         startTime: '09:00',
@@ -135,6 +160,26 @@ const openCreate = () => {
     };
     busy.value = [];
     creating.value = true;
+    void loadAvailability();
+};
+
+const selectType = (typeId: number) => {
+    if (form.value.typeId === typeId) {
+        return;
+    }
+
+    const type = types.value.find((t) => t.id === typeId);
+
+    form.value.typeId = typeId;
+    form.value.resource_id =
+        type?.resources.length === 1 ? type.resources[0].id : null;
+    busy.value = [];
+    void loadAvailability();
+};
+
+const selectResource = (resourceId: number) => {
+    form.value.resource_id = resourceId;
+    void loadAvailability();
 };
 
 const loadAvailability = async () => {
@@ -219,14 +264,13 @@ const cancelBooking = async (booking: MyBooking) => {
 };
 
 const statusVariant = (status: MyBooking['status']) =>
-    ((
-        {
-            approved: 'default',
-            pending: 'secondary',
-            rejected: 'destructive',
-            cancelled: 'outline',
-        }
-    )[status] ?? 'outline') as 'default' | 'secondary' | 'destructive' | 'outline';
+    (({
+        approved: 'default',
+        pending: 'secondary',
+        rejected: 'destructive',
+        cancelled: 'outline',
+    })[status] ?? 'outline') as
+        'default' | 'secondary' | 'destructive' | 'outline';
 
 const when = (booking: MyBooking) =>
     `${format(new Date(booking.starts_at), 'MMM d, HH:mm')} - ${format(new Date(booking.ends_at), 'HH:mm')}`;
@@ -235,94 +279,171 @@ const when = (booking: MyBooking) =>
 <template>
     <Head title="Bookings" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Reserve rooms, vehicles and other shared resources.
-            </p>
-            <Button data-test="new-booking" @click="openCreate">
-                <CalendarPlus aria-hidden="true" />
-                New booking
-            </Button>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Bookings"
+            description="Reserve rooms, vehicles and other shared resources."
+        >
+            <template #actions>
+                <Button data-test="new-booking" @click="openCreate()">
+                    <CalendarPlus aria-hidden="true" />
+                    New booking
+                </Button>
+            </template>
+        </PageHeader>
 
-        <div class="rounded-xl border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Resource</TableHead>
-                        <TableHead>When</TableHead>
-                        <TableHead>Purpose</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead class="w-28 text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    <TableEmpty
-                        v-if="mine.length === 0 && !loading"
-                        :colspan="5"
+        <section class="flex flex-col gap-3">
+            <h2 class="text-sm font-medium text-muted-foreground">
+                What do you need?
+            </h2>
+
+            <div
+                v-if="loading && types.length === 0"
+                class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            >
+                <div
+                    v-for="i in 4"
+                    :key="i"
+                    class="h-24 animate-pulse rounded-xl border bg-muted/40"
+                />
+            </div>
+
+            <div
+                v-else-if="types.length > 0"
+                class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            >
+                <button
+                    v-for="type in types"
+                    :key="type.id"
+                    type="button"
+                    class="group flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border bg-card p-4 text-left transition-colors duration-200 hover:border-primary/40 hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-[0.99]"
+                    :data-test="`book-type-${type.id}`"
+                    @click="openCreate(type.id)"
+                >
+                    <span
+                        class="flex size-11 shrink-0 items-center justify-center rounded-lg border bg-background transition-colors duration-200 group-hover:border-primary/40 group-hover:text-primary"
                     >
-                        <span
-                            class="inline-flex flex-col items-center gap-2 py-4"
-                        >
-                            <ClipboardList
-                                class="size-8 text-muted-foreground"
-                                aria-hidden="true"
-                            />
-                            No bookings yet. Reserve a room or vehicle with
-                            the button above.
+                        <component
+                            :is="typeIcon(type.name)"
+                            class="size-5"
+                            aria-hidden="true"
+                        />
+                    </span>
+                    <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span class="truncate text-sm font-semibold">
+                            {{ type.name }}
                         </span>
-                    </TableEmpty>
-                    <TableRow v-for="booking in mine" :key="booking.id">
-                        <TableCell>
-                            <div class="font-medium">
-                                {{ booking.resource.name }}
-                            </div>
-                            <div class="text-xs text-muted-foreground">
-                                {{ booking.resource.type }}
-                            </div>
-                        </TableCell>
-                        <TableCell>{{ when(booking) }}</TableCell>
-                        <TableCell
-                            class="max-w-56 truncate text-muted-foreground"
-                        >
-                            {{ booking.purpose ?? '-' }}
-                        </TableCell>
-                        <TableCell>
-                            <div class="flex flex-col gap-1">
-                                <Badge
-                                    :variant="statusVariant(booking.status)"
-                                >
-                                    {{ booking.status }}
-                                </Badge>
-                                <span
-                                    v-if="booking.rejection_reason"
-                                    class="max-w-52 text-xs text-muted-foreground"
-                                >
-                                    {{ booking.rejection_reason }}
-                                </span>
-                                <Badge
-                                    v-if="booking.has_pending_edit"
-                                    variant="outline"
-                                >
-                                    change pending
-                                </Badge>
-                            </div>
-                        </TableCell>
-                        <TableCell class="text-right">
-                            <Button
-                                v-if="booking.can_cancel"
-                                variant="outline"
-                                size="sm"
-                                @click="cancelBooking(booking)"
+                        <span class="text-xs text-muted-foreground">
+                            {{ type.resources.length }}
+                            {{
+                                type.resources.length === 1
+                                    ? 'option'
+                                    : 'options'
+                            }}
+                            <template v-if="type.requires_approval">
+                                &middot; needs approval
+                            </template>
+                        </span>
+                    </span>
+                    <ChevronRight
+                        class="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5"
+                        aria-hidden="true"
+                    />
+                </button>
+            </div>
+
+            <p
+                v-else
+                class="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground"
+            >
+                No bookable resources have been set up yet.
+            </p>
+        </section>
+
+        <section class="flex flex-col gap-3">
+            <h2 class="text-sm font-medium text-muted-foreground">
+                My bookings
+            </h2>
+            <div class="rounded-xl border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Resource</TableHead>
+                            <TableHead>When</TableHead>
+                            <TableHead>Purpose</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead class="w-28 text-right"
+                                >Actions</TableHead
                             >
-                                Cancel
-                            </Button>
-                        </TableCell>
-                    </TableRow>
-                </TableBody>
-            </Table>
-        </div>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableEmpty
+                            v-if="mine.length === 0 && !loading"
+                            :colspan="5"
+                        >
+                            <span
+                                class="inline-flex flex-col items-center gap-2 py-4"
+                            >
+                                <ClipboardList
+                                    class="size-8 text-muted-foreground"
+                                    aria-hidden="true"
+                                />
+                                No bookings yet. Pick a category above to
+                                reserve a room or vehicle.
+                            </span>
+                        </TableEmpty>
+                        <TableRow v-for="booking in mine" :key="booking.id">
+                            <TableCell>
+                                <div class="font-medium">
+                                    {{ booking.resource.name }}
+                                </div>
+                                <div class="text-xs text-muted-foreground">
+                                    {{ booking.resource.type }}
+                                </div>
+                            </TableCell>
+                            <TableCell>{{ when(booking) }}</TableCell>
+                            <TableCell
+                                class="max-w-56 truncate text-muted-foreground"
+                            >
+                                {{ booking.purpose ?? '-' }}
+                            </TableCell>
+                            <TableCell>
+                                <div class="flex flex-col gap-1">
+                                    <Badge
+                                        :variant="statusVariant(booking.status)"
+                                    >
+                                        {{ booking.status }}
+                                    </Badge>
+                                    <span
+                                        v-if="booking.rejection_reason"
+                                        class="max-w-52 text-xs text-muted-foreground"
+                                    >
+                                        {{ booking.rejection_reason }}
+                                    </span>
+                                    <Badge
+                                        v-if="booking.has_pending_edit"
+                                        variant="outline"
+                                    >
+                                        change pending
+                                    </Badge>
+                                </div>
+                            </TableCell>
+                            <TableCell class="text-right">
+                                <Button
+                                    v-if="booking.can_cancel"
+                                    variant="outline"
+                                    size="sm"
+                                    @click="cancelBooking(booking)"
+                                >
+                                    Cancel
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </div>
+        </section>
 
         <Dialog v-model:open="creating">
             <DialogContent class="max-h-[90vh] max-w-lg overflow-y-auto">
@@ -334,77 +455,110 @@ const when = (booking: MyBooking) =>
                 </DialogHeader>
 
                 <div class="grid gap-4">
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="grid gap-2">
-                            <Label for="booking-type">Type</Label>
-                            <Select
-                                :model-value="
-                                    form.typeId === null
-                                        ? undefined
-                                        : String(form.typeId)
+                    <div class="grid gap-2">
+                        <Label id="booking-type-label">Type</Label>
+                        <div
+                            class="flex flex-wrap gap-2"
+                            role="radiogroup"
+                            aria-labelledby="booking-type-label"
+                        >
+                            <button
+                                v-for="type in types"
+                                :key="type.id"
+                                type="button"
+                                role="radio"
+                                :aria-checked="form.typeId === type.id"
+                                class="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-[0.98]"
+                                :class="
+                                    form.typeId === type.id
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : 'bg-background text-foreground hover:bg-accent'
                                 "
-                                @update:model-value="
-                                    (v) => {
-                                        form.typeId = Number(v);
-                                        form.resource_id = null;
-                                        busy = [];
-                                    }
-                                "
+                                @click="selectType(type.id)"
                             >
-                                <SelectTrigger id="booking-type">
-                                    <SelectValue placeholder="Pick a type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        v-for="type in types"
-                                        :key="type.id"
-                                        :value="String(type.id)"
-                                    >
-                                        {{ type.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
+                                <component
+                                    :is="typeIcon(type.name)"
+                                    class="size-4"
+                                    aria-hidden="true"
+                                />
+                                {{ type.name }}
+                            </button>
                         </div>
+                        <p
+                            v-if="selectedType?.requires_approval"
+                            class="text-xs text-muted-foreground"
+                        >
+                            {{ selectedType.name }} bookings are confirmed by an
+                            approver before they are final.
+                        </p>
+                    </div>
 
-                        <div class="grid gap-2">
-                            <Label for="booking-resource">Resource</Label>
-                            <Select
-                                :model-value="
-                                    form.resource_id === null
-                                        ? undefined
-                                        : String(form.resource_id)
+                    <div class="grid gap-2">
+                        <Label id="booking-resource-label">
+                            {{ selectedType?.name ?? 'Resource' }}
+                        </Label>
+                        <div
+                            v-if="(selectedType?.resources.length ?? 0) > 0"
+                            class="grid max-h-48 gap-2 overflow-y-auto pr-1"
+                            role="radiogroup"
+                            aria-labelledby="booking-resource-label"
+                        >
+                            <button
+                                v-for="resource in selectedType?.resources ??
+                                []"
+                                :key="resource.id"
+                                type="button"
+                                role="radio"
+                                :aria-checked="form.resource_id === resource.id"
+                                class="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-[0.99]"
+                                :class="
+                                    form.resource_id === resource.id
+                                        ? 'border-primary bg-accent'
+                                        : 'hover:bg-accent/50'
                                 "
-                                @update:model-value="
-                                    (v) => {
-                                        form.resource_id = Number(v);
-                                        void loadAvailability();
-                                    }
-                                "
+                                @click="selectResource(resource.id)"
                             >
-                                <SelectTrigger id="booking-resource">
-                                    <SelectValue placeholder="Pick one" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        v-for="resource in selectedType?.resources ??
-                                        []"
-                                        :key="resource.id"
-                                        :value="String(resource.id)"
+                                <span class="min-w-0">
+                                    <span
+                                        class="block truncate text-sm font-medium"
                                     >
                                         {{ resource.name }}
-                                        <template v-if="resource.capacity">
-                                            ({{ resource.capacity }} pax)
-                                        </template>
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <p
-                                v-if="fieldError('resource_id')"
-                                class="text-sm text-destructive"
-                            >
-                                {{ fieldError('resource_id') }}
-                            </p>
+                                    </span>
+                                    <span
+                                        v-if="resource.location"
+                                        class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"
+                                    >
+                                        <MapPin
+                                            class="size-3"
+                                            aria-hidden="true"
+                                        />
+                                        {{ resource.location }}
+                                    </span>
+                                </span>
+                                <span
+                                    v-if="resource.capacity"
+                                    class="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
+                                >
+                                    <Users
+                                        class="size-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    {{ resource.capacity }}
+                                </span>
+                            </button>
                         </div>
+                        <p
+                            v-else
+                            class="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground"
+                        >
+                            No resources in this category yet.
+                        </p>
+                        <p
+                            v-if="fieldError('resource_id')"
+                            class="text-sm text-destructive"
+                        >
+                            {{ fieldError('resource_id') }}
+                        </p>
                     </div>
 
                     <div class="grid gap-2">
@@ -459,20 +613,32 @@ const when = (booking: MyBooking) =>
                     <div
                         v-if="form.resource_id !== null"
                         class="rounded-lg border bg-muted/30 px-3 py-2 text-xs"
+                        aria-live="polite"
                     >
                         <template v-if="busy.length === 0">
-                            The resource is free all day.
+                            Free all day on
+                            {{ format(new Date(form.date), 'MMM d') }}. Pick any
+                            time.
                         </template>
                         <template v-else>
-                            <span class="font-medium">Already booked:</span>
-                            <span
-                                v-for="(slot, i) in busy"
-                                :key="i"
-                                class="ml-1.5"
-                            >
-                                {{
-                                    format(new Date(slot.starts_at), 'HH:mm')
-                                }}-{{ format(new Date(slot.ends_at), 'HH:mm') }}
+                            <span class="font-medium">
+                                Already booked that day:
+                            </span>
+                            <span class="mt-1.5 flex flex-wrap gap-1.5">
+                                <span
+                                    v-for="(slot, i) in busy"
+                                    :key="i"
+                                    class="rounded-md border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 font-medium tabular-nums"
+                                >
+                                    {{
+                                        format(
+                                            new Date(slot.starts_at),
+                                            'HH:mm',
+                                        )
+                                    }}-{{
+                                        format(new Date(slot.ends_at), 'HH:mm')
+                                    }}
+                                </span>
                             </span>
                         </template>
                     </div>

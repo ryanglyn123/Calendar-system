@@ -70,20 +70,27 @@ const paginationLabel = (label: string) =>
 <template>
     <Head title="Audit Log" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="relative max-w-xs">
-            <Search
-                class="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-            />
-            <Input
-                v-model="search"
-                type="search"
-                placeholder="Search activity…"
-                class="pl-8"
-                aria-label="Search audit log"
-            />
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Audit Log"
+            description="Every administrative action, recorded and searchable."
+        >
+            <template #actions>
+                <div class="relative max-w-xs">
+                    <Search
+                        class="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden="true"
+                    />
+                    <Input
+                        v-model="search"
+                        type="search"
+                        placeholder="Search activity…"
+                        class="pl-8"
+                        aria-label="Search audit log"
+                    />
+                </div>
+            </template>
+        </PageHeader>
 
         <div class="rounded-xl border">
             <Table>

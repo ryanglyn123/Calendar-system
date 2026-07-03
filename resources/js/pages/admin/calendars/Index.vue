@@ -2,6 +2,7 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { CalendarDays, Pencil, Plus, Star, Trash2 } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -127,17 +128,18 @@ const destroy = () => {
 <template>
     <Head title="Calendars" />
 
-    <div class="flex h-full flex-1 flex-col gap-6 p-4">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Organization calendars are visible to everyone; starred ones
-                are on by default. Division calendars belong to their members.
-            </p>
-            <Button @click="openCreate">
-                <Plus aria-hidden="true" />
-                New calendar
-            </Button>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Calendars"
+            description="Organization calendars are visible to everyone; starred ones are on by default. Division calendars belong to their members."
+        >
+            <template #actions>
+                <Button @click="openCreate">
+                    <Plus aria-hidden="true" />
+                    New calendar
+                </Button>
+            </template>
+        </PageHeader>
 
         <section
             v-for="group in [

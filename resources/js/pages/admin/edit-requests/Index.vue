@@ -2,6 +2,7 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowRight, CheckCircle2, Inbox, XCircle } from '@lucide/vue';
 import { ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -86,7 +87,12 @@ const submitReject = () => {
 <template>
     <Head title="Change Requests" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Change Requests"
+            description="Review requested changes to existing bookings before they take effect."
+        />
+
         <div
             v-if="pending.length === 0"
             class="flex flex-1 flex-col items-center justify-center gap-3 text-center"

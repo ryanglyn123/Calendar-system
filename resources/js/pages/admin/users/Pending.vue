@@ -2,6 +2,7 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { CheckCircle2, Inbox, XCircle } from '@lucide/vue';
 import { ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -89,7 +90,12 @@ const submitReject = () => {
 <template>
     <Head title="Pending Registrations" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Pending Registrations"
+            description="Review new account registrations and assign access before activating them."
+        />
+
         <div
             v-if="pending.data.length === 0"
             class="flex flex-1 flex-col items-center justify-center gap-3 text-center"

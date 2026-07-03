@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
+import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -75,36 +76,36 @@ const submit = () => {
 <template>
     <Head title="Working Hours" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-sm text-muted-foreground">
-                The default weekly schedule; individual resources can
-                override it.
-            </p>
-
-            <Select
-                :model-value="
-                    resourceId === null ? 'org' : String(resourceId)
-                "
-                @update:model-value="(v) => switchScope(String(v))"
-            >
-                <SelectTrigger class="w-64" aria-label="Schedule scope">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="org">
-                        Organization default
-                    </SelectItem>
-                    <SelectItem
-                        v-for="resource in resources"
-                        :key="resource.id"
-                        :value="String(resource.id)"
-                    >
-                        {{ resource.name }}
-                    </SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Working Hours"
+            description="The default weekly schedule; individual resources can override it."
+        >
+            <template #actions>
+                <Select
+                    :model-value="
+                        resourceId === null ? 'org' : String(resourceId)
+                    "
+                    @update:model-value="(v) => switchScope(String(v))"
+                >
+                    <SelectTrigger class="w-64" aria-label="Schedule scope">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="org">
+                            Organization default
+                        </SelectItem>
+                        <SelectItem
+                            v-for="resource in resources"
+                            :key="resource.id"
+                            :value="String(resource.id)"
+                        >
+                            {{ resource.name }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </template>
+        </PageHeader>
 
         <div class="max-w-xl overflow-hidden rounded-xl border">
             <div

@@ -133,17 +133,18 @@ const numberOrNull = (value: string | number): number | null =>
 <template>
     <Head title="Resource Types" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Each type sets who approves its bookings and which rules
-                apply.
-            </p>
-            <Button @click="openCreate">
-                <Plus aria-hidden="true" />
-                New type
-            </Button>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Resource Types"
+            description="Each type sets who approves its bookings and which rules apply."
+        >
+            <template #actions>
+                <Button @click="openCreate">
+                    <Plus aria-hidden="true" />
+                    New type
+                </Button>
+            </template>
+        </PageHeader>
 
         <div class="rounded-xl border">
             <Table>

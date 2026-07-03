@@ -11,7 +11,7 @@ defineProps<{
     >
         <div class="space-y-1">
             <h1
-                class="text-2xl font-semibold tracking-tight text-foreground text-balance"
+                class="text-2xl font-semibold tracking-tight text-balance text-foreground"
             >
                 {{ title }}
             </h1>

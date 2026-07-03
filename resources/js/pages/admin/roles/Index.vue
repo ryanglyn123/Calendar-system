@@ -2,6 +2,7 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Lock, Plus, Trash2 } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -115,17 +116,18 @@ const destroy = () => {
 <template>
     <Head title="Roles & Permissions" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Roles bundle permissions. Assign roles to users from the Users
-                screen.
-            </p>
-            <Button @click="openCreate">
-                <Plus aria-hidden="true" />
-                New role
-            </Button>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Roles & Permissions"
+            description="Roles bundle permissions. Assign roles to users from the Users screen."
+        >
+            <template #actions>
+                <Button @click="openCreate">
+                    <Plus aria-hidden="true" />
+                    New role
+                </Button>
+            </template>
+        </PageHeader>
 
         <Card v-if="superAdmin">
             <CardHeader>
