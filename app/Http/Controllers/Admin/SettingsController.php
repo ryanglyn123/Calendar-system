@@ -14,11 +14,16 @@ use Inertia\Response;
 
 class SettingsController extends Controller
 {
+    public function index(): Response
+    {
+        return Inertia::render('admin/settings/Index');
+    }
+
     public function edit(Request $request, GeneralSettings $general, RegistrationSettings $registration): Response
     {
         abort_unless($request->user()->can('settings.manage'), 403);
 
-        return Inertia::render('admin/settings/Index', [
+        return Inertia::render('admin/settings/General', [
             'general' => [
                 'organization_name' => $general->organization_name,
                 'organization_acronym' => $general->organization_acronym,

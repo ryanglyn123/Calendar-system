@@ -1,166 +1,225 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
-import { Button } from '@/components/ui/button';
+import type { InertiaLinkProps } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
+import type { LucideIcon } from '@lucide/vue';
+import {
+    Activity,
+    Building2,
+    CalendarClock,
+    CalendarOff,
+    CalendarRange,
+    CarFront,
+    Presentation,
+    ScrollText,
+    Settings2,
+    ShieldCheck,
+    Tags,
+} from '@lucide/vue';
+import { computed } from 'vue';
 import {
     Card,
-    CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/composables/useAuth';
 import admin from '@/routes/admin';
+import adminAudit from '@/routes/admin/audit';
+import adminCalendars from '@/routes/admin/calendars';
+import adminDivisions from '@/routes/admin/divisions';
+import adminEventTypes from '@/routes/admin/event-types';
+import adminHealth from '@/routes/admin/health';
+import adminHolidays from '@/routes/admin/holidays';
+import adminResourceTypes from '@/routes/admin/resource-types';
+import adminResources from '@/routes/admin/resources';
+import adminRoles from '@/routes/admin/roles';
 import adminSettings from '@/routes/admin/settings';
+import adminWorkingHours from '@/routes/admin/working-hours';
 
 defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Admin', href: admin.dashboard() },
-            { title: 'Settings', href: adminSettings.edit() },
+            { title: 'Settings', href: adminSettings.index() },
         ],
     },
 });
 
-const props = defineProps<{
-    general: {
-        organization_name: string;
-        organization_acronym: string;
-        timezone: string;
-        week_starts_on: number;
-    };
-    registration: {
-        self_registration_enabled: boolean;
-        allowed_email_domain: string | null;
-        require_approval: boolean;
-    };
-}>();
-
-const form = useForm({
-    general: { ...props.general },
-    registration: { ...props.registration },
-});
-
-const submit = () => {
-    form.put(adminSettings.update().url, { preserveScroll: true });
+type SettingsLink = {
+    title: string;
+    description: string;
+    href: NonNullable<InertiaLinkProps['href']>;
+    icon: LucideIcon;
+    permission: string;
 };
+
+type SettingsSection = {
+    title: string;
+    links: SettingsLink[];
+};
+
+const { hasPermission } = useAuth();
+
+const sections = computed<SettingsSection[]>(() =>
+    [
+        {
+            title: 'Scheduling',
+            links: [
+                {
+                    title: 'Calendars',
+                    description: 'Managed calendars and their divisions.',
+                    href: adminCalendars.index(),
+                    icon: CalendarRange,
+                    permission: 'calendars.manage',
+                },
+                {
+                    title: 'Event Types',
+                    description: 'Categories and colors for events.',
+                    href: adminEventTypes.index(),
+                    icon: Tags,
+                    permission: 'event-types.manage',
+                },
+                {
+                    title: 'Holidays',
+                    description: 'Non-working days that block bookings.',
+                    href: adminHolidays.index(),
+                    icon: CalendarOff,
+                    permission: 'holidays.manage',
+                },
+                {
+                    title: 'Working Hours',
+                    description: 'Bookable hours for each weekday.',
+                    href: adminWorkingHours.index(),
+                    icon: CalendarClock,
+                    permission: 'working-hours.manage',
+                },
+            ],
+        },
+        {
+            title: 'Resources',
+            links: [
+                {
+                    title: 'Resource Types',
+                    description: 'Categories of bookable resources.',
+                    href: adminResourceTypes.index(),
+                    icon: CarFront,
+                    permission: 'resource-types.manage',
+                },
+                {
+                    title: 'Resources',
+                    description: 'Rooms, vehicles, and equipment.',
+                    href: adminResources.index(),
+                    icon: Presentation,
+                    permission: 'resources.manage',
+                },
+            ],
+        },
+        {
+            title: 'Organization & Access',
+            links: [
+                {
+                    title: 'Divisions',
+                    description: 'Departments and office units.',
+                    href: adminDivisions.index(),
+                    icon: Building2,
+                    permission: 'divisions.manage',
+                },
+                {
+                    title: 'Roles & Permissions',
+                    description: 'What each role is allowed to do.',
+                    href: adminRoles.index(),
+                    icon: ShieldCheck,
+                    permission: 'roles.manage',
+                },
+            ],
+        },
+        {
+            title: 'System',
+            links: [
+                {
+                    title: 'General',
+                    description: 'Organization details and registration.',
+                    href: adminSettings.edit(),
+                    icon: Settings2,
+                    permission: 'settings.manage',
+                },
+                {
+                    title: 'System Health',
+                    description: 'Queues, mail, and background jobs.',
+                    href: adminHealth.index(),
+                    icon: Activity,
+                    permission: 'settings.manage',
+                },
+                {
+                    title: 'Audit Log',
+                    description: 'Who changed what, and when.',
+                    href: adminAudit.index(),
+                    icon: ScrollText,
+                    permission: 'audit.view',
+                },
+            ],
+        },
+    ]
+        .map((section) => ({
+            ...section,
+            links: section.links.filter((link) =>
+                hasPermission(link.permission),
+            ),
+        }))
+        .filter((section) => section.links.length > 0),
+);
 </script>
 
 <template>
-    <Head title="System Settings" />
+    <Head title="Settings" />
 
-    <div class="flex max-w-2xl flex-col gap-4 p-4">
-        <Card>
-            <CardHeader>
-                <CardTitle>Organization</CardTitle>
-                <CardDescription>
-                    Naming and calendar defaults used across the app.
-                </CardDescription>
-            </CardHeader>
-            <CardContent class="grid gap-4">
-                <div class="grid grid-cols-[1fr_8rem] gap-3">
-                    <div class="grid gap-2">
-                        <Label for="org-name">Organization name</Label>
-                        <Input
-                            id="org-name"
-                            v-model="form.general.organization_name"
-                        />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="org-acronym">Acronym</Label>
-                        <Input
-                            id="org-acronym"
-                            v-model="form.general.organization_acronym"
-                        />
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="grid gap-2">
-                        <Label for="org-timezone">Timezone</Label>
-                        <Input
-                            id="org-timezone"
-                            v-model="form.general.timezone"
-                        />
-                        <p
-                            v-if="form.errors['general.timezone']"
-                            class="text-sm text-destructive"
-                        >
-                            {{ form.errors['general.timezone'] }}
-                        </p>
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="org-week-start">Week starts on</Label>
-                        <Select
-                            :model-value="String(form.general.week_starts_on)"
-                            @update:model-value="
-                                (v) =>
-                                    (form.general.week_starts_on = Number(v))
-                            "
-                        >
-                            <SelectTrigger id="org-week-start">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="1">Monday</SelectItem>
-                                <SelectItem value="0">Sunday</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card>
-            <CardHeader>
-                <CardTitle>Registration</CardTitle>
-                <CardDescription>
-                    Who can sign up, and what happens when they do.
-                </CardDescription>
-            </CardHeader>
-            <CardContent class="grid gap-4">
-                <Label class="flex items-center gap-3 font-normal">
-                    <Switch
-                        v-model="form.registration.self_registration_enabled"
-                    />
-                    Allow self-registration
-                </Label>
-                <Label class="flex items-center gap-3 font-normal">
-                    <Switch v-model="form.registration.require_approval" />
-                    New accounts need admin approval
-                </Label>
-                <div class="grid gap-2">
-                    <Label for="reg-domain">
-                        Limit sign-ups to email domain
-                    </Label>
-                    <Input
-                        id="reg-domain"
-                        :model-value="
-                            form.registration.allowed_email_domain ?? ''
-                        "
-                        placeholder="e.g. fdcp.gov.ph (empty = any)"
-                        @update:model-value="
-                            (v) =>
-                                (form.registration.allowed_email_domain =
-                                    v === '' ? null : String(v))
-                        "
-                    />
-                </div>
-            </CardContent>
-        </Card>
-
+    <div class="flex flex-col gap-6 p-4">
         <div>
-            <Button :disabled="form.processing" @click="submit">
-                Save settings
-            </Button>
+            <h1 class="text-lg font-semibold">Settings</h1>
+            <p class="text-sm text-muted-foreground">
+                Configuration for scheduling, resources, access, and the system.
+            </p>
         </div>
+
+        <section
+            v-for="section in sections"
+            :key="section.title"
+            class="flex flex-col gap-3"
+        >
+            <h2 class="text-sm font-medium text-muted-foreground">
+                {{ section.title }}
+            </h2>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Link
+                    v-for="link in section.links"
+                    :key="link.title"
+                    :href="link.href"
+                    class="group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <Card
+                        class="h-full transition-colors group-hover:bg-accent/50"
+                    >
+                        <CardHeader class="flex flex-row items-center gap-3">
+                            <div
+                                class="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background"
+                            >
+                                <component
+                                    :is="link.icon"
+                                    class="size-4 text-muted-foreground"
+                                />
+                            </div>
+                            <div class="grid gap-1">
+                                <CardTitle class="text-sm">
+                                    {{ link.title }}
+                                </CardTitle>
+                                <CardDescription class="text-xs">
+                                    {{ link.description }}
+                                </CardDescription>
+                            </div>
+                        </CardHeader>
+                    </Card>
+                </Link>
+            </div>
+        </section>
     </div>
 </template>

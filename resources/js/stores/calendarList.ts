@@ -28,6 +28,12 @@ export const useCalendarListStore = defineStore('calendarList', () => {
         calendars.value.filter((c) => c.can_write_events),
     );
 
+    /** Hydrate from server-provided data inlined with the page. */
+    function prime(data: CalendarItem[]): void {
+        calendars.value = data;
+        loaded.value = true;
+    }
+
     async function load(force = false): Promise<void> {
         if (loading.value || (loaded.value && !force)) {
             return;
@@ -69,6 +75,7 @@ export const useCalendarListStore = defineStore('calendarList', () => {
         byId,
         grouped,
         writableCalendars,
+        prime,
         load,
         toggleVisibility,
     };

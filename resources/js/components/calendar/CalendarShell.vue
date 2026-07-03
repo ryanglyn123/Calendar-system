@@ -18,11 +18,17 @@ import { api, ApiError } from '@/lib/api';
 import { destroy as eventsDestroy } from '@/routes/api/events';
 import { useCalendarGridStore } from '@/stores/calendarGrid';
 import { useCalendarListStore } from '@/stores/calendarList';
-import type { EventOccurrence, EventTypeItem } from '@/types/calendar';
+import type {
+    CalendarItem,
+    EventOccurrence,
+    EventTypeItem,
+} from '@/types/calendar';
 
 const props = defineProps<{
     eventTypes: EventTypeItem[];
     weekStartsOn: 0 | 1;
+    initialCalendars?: CalendarItem[];
+    initialEvents?: EventOccurrence[];
 }>();
 
 const grid = useCalendarGridStore();
@@ -30,6 +36,18 @@ const list = useCalendarListStore();
 const { confirm } = useConfirm();
 
 grid.weekStartsOn = props.weekStartsOn;
+
+// Server-inlined data: the grid and sidebar render full on first paint,
+// with no follow-up API round trips.
+if (props.initialCalendars) {
+    list.prime(props.initialCalendars);
+}
+
+// The server span is built around "now", so prime around today; if the
+// user left the grid focused elsewhere, onMounted fetches that instead.
+if (props.initialEvents) {
+    grid.primeAround(new Date(), props.initialEvents);
+}
 
 onMounted(() => {
     void list.load();

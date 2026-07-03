@@ -37,6 +37,7 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $roles = $user?->getRoleNames()->all() ?? [];
 
         return [
             ...parent::share($request),
@@ -55,9 +56,9 @@ class HandleInertiaRequests extends Middleware
                         'acronym' => $user->division->acronym,
                         'color' => $user->division->color,
                     ],
-                    'roles' => $user->getRoleNames()->all(),
+                    'roles' => $roles,
                     'permissions' => $user->getAllPermissions()->pluck('name')->all(),
-                    'is_super_admin' => $user->hasRole('super_admin'),
+                    'is_super_admin' => in_array('super_admin', $roles, true),
                 ],
             ],
             'announcements' => $user === null || ! $user->isActive()

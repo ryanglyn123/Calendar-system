@@ -71,36 +71,77 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         );
     }
 
-    async function fetchWindow(key: string): Promise<void> {
-        const existing = windows.value.get(key);
+    function overlapsRange(
+        occurrence: EventOccurrence,
+        range: { start: Date; end: Date },
+    ): boolean {
+        return (
+            new Date(occurrence.starts_at) < range.end &&
+            new Date(occurrence.ends_at) > range.start
+        );
+    }
 
-        if (existing && existing.status !== 'stale') {
+    /**
+     * Fetch several month windows as ONE spanning request (the keys are
+     * always contiguous months), then partition the result per window.
+     * One round trip instead of one per month.
+     */
+    async function fetchWindows(keys: string[]): Promise<void> {
+        const missing = keys.filter((key) => {
+            const existing = windows.value.get(key);
+
+            return !existing || existing.status === 'stale';
+        });
+
+        if (missing.length === 0) {
             return;
         }
 
-        windows.value.set(key, {
-            status: 'loading',
-            occurrences: existing?.occurrences ?? [],
-        });
+        const ranges = new Map(
+            missing.map((key) => [
+                key,
+                monthFetchRange(key, weekStartsOn.value),
+            ]),
+        );
 
-        const range = monthFetchRange(key, weekStartsOn.value);
+        const start = new Date(
+            Math.min(...[...ranges.values()].map((r) => r.start.getTime())),
+        );
+        const end = new Date(
+            Math.max(...[...ranges.values()].map((r) => r.end.getTime())),
+        );
+
+        for (const key of missing) {
+            windows.value.set(key, {
+                status: 'loading',
+                occurrences: windows.value.get(key)?.occurrences ?? [],
+            });
+        }
 
         try {
             const response = await api.get<{ data: EventOccurrence[] }>(
                 eventsIndex({
                     query: {
-                        start: range.start.toISOString(),
-                        end: range.end.toISOString(),
+                        start: start.toISOString(),
+                        end: end.toISOString(),
                     },
                 }).url,
             );
 
-            windows.value.set(key, {
-                status: 'ready',
-                occurrences: response.data,
-            });
+            for (const key of missing) {
+                const range = ranges.get(key)!;
+
+                windows.value.set(key, {
+                    status: 'ready',
+                    occurrences: response.data.filter((occurrence) =>
+                        overlapsRange(occurrence, range),
+                    ),
+                });
+            }
         } catch (error) {
-            windows.value.delete(key);
+            for (const key of missing) {
+                windows.value.delete(key);
+            }
 
             throw error;
         } finally {
@@ -108,8 +149,32 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         }
     }
 
+    async function fetchWindow(key: string): Promise<void> {
+        await fetchWindows([key]);
+    }
+
     async function ensureWindowsAround(date: Date): Promise<void> {
-        await Promise.all(windowKeysAround(date).map((key) => fetchWindow(key)));
+        await fetchWindows(windowKeysAround(date));
+    }
+
+    /**
+     * Hydrate the windows around a date from server-provided occurrences
+     * (inlined with the dashboard page), so the grid paints full on first
+     * render without any API round trip.
+     */
+    function primeAround(date: Date, occurrences: EventOccurrence[]): void {
+        for (const key of windowKeysAround(date)) {
+            const range = monthFetchRange(key, weekStartsOn.value);
+
+            windows.value.set(key, {
+                status: 'ready',
+                occurrences: occurrences.filter((occurrence) =>
+                    overlapsRange(occurrence, range),
+                ),
+            });
+        }
+
+        version.value++;
     }
 
     /** Mark every window overlapping the event's span stale and refetch the visible ones. */
@@ -263,6 +328,7 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         occurrencesBetween,
         fetchWindow,
         ensureWindowsAround,
+        primeAround,
         invalidateAround,
         setView,
         setFocusDate,

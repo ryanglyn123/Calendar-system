@@ -101,6 +101,7 @@ Route::prefix('admin')
         Route::get('health', [SystemHealthController::class, 'index'])->name('health.index');
         Route::post('health/retry', [SystemHealthController::class, 'retry'])->name('health.retry');
 
-        Route::get('settings', [SettingsController::class, 'edit'])->name('settings.edit');
-        Route::put('settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::get('settings/general', [SettingsController::class, 'edit'])->name('settings.edit');
+        Route::put('settings/general', [SettingsController::class, 'update'])->name('settings.update');
     });

@@ -55,6 +55,23 @@ All seeded accounts use the password `password`.
 
 Create OAuth 2.0 credentials in the Google Cloud console with the redirect URI `APP_URL/auth/google/callback`, then set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. Unknown Google emails create pending accounts that an admin approves. An allowed email domain can be enforced under Admin, Settings.
 
+## Performance
+
+Local development on Windows has two structural bottlenecks worth knowing about:
+
+- `php artisan serve` (what `composer dev` runs) handles **one request at a time on Windows**; PHP's built-in server cannot fork workers there. The app minimizes concurrent requests (the dashboard inlines its initial data, and month windows fetch as one spanning request), but for a much faster dev loop use [Laravel Herd](https://herd.laravel.com/windows) (nginx + PHP-FPM + OPcache) and point it at this folder instead of `artisan serve`.
+- Keeping the repository inside a OneDrive-synced folder slows every request: PHP stats thousands of files per request, and OneDrive plus Windows Defender intercept each one. Move the project outside OneDrive if you can, or at least add an exclusion for the folder in Windows Security and pause OneDrive sync while developing.
+
+In production, always run:
+
+```bash
+composer install --no-dev --optimize-autoloader
+php artisan optimize        # caches config, routes, views, events
+npm run build
+```
+
+and enable OPcache in `php.ini`. Settings are cached (`SETTINGS_CACHE_ENABLED=true`) and each user's accessible-calendar set is cached for five minutes; both invalidate automatically on change.
+
 ## Production notes
 
 - Scheduler: add a cron entry running `php artisan schedule:run` every minute. It dispatches due event reminders and prunes expired invitations.
@@ -80,3 +97,4 @@ npm run build
 - Session-authenticated JSON endpoints live under `/api/v1` inside the web middleware group, so CSRF is enforced everywhere.
 - Authorization is permission-based (spatie/laravel-permission). `super_admin` bypasses permission checks via `Gate::before`; business invariants are enforced as explicit controller guards.
 - Typed settings (spatie/laravel-settings) are injected into validators and services, so admin-configured rules are enforced by construction.
+To try it locally: php artisan migrate --seed, then php artisan db:seed --class=DemoSeeder, then composer dev — sign in as admin@fdcp.gov.ph / password.
