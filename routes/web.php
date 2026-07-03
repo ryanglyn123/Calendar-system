@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CalendarListController;
 use App\Http\Controllers\Api\CalendarPreferenceController;
 use App\Http\Controllers\Api\EventController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\Api\EventOccurrenceController;
 use App\Http\Controllers\Api\EventRsvpController;
 use App\Http\Controllers\Api\EventWindowController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ResourceBrowserController;
 use App\Http\Controllers\Api\UserSearchController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\InvitationAcceptanceController;
@@ -38,6 +40,7 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::inertia('bookings', 'Bookings')->name('bookings.index');
 
     // Personal calendar management + person-to-person sharing (Inertia forms).
     Route::post('calendars', [PersonalCalendarController::class, 'store'])->name('calendars.store');
@@ -67,6 +70,17 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
         Route::post('notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
         Route::delete('notifications', [NotificationController::class, 'destroyAll'])->name('notifications.clear');
+
+        Route::get('resources', [ResourceBrowserController::class, 'index'])->name('resources.index');
+        Route::get('resources/{resource}/availability', [ResourceBrowserController::class, 'availability'])->name('resources.availability');
+
+        Route::post('bookings', [BookingController::class, 'store'])
+            ->middleware('throttle:booking-actions')->name('bookings.store');
+        Route::get('bookings/mine', [BookingController::class, 'mine'])->name('bookings.mine');
+        Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel'])
+            ->middleware('throttle:booking-actions')->name('bookings.cancel');
+        Route::post('bookings/{booking}/edit-requests', [BookingController::class, 'requestEdit'])
+            ->middleware('throttle:booking-actions')->name('bookings.edit-requests.store');
     });
 });
 

@@ -46,10 +46,19 @@ class EventOccurrenceResource extends JsonResource
             'ends_at' => $this->occurrence->endsAt->toIso8601String(),
             'all_day' => $event->all_day,
             'status' => $event->status->value,
-            'color' => $event->color
+            // Booking status projects onto color at render time, never stored.
+            'color' => ($event->relationLoaded('booking') ? $event->booking?->status->color() : null)
+                ?? $event->color
                 ?? $event->eventType->color
                 ?? $this->preferenceColor
                 ?? $event->calendar->color,
+            'booking' => ! $event->relationLoaded('booking') || $event->booking === null
+                ? null
+                : [
+                    'id' => $event->booking->id,
+                    'status' => $event->booking->status->value,
+                    'resource' => $event->booking->resource?->name,
+                ],
             'event_type' => $masked || ! $event->relationLoaded('eventType') || $event->eventType === null
                 ? null
                 : EventTypeResource::make($event->eventType)->toArray($request),

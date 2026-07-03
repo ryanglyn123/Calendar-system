@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             DivisionSeeder::class,
             CalendarSeeder::class,
             EventTypeSeeder::class,
+            HolidaySeeder::class,
         ]);
 
         $superAdmin = User::query()->firstOrCreate(
@@ -34,5 +35,8 @@ class DatabaseSeeder extends Seeder
         );
 
         $superAdmin->syncRoles(['super_admin']);
+
+        // Needs the super admin + approver roles to exist.
+        $this->call(ResourceSeeder::class);
     }
 }

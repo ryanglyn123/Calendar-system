@@ -2,10 +2,16 @@
 import { Link } from '@inertiajs/vue3';
 import {
     Building2,
+    CalendarClock,
     CalendarDays,
+    CalendarOff,
     CalendarRange,
+    CarFront,
+    ClipboardCheck,
+    FileDiff,
     LayoutGrid,
     MailPlus,
+    Presentation,
     ShieldCheck,
     Tags,
     UserCheck,
@@ -27,13 +33,20 @@ import {
 import { useAuth } from '@/composables/useAuth';
 import { dashboard } from '@/routes';
 import admin from '@/routes/admin';
+import adminBookings from '@/routes/admin/bookings';
 import adminCalendars from '@/routes/admin/calendars';
 import adminDivisions from '@/routes/admin/divisions';
+import adminEditRequests from '@/routes/admin/edit-requests';
 import adminEventTypes from '@/routes/admin/event-types';
+import adminHolidays from '@/routes/admin/holidays';
 import adminInvitations from '@/routes/admin/invitations';
 import adminPending from '@/routes/admin/pending-registrations';
+import adminResourceTypes from '@/routes/admin/resource-types';
+import adminResources from '@/routes/admin/resources';
 import adminRoles from '@/routes/admin/roles';
 import adminUsers from '@/routes/admin/users';
+import adminWorkingHours from '@/routes/admin/working-hours';
+import bookingsPage from '@/routes/bookings';
 import type { NavItem } from '@/types';
 
 const { hasPermission, hasAnyPermission } = useAuth();
@@ -43,6 +56,11 @@ const mainNavItems: NavItem[] = [
         title: 'Calendar',
         href: dashboard(),
         icon: CalendarDays,
+    },
+    {
+        title: 'Bookings',
+        href: bookingsPage.index(),
+        icon: ClipboardCheck,
     },
 ];
 
@@ -103,6 +121,53 @@ const adminNavItems = computed<NavItem[]>(() => {
             title: 'Event Types',
             href: adminEventTypes.index(),
             icon: Tags,
+        });
+    }
+
+    if (hasPermission('bookings.approve')) {
+        items.push(
+            {
+                title: 'Booking Approvals',
+                href: adminBookings.index(),
+                icon: Presentation,
+            },
+            {
+                title: 'Change Requests',
+                href: adminEditRequests.index(),
+                icon: FileDiff,
+            },
+        );
+    }
+
+    if (hasPermission('resource-types.manage')) {
+        items.push({
+            title: 'Resource Types',
+            href: adminResourceTypes.index(),
+            icon: CarFront,
+        });
+    }
+
+    if (hasPermission('resources.manage')) {
+        items.push({
+            title: 'Resources',
+            href: adminResources.index(),
+            icon: Presentation,
+        });
+    }
+
+    if (hasPermission('holidays.manage')) {
+        items.push({
+            title: 'Holidays',
+            href: adminHolidays.index(),
+            icon: CalendarOff,
+        });
+    }
+
+    if (hasPermission('working-hours.manage')) {
+        items.push({
+            title: 'Working Hours',
+            href: adminWorkingHours.index(),
+            icon: CalendarClock,
         });
     }
 

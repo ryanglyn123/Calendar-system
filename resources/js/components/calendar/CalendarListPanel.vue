@@ -20,10 +20,14 @@ import type { CalendarItem } from '@/types/calendar';
 
 const list = useCalendarListStore();
 
-const groups: { key: 'organization' | 'division' | 'personal'; label: string }[] = [
+const groups: {
+    key: 'organization' | 'division' | 'personal' | 'resource';
+    label: string;
+}[] = [
     { key: 'organization', label: 'FDCP' },
     { key: 'division', label: 'Division' },
     { key: 'personal', label: 'My calendars' },
+    { key: 'resource', label: 'Rooms & vehicles' },
 ];
 
 const swatches = [

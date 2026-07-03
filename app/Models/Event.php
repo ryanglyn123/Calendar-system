@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -105,6 +106,12 @@ class Event extends Model
     public function reminders(): HasMany
     {
         return $this->hasMany(EventReminder::class);
+    }
+
+    /** @return HasOne<Booking, $this> */
+    public function booking(): HasOne
+    {
+        return $this->hasOne(Booking::class);
     }
 
     public function isRecurring(): bool
