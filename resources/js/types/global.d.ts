@@ -1,5 +1,15 @@
 import type { Auth } from '@/types/auth';
 
+declare module '*.png' {
+    const src: string;
+    export default src;
+}
+
+declare module '*.svg' {
+    const src: string;
+    export default src;
+}
+
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
     interface ImportMetaEnv {
