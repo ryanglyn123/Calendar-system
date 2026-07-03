@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AnnouncementDismissalController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CalendarListController;
 use App\Http\Controllers\Api\CalendarPreferenceController;
@@ -81,6 +82,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->middleware('throttle:booking-actions')->name('bookings.cancel');
         Route::post('bookings/{booking}/edit-requests', [BookingController::class, 'requestEdit'])
             ->middleware('throttle:booking-actions')->name('bookings.edit-requests.store');
+
+        Route::post('announcements/{announcement}/dismiss', [AnnouncementDismissalController::class, 'store'])->name('announcements.dismiss');
     });
 });
 

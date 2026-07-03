@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Announcement;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -59,6 +60,14 @@ class HandleInertiaRequests extends Middleware
                     'is_super_admin' => $user->hasRole('super_admin'),
                 ],
             ],
+            'announcements' => $user === null || ! $user->isActive()
+                ? []
+                : Announcement::query()
+                    ->visibleTo($user)
+                    ->orderByDesc('level')
+                    ->limit(3)
+                    ->get(['id', 'title', 'body', 'level', 'is_dismissible'])
+                    ->toArray(),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

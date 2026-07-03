@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin\AnnouncementController;
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\BookingApprovalController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DivisionController;
@@ -12,6 +14,8 @@ use App\Http\Controllers\Admin\PendingRegistrationController;
 use App\Http\Controllers\Admin\ResourceController;
 use App\Http\Controllers\Admin\ResourceTypeController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\SystemHealthController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\WorkingHourController;
 use Illuminate\Support\Facades\Route;
@@ -86,4 +90,17 @@ Route::prefix('admin')
 
         Route::get('working-hours', [WorkingHourController::class, 'index'])->name('working-hours.index');
         Route::put('working-hours', [WorkingHourController::class, 'update'])->name('working-hours.update');
+
+        Route::get('announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::post('announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
+        Route::patch('announcements/{announcement}', [AnnouncementController::class, 'update'])->name('announcements.update');
+        Route::delete('announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+
+        Route::get('audit', [AuditLogController::class, 'index'])->name('audit.index');
+
+        Route::get('health', [SystemHealthController::class, 'index'])->name('health.index');
+        Route::post('health/retry', [SystemHealthController::class, 'retry'])->name('health.retry');
+
+        Route::get('settings', [SettingsController::class, 'edit'])->name('settings.edit');
+        Route::put('settings', [SettingsController::class, 'update'])->name('settings.update');
     });

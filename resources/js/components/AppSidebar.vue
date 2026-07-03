@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import {
+    Activity,
     Building2,
     CalendarClock,
     CalendarDays,
@@ -11,7 +12,10 @@ import {
     FileDiff,
     LayoutGrid,
     MailPlus,
+    Megaphone,
     Presentation,
+    ScrollText,
+    Settings2,
     ShieldCheck,
     Tags,
     UserCheck,
@@ -33,17 +37,21 @@ import {
 import { useAuth } from '@/composables/useAuth';
 import { dashboard } from '@/routes';
 import admin from '@/routes/admin';
+import adminAnnouncements from '@/routes/admin/announcements';
+import adminAudit from '@/routes/admin/audit';
 import adminBookings from '@/routes/admin/bookings';
 import adminCalendars from '@/routes/admin/calendars';
 import adminDivisions from '@/routes/admin/divisions';
 import adminEditRequests from '@/routes/admin/edit-requests';
 import adminEventTypes from '@/routes/admin/event-types';
+import adminHealth from '@/routes/admin/health';
 import adminHolidays from '@/routes/admin/holidays';
 import adminInvitations from '@/routes/admin/invitations';
 import adminPending from '@/routes/admin/pending-registrations';
 import adminResourceTypes from '@/routes/admin/resource-types';
 import adminResources from '@/routes/admin/resources';
 import adminRoles from '@/routes/admin/roles';
+import adminSettings from '@/routes/admin/settings';
 import adminUsers from '@/routes/admin/users';
 import adminWorkingHours from '@/routes/admin/working-hours';
 import bookingsPage from '@/routes/bookings';
@@ -177,6 +185,37 @@ const adminNavItems = computed<NavItem[]>(() => {
             href: adminRoles.index(),
             icon: ShieldCheck,
         });
+    }
+
+    if (hasPermission('announcements.manage')) {
+        items.push({
+            title: 'Announcements',
+            href: adminAnnouncements.index(),
+            icon: Megaphone,
+        });
+    }
+
+    if (hasPermission('audit.view')) {
+        items.push({
+            title: 'Audit Log',
+            href: adminAudit.index(),
+            icon: ScrollText,
+        });
+    }
+
+    if (hasPermission('settings.manage')) {
+        items.push(
+            {
+                title: 'System Health',
+                href: adminHealth.index(),
+                icon: Activity,
+            },
+            {
+                title: 'Settings',
+                href: adminSettings.edit(),
+                icon: Settings2,
+            },
+        );
     }
 
     return items;
