@@ -16,8 +16,8 @@
     --radius-md: calc(var(--radius) - 2px);
     --radius-sm: calc(var(--radius) - 4px);
 
-    /* FDCP brand */
-    --color-fdcp-gold: #cc8500;
+    /* FDCP brand — vivid golden yellow leads the system */
+    --color-fdcp-gold: #f2b705;
     --color-fdcp-yellow: #ffcc00;
     --color-fdcp-purple: #580076;
     --color-fdcp-magenta: #e200a9;
@@ -100,79 +100,59 @@
             'Noto Color Emoji';
     }
 
-    /* FDCP signature gradients */
-    .bg-gradient-gold {
-        background: linear-gradient(135deg, #cc8500 0%, #ffcc00 100%);
-    }
-
-    .bg-gradient-royal {
-        background: linear-gradient(135deg, #580076 0%, #e200a9 100%);
-    }
-
-    .text-gradient-gold {
-        background: linear-gradient(135deg, #cc8500 0%, #ffcc00 100%);
-        background-clip: text;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .text-gradient-royal {
-        background: linear-gradient(135deg, #580076 0%, #e200a9 100%);
-        background-clip: text;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    /* Theme-aware accent gradient: royal in light mode, gold in dark mode
-       (used for "today" badges and highlight chips) */
+    /* "Today" marker and highlight chips: a single solid brand gold in both
+       themes, paired with dark text. Solid reads as more intentional than a
+       theme-flipping gradient. */
     .bg-gradient-accent {
-        background: linear-gradient(135deg, #580076 0%, #e200a9 100%);
-    }
-
-    .dark .bg-gradient-accent {
-        background: linear-gradient(135deg, #cc8500 0%, #ffcc00 100%);
+        background-color: var(--primary);
+        color: var(--primary-foreground);
     }
 }
 
 :root {
-    --background: hsl(0 0% 97.3%);
-    --foreground: hsl(0 0% 3.9%);
-    --card: hsl(0 0% 100%);
-    --card-foreground: hsl(0 0% 3.9%);
-    --popover: hsl(0 0% 100%);
-    --popover-foreground: hsl(0 0% 3.9%);
-    --primary: #cc8500;
-    --primary-foreground: hsl(36 100% 98%);
-    --secondary: hsl(0 0% 92.1%);
-    --secondary-foreground: hsl(0 0% 9%);
-    --muted: hsl(0 0% 94.5%);
-    --muted-foreground: hsl(0 0% 42%);
-    --accent: #ffcc00;
-    --accent-foreground: hsl(0 0% 10%);
-    --destructive: hsl(0 72% 45%);
-    --destructive-foreground: hsl(0 0% 98%);
-    --success: hsl(160 84% 30%);
-    --success-foreground: hsl(0 0% 98%);
-    --warning: hsl(38 92% 40%);
-    --warning-foreground: hsl(0 0% 98%);
-    --border: hsl(0 0% 90%);
-    --input: hsl(0 0% 87%);
-    --ring: #cc8500;
-    --chart-1: #cc8500;
-    --chart-2: #0096e2;
-    --chart-3: #580076;
-    --chart-4: #e200a9;
-    --chart-5: #ffcc00;
+    /* Neutrals carry a faint gold tint (hue ~85) so surfaces feel of a piece
+       with the brand rather than clinically gray. */
+    --background: oklch(0.976 0.004 85);
+    --foreground: oklch(0.23 0.006 75);
+    --card: oklch(0.995 0.003 85);
+    --card-foreground: oklch(0.23 0.006 75);
+    --popover: oklch(0.995 0.003 85);
+    --popover-foreground: oklch(0.23 0.006 75);
+    /* Vivid FDCP gold — near-black text rides on it (yellow demands dark ink). */
+    --primary: oklch(0.8 0.16 86);
+    --primary-foreground: oklch(0.24 0.03 78);
+    --secondary: oklch(0.93 0.005 85);
+    --secondary-foreground: oklch(0.25 0.006 75);
+    --muted: oklch(0.955 0.004 85);
+    --muted-foreground: oklch(0.5 0.012 80);
+    --accent: oklch(0.9 0.055 90);
+    --accent-foreground: oklch(0.28 0.04 80);
+    --destructive: oklch(0.55 0.2 27);
+    --destructive-foreground: oklch(0.99 0.005 85);
+    --success: oklch(0.6 0.13 160);
+    --success-foreground: oklch(0.99 0.005 85);
+    /* Warning sits deliberately more orange than the gold primary so the two
+       never read as the same signal. */
+    --warning: oklch(0.68 0.16 62);
+    --warning-foreground: oklch(0.99 0.005 85);
+    --border: oklch(0.9 0.005 85);
+    --input: oklch(0.88 0.006 85);
+    --ring: oklch(0.8 0.16 86);
+    --chart-1: oklch(0.8 0.16 86);
+    --chart-2: oklch(0.65 0.15 235);
+    --chart-3: oklch(0.4 0.19 305);
+    --chart-4: oklch(0.6 0.25 350);
+    --chart-5: oklch(0.86 0.17 92);
     --radius: 0.5rem;
-    --sidebar-background: hsl(0 0% 98.5%);
-    --sidebar-foreground: hsl(240 5.3% 26.1%);
-    --sidebar-primary: #cc8500;
-    --sidebar-primary-foreground: hsl(0 0% 98%);
-    --sidebar-accent: hsl(42 100% 94%);
-    --sidebar-accent-foreground: hsl(36 100% 22%);
-    --sidebar-border: hsl(0 0% 91%);
-    --sidebar-ring: #cc8500;
-    --sidebar: hsl(0 0% 98.5%);
+    --sidebar-background: oklch(0.985 0.004 85);
+    --sidebar-foreground: oklch(0.32 0.008 80);
+    --sidebar-primary: oklch(0.8 0.16 86);
+    --sidebar-primary-foreground: oklch(0.24 0.03 78);
+    --sidebar-accent: oklch(0.945 0.04 90);
+    --sidebar-accent-foreground: oklch(0.32 0.05 82);
+    --sidebar-border: oklch(0.91 0.005 85);
+    --sidebar-ring: oklch(0.8 0.16 86);
+    --sidebar: oklch(0.985 0.004 85);
 }
 
 .dark {
@@ -182,36 +162,36 @@
     --card-foreground: hsl(0 0% 98%);
     --popover: #141413;
     --popover-foreground: hsl(0 0% 98%);
-    --primary: #ffcc00;
-    --primary-foreground: hsl(0 0% 8%);
+    --primary: oklch(0.84 0.165 90);
+    --primary-foreground: oklch(0.2 0.02 80);
     --secondary: #30302e;
     --secondary-foreground: hsl(0 0% 98%);
     --muted: #30302e;
     --muted-foreground: hsl(0 0% 66%);
-    --accent: #ffcc00;
-    --accent-foreground: hsl(0 0% 8%);
+    --accent: oklch(0.84 0.165 90);
+    --accent-foreground: oklch(0.2 0.02 80);
     --destructive: hsl(0 84% 60%);
     --destructive-foreground: hsl(0 0% 98%);
     --success: hsl(160 70% 42%);
     --success-foreground: hsl(0 0% 8%);
-    --warning: hsl(43 96% 56%);
-    --warning-foreground: hsl(0 0% 8%);
+    --warning: oklch(0.75 0.15 65);
+    --warning-foreground: oklch(0.2 0.02 80);
     --border: hsl(60 2% 22%);
     --input: hsl(60 2% 24%);
-    --ring: #ffcc00;
-    --chart-1: #ffcc00;
-    --chart-2: #0096e2;
-    --chart-3: #cc8500;
-    --chart-4: #e200a9;
-    --chart-5: #580076;
+    --ring: oklch(0.84 0.165 90);
+    --chart-1: oklch(0.84 0.165 90);
+    --chart-2: oklch(0.68 0.15 235);
+    --chart-3: oklch(0.72 0.15 78);
+    --chart-4: oklch(0.65 0.24 350);
+    --chart-5: oklch(0.5 0.2 305);
     --sidebar-background: #141413;
     --sidebar-foreground: hsl(0 0% 95.9%);
-    --sidebar-primary: #ffcc00;
-    --sidebar-primary-foreground: hsl(0 0% 8%);
+    --sidebar-primary: oklch(0.84 0.165 90);
+    --sidebar-primary-foreground: oklch(0.2 0.02 80);
     --sidebar-accent: #30302e;
     --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
     --sidebar-border: hsl(60 2% 18%);
-    --sidebar-ring: #ffcc00;
+    --sidebar-ring: oklch(0.84 0.165 90);
     --sidebar: #262624;
 }
 

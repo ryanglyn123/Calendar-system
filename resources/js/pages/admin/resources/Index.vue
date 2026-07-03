@@ -2,6 +2,7 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Pencil, Plus, Trash2 } from '@lucide/vue';
 import { ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -116,16 +117,18 @@ const destroy = (resource: ResourceRow) =>
 <template>
     <Head title="Resources" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Every resource gets its own calendar; bookings show up there.
-            </p>
-            <Button @click="openCreate">
-                <Plus aria-hidden="true" />
-                New resource
-            </Button>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Resources"
+            description="Every resource gets its own calendar; bookings show up there."
+        >
+            <template #actions>
+                <Button @click="openCreate">
+                    <Plus aria-hidden="true" />
+                    New resource
+                </Button>
+            </template>
+        </PageHeader>
 
         <div class="rounded-xl border">
             <Table>

@@ -81,7 +81,7 @@ const timeLabel = (occurrence: EventOccurrence) =>
                         class="flex size-8 items-center justify-center rounded-full text-sm"
                         :class="
                             isSameDay(group.day, today)
-                                ? 'bg-gradient-accent text-white'
+                                ? 'bg-gradient-accent font-semibold'
                                 : 'bg-muted'
                         "
                     >

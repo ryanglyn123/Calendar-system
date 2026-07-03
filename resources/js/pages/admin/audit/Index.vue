@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { Search } from '@lucide/vue';
 import { useDebounceFn } from '@vueuse/core';
 import { ref, watch } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {

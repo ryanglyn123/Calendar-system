@@ -3,6 +3,7 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { Pencil, Search, ShieldBan, ShieldCheck, Trash2 } from '@lucide/vue';
 import { useDebounceFn } from '@vueuse/core';
 import { ref, watch } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -141,7 +142,12 @@ const paginationLabel = (label: string) =>
 <template>
     <Head title="Users" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Users"
+            description="Manage accounts, divisions, roles and access."
+        />
+
         <div class="flex flex-wrap items-center gap-2">
             <div class="relative max-w-xs flex-1">
                 <Search

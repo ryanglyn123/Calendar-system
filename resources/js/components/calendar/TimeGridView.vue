@@ -646,7 +646,7 @@ const draggingEventId = computed(() =>
                         class="flex size-7 items-center justify-center rounded-full text-sm font-medium"
                         :class="
                             isSameDay(day, today)
-                                ? 'bg-gradient-accent text-white'
+                                ? 'bg-gradient-accent font-semibold'
                                 : ''
                         "
                     >

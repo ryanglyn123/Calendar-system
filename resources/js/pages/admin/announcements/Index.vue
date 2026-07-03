@@ -2,6 +2,7 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Pencil, Plus, Trash2 } from '@lucide/vue';
 import { ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -125,16 +126,18 @@ const levelVariant = (level: AnnouncementRow['level']) =>
 <template>
     <Head title="Announcements" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Banners shown to everyone, or to one division only.
-            </p>
-            <Button @click="openCreate">
-                <Plus aria-hidden="true" />
-                New announcement
-            </Button>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Announcements"
+            description="Banners shown to everyone, or to one division only."
+        >
+            <template #actions>
+                <Button @click="openCreate">
+                    <Plus aria-hidden="true" />
+                    New announcement
+                </Button>
+            </template>
+        </PageHeader>
 
         <div class="rounded-xl border">
             <Table>

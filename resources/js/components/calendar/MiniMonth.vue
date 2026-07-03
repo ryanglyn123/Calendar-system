@@ -76,8 +76,7 @@ const today = new Date();
                 class="mx-auto flex size-7 items-center justify-center rounded-full text-xs transition-colors hover:bg-muted"
                 :class="{
                     'text-muted-foreground/50': !isSameMonth(day, anchor),
-                    'bg-gradient-accent font-semibold text-white':
-                        isSameDay(day, today),
+                    'bg-gradient-accent font-semibold': isSameDay(day, today),
                     'ring-1 ring-primary':
                         isSameDay(day, grid.focusDate) &&
                         !isSameDay(day, today),

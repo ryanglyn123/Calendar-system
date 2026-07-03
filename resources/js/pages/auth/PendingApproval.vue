@@ -40,7 +40,7 @@ const copy =
             :class="
                 status === 'suspended'
                     ? 'bg-destructive/10 text-destructive'
-                    : 'bg-gradient-gold text-white'
+                    : 'bg-primary/20 text-foreground'
             "
         >
             <component :is="copy.icon" class="size-8" aria-hidden="true" />

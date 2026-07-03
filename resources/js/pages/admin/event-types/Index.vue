@@ -2,6 +2,7 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Pencil, Plus, Tag, Trash2 } from '@lucide/vue';
 import { ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -104,16 +105,18 @@ const destroy = () => {
 <template>
     <Head title="Event Types" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Event types give events a category and a default color.
-            </p>
-            <Button @click="openCreate">
-                <Plus aria-hidden="true" />
-                New event type
-            </Button>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Event Types"
+            description="Event types give events a category and a default color."
+        >
+            <template #actions>
+                <Button @click="openCreate">
+                    <Plus aria-hidden="true" />
+                    New event type
+                </Button>
+            </template>
+        </PageHeader>
 
         <div class="rounded-xl border">
             <Table>

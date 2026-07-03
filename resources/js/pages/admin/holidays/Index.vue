@@ -2,6 +2,7 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Pencil, Plus, Trash2 } from '@lucide/vue';
 import { ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -114,16 +115,18 @@ const destroy = (holiday: HolidayRow) =>
 <template>
     <Head title="Holidays" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Holidays can block bookings on resource types that opt in.
-            </p>
-            <Button @click="openCreate">
-                <Plus aria-hidden="true" />
-                Add holiday
-            </Button>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Holidays"
+            description="Holidays can block bookings on resource types that opt in."
+        >
+            <template #actions>
+                <Button @click="openCreate">
+                    <Plus aria-hidden="true" />
+                    Add holiday
+                </Button>
+            </template>
+        </PageHeader>
 
         <div class="rounded-xl border">
             <Table>

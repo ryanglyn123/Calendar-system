@@ -350,7 +350,7 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                             class="flex size-6 items-center justify-center rounded-full text-xs"
                             :class="
                                 isSameDay(day, today)
-                                    ? 'bg-gradient-accent font-semibold text-white'
+                                    ? 'bg-gradient-accent font-semibold'
                                     : ''
                             "
                         >

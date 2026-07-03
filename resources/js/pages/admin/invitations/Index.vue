@@ -2,6 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { MailPlus, RefreshCw, Trash2 } from '@lucide/vue';
 import { ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -86,17 +87,18 @@ const paginationLabel = (label: string) =>
 <template>
     <Head title="Invitations" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-muted-foreground">
-                Invited users skip approval: they pick a password and land
-                straight in the calendar.
-            </p>
-            <Button @click="creating = true">
-                <MailPlus aria-hidden="true" />
-                Invite user
-            </Button>
-        </div>
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Invitations"
+            description="Invited users skip approval: they pick a password and land straight in the calendar."
+        >
+            <template #actions>
+                <Button @click="creating = true">
+                    <MailPlus aria-hidden="true" />
+                    Invite user
+                </Button>
+            </template>
+        </PageHeader>
 
         <div class="rounded-xl border">
             <Table>

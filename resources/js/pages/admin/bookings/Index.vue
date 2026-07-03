@@ -2,6 +2,7 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { CheckCircle2, Inbox, XCircle } from '@lucide/vue';
 import { ref } from 'vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -81,7 +82,12 @@ const when = (booking: PendingBooking) =>
 <template>
     <Head title="Booking Approvals" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 p-4">
+    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Booking Approvals"
+            description="Review and act on resource bookings awaiting your approval."
+        />
+
         <div
             v-if="pending.length === 0"
             class="flex flex-1 flex-col items-center justify-center gap-3 text-center"
