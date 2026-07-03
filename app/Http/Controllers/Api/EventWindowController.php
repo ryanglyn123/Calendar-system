@@ -51,7 +51,7 @@ class EventWindowController extends Controller
         $roots = Event::query()
             ->whereIn('calendar_id', $calendarIds)
             ->windowRoots($start, $end)
-            ->with(['eventType', 'calendar', 'overrides'])
+            ->with(['eventType', 'calendar', 'overrides', 'attendees.user', 'reminders'])
             ->get();
 
         $preferences = CalendarUserPreference::query()

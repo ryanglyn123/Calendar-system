@@ -23,14 +23,40 @@ class EventController extends Controller
 
     public function store(StoreEventRequest $request): JsonResponse
     {
-        $event = $this->events->create($request->user(), $request->validated());
+        $validated = $request->validated();
+
+        $event = $this->events->create(
+            $request->user(),
+            collect($validated)->except(['attendees', 'reminders'])->all(),
+        );
+
+        if (isset($validated['attendees'])) {
+            $this->events->syncAttendees($event, $validated['attendees']);
+        }
+
+        if (isset($validated['reminders'])) {
+            $this->events->syncReminders($event, $request->user(), $validated['reminders']);
+        }
 
         return $this->occurrenceResponse($request, $event->load(['eventType', 'calendar']), 201);
     }
 
     public function update(UpdateEventRequest $request, Event $event): JsonResponse
     {
-        $this->events->update($event, $request->validated());
+        $validated = $request->validated();
+
+        $this->events->update(
+            $event,
+            collect($validated)->except(['attendees', 'reminders'])->all(),
+        );
+
+        if (isset($validated['attendees'])) {
+            $this->events->syncAttendees($event, $validated['attendees']);
+        }
+
+        if (isset($validated['reminders'])) {
+            $this->events->syncReminders($event, $request->user(), $validated['reminders']);
+        }
 
         return $this->occurrenceResponse($request, $event->load(['eventType', 'calendar']));
     }

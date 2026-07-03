@@ -55,6 +55,26 @@ class EventOccurrenceResource extends JsonResource
                 : EventTypeResource::make($event->eventType)->toArray($request),
             'is_recurring' => $event->isRecurring() || $event->isOverride(),
             'rrule' => $masked ? null : $event->rrule,
+            'attendees' => $masked || ! $event->relationLoaded('attendees')
+                ? []
+                : $event->attendees->map(fn ($attendee) => [
+                    'user_id' => $attendee->user_id,
+                    'name' => $attendee->user->name ?? $attendee->name,
+                    'rsvp_status' => $attendee->rsvp_status->value,
+                    'is_organizer' => $attendee->is_organizer,
+                ])->values()->all(),
+            'my_rsvp' => $event->relationLoaded('attendees')
+                ? $event->attendees->firstWhere('user_id', $user->id)?->rsvp_status->value
+                : null,
+            'my_reminder_minutes' => $event->relationLoaded('reminders')
+                ? $event->reminders
+                    ->where('user_id', $user->id)
+                    ->where('channel', 'database')
+                    ->pluck('minutes_before')
+                    ->unique()
+                    ->values()
+                    ->all()
+                : [],
             'is_private' => $event->visibility === 'private',
             'is_masked' => $masked,
             'can_edit' => $this->canEdit && ! $masked,

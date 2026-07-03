@@ -2,6 +2,8 @@
 import {
     AlignLeft,
     CalendarDays,
+    Check,
+    CircleHelp,
     Clock,
     Link2,
     Lock,
@@ -9,8 +11,11 @@ import {
     Pencil,
     Repeat,
     Trash2,
+    Users,
+    X,
 } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,9 +25,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { api, ApiError } from '@/lib/api';
 import { format, isSameDay } from '@/lib/calendarMath';
+import { rsvp as eventsRsvp } from '@/routes/api/events';
 import { useCalendarListStore } from '@/stores/calendarList';
-import type { EventOccurrence } from '@/types/calendar';
+import type { EventOccurrence, RsvpStatus } from '@/types/calendar';
 
 const props = defineProps<{
     occurrence: EventOccurrence | null;
@@ -60,6 +67,34 @@ const when = computed(() => {
         ? `${format(start, 'EEEE, MMMM d')} · ${format(start, 'HH:mm')} - ${format(end, 'HH:mm')}`
         : `${format(start, 'MMM d, HH:mm')} - ${format(end, 'MMM d, HH:mm')}`;
 });
+
+const myRsvp = ref<RsvpStatus | null>(null);
+
+const respond = async (status: RsvpStatus) => {
+    if (!props.occurrence) {
+        return;
+    }
+
+    try {
+        await api.put(eventsRsvp(props.occurrence.event_id).url, { status });
+        myRsvp.value = status;
+        toast.success('Response saved.');
+    } catch (error) {
+        toast.error(
+            error instanceof ApiError ? error.message : 'Could not respond.',
+        );
+    }
+};
+
+const effectiveRsvp = computed(
+    () => myRsvp.value ?? props.occurrence?.my_rsvp ?? null,
+);
+
+const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
+    { status: 'accepted', label: 'Going', icon: Check },
+    { status: 'tentative', label: 'Maybe', icon: CircleHelp },
+    { status: 'declined', label: 'No', icon: X },
+];
 </script>
 
 <template>
@@ -155,6 +190,63 @@ const when = computed(() => {
                     >
                         {{ occurrence.meeting_url }}
                     </a>
+                </div>
+
+                <div
+                    v-if="occurrence.attendees.length > 0"
+                    class="flex items-start gap-2.5"
+                >
+                    <Users
+                        class="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                    />
+                    <span class="flex flex-wrap gap-1">
+                        <Badge
+                            v-for="attendee in occurrence.attendees"
+                            :key="attendee.user_id ?? attendee.name"
+                            variant="outline"
+                            class="gap-1 font-normal"
+                        >
+                            <Check
+                                v-if="attendee.rsvp_status === 'accepted'"
+                                class="size-3 text-success"
+                                aria-label="Accepted"
+                            />
+                            <X
+                                v-else-if="attendee.rsvp_status === 'declined'"
+                                class="size-3 text-destructive"
+                                aria-label="Declined"
+                            />
+                            <CircleHelp
+                                v-else
+                                class="size-3 text-muted-foreground"
+                                aria-label="No response yet"
+                            />
+                            {{ attendee.name }}
+                        </Badge>
+                    </span>
+                </div>
+
+                <div
+                    v-if="occurrence.my_rsvp !== null"
+                    class="flex items-center gap-2 pt-1"
+                >
+                    <span class="text-xs text-muted-foreground">Going?</span>
+                    <Button
+                        v-for="option in rsvpOptions"
+                        :key="option.status"
+                        size="sm"
+                        :variant="
+                            effectiveRsvp === option.status
+                                ? 'default'
+                                : 'outline'
+                        "
+                        class="h-7"
+                        @click="respond(option.status)"
+                    >
+                        <component :is="option.icon" aria-hidden="true" />
+                        {{ option.label }}
+                    </Button>
                 </div>
 
                 <div

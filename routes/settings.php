@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\NotificationPreferenceController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use Illuminate\Auth\Middleware\RequirePassword;
@@ -24,6 +25,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
+
+    Route::get('settings/notifications', [NotificationPreferenceController::class, 'edit'])->name('notifications.edit');
+    Route::put('settings/notifications', [NotificationPreferenceController::class, 'update'])->name('notifications.update');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {

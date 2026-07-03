@@ -35,6 +35,10 @@ class UpdateEventRequest extends FormRequest
             'color' => ['sometimes', 'nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'visibility' => ['sometimes', Rule::in(['default', 'private'])],
             'rrule' => ['sometimes', 'nullable', 'string', 'max:500', new ValidRrule],
+            'attendees' => ['sometimes', 'array', 'max:100'],
+            'attendees.*' => ['integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
+            'reminders' => ['sometimes', 'array', 'max:5'],
+            'reminders.*' => ['integer', 'min:0', 'max:20160'],
         ];
     }
 

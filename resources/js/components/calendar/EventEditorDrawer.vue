@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import AttendeePicker from '@/components/calendar/AttendeePicker.vue';
 import RecurrenceEditor from '@/components/calendar/RecurrenceEditor.vue';
 import RecurrenceScopeDialog from '@/components/calendar/RecurrenceScopeDialog.vue';
 import type {RecurrenceScope} from '@/components/calendar/RecurrenceScopeDialog.vue';
@@ -80,6 +81,8 @@ type FormState = {
     color: string | null;
     visibility: 'default' | 'private';
     rrule: string | null;
+    attendees: { id: number; name: string }[];
+    reminders: number[];
 };
 
 const form = reactive<FormState>({
@@ -97,7 +100,22 @@ const form = reactive<FormState>({
     color: null,
     visibility: 'default',
     rrule: null,
+    attendees: [],
+    reminders: [],
 });
+
+const REMINDER_PRESETS = [
+    { minutes: 10, label: '10 min before' },
+    { minutes: 30, label: '30 min before' },
+    { minutes: 60, label: '1 hour before' },
+    { minutes: 1440, label: '1 day before' },
+];
+
+const toggleReminder = (minutes: number) => {
+    form.reminders = form.reminders.includes(minutes)
+        ? form.reminders.filter((m) => m !== minutes)
+        : [...form.reminders, minutes];
+};
 
 const scopeDialogOpen = ref(false);
 
@@ -142,6 +160,10 @@ watch(
                 ? 'private'
                 : 'default';
             form.rrule = props.occurrence.rrule;
+            form.attendees = props.occurrence.attendees
+                .filter((a) => a.user_id !== null)
+                .map((a) => ({ id: a.user_id!, name: a.name }));
+            form.reminders = [...props.occurrence.my_reminder_minutes];
         } else {
             const start = props.initialStart ?? new Date();
             const end =
@@ -165,6 +187,8 @@ watch(
             form.color = null;
             form.visibility = 'default';
             form.rrule = null;
+            form.attendees = [];
+            form.reminders = [];
         }
     },
 );
@@ -208,6 +232,8 @@ const payload = () => ({
     color: form.color,
     visibility: form.visibility,
     rrule: form.rrule,
+    attendees: form.attendees.map((a) => a.id),
+    reminders: form.reminders,
 });
 
 const save = async () => {
@@ -447,6 +473,31 @@ const submit = async (action: () => Promise<unknown>) => {
                     v-model="form.rrule"
                     :start-date="startDateAsDate"
                 />
+
+                <AttendeePicker v-model="form.attendees" />
+
+                <div class="grid gap-2">
+                    <Label>Reminders</Label>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button
+                            v-for="preset in REMINDER_PRESETS"
+                            :key="preset.minutes"
+                            type="button"
+                            class="rounded-full border px-2.5 py-1 text-xs transition-colors"
+                            :class="
+                                form.reminders.includes(preset.minutes)
+                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    : 'hover:bg-muted'
+                            "
+                            :aria-pressed="
+                                form.reminders.includes(preset.minutes)
+                            "
+                            @click="toggleReminder(preset.minutes)"
+                        >
+                            {{ preset.label }}
+                        </button>
+                    </div>
+                </div>
 
                 <div class="grid gap-2">
                     <Label for="event-location">Location</Label>

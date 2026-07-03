@@ -4,6 +4,7 @@ namespace App\Services\Event;
 
 use App\Models\Event;
 use App\Models\User;
+use App\Notifications\EventInvitedNotification;
 use Illuminate\Support\Carbon;
 
 class EventService
@@ -51,6 +52,64 @@ class EventService
         $this->syncRecurrenceUntil($event);
 
         return $event;
+    }
+
+    /**
+     * Sync the invited users. Newly invited people are notified; the creator
+     * is kept as organizer implicitly.
+     *
+     * @param  list<int>  $userIds
+     */
+    public function syncAttendees(Event $event, array $userIds): void
+    {
+        $userIds = array_values(array_unique(array_filter(
+            $userIds,
+            fn (int $id) => $id !== $event->created_by,
+        )));
+
+        $existing = $event->attendees()->pluck('user_id')->all();
+
+        $event->attendees()
+            ->whereNotIn('user_id', $userIds)
+            ->where('is_organizer', false)
+            ->delete();
+
+        $added = array_diff($userIds, $existing);
+
+        foreach ($added as $userId) {
+            $event->attendees()->create(['user_id' => $userId]);
+        }
+
+        if ($added !== []) {
+            $users = User::query()->active()->whereIn('id', $added)->get();
+
+            foreach ($users as $user) {
+                $user->notify(new EventInvitedNotification($event));
+            }
+        }
+    }
+
+    /**
+     * Replace the given user's reminders on the event. Each selected lead
+     * time delivers on both channels; the per-key preference still filters.
+     *
+     * @param  list<int>  $minutes
+     */
+    public function syncReminders(Event $event, User $user, array $minutes): void
+    {
+        $minutes = array_values(array_unique(array_map('intval', $minutes)));
+
+        $event->reminders()->where('user_id', $user->id)->delete();
+
+        foreach ($minutes as $lead) {
+            foreach (['database', 'mail'] as $channel) {
+                $event->reminders()->create([
+                    'user_id' => $user->id,
+                    'minutes_before' => $lead,
+                    'channel' => $channel,
+                ]);
+            }
+        }
     }
 
     private function syncRecurrenceUntil(Event $event): void

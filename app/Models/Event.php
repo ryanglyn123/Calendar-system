@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EventStatus;
+use Carbon\CarbonInterface;
 use Database\Factories\EventFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -122,7 +123,7 @@ class Event extends Model
      *
      * @param  Builder<Event>  $query
      */
-    public function scopeWindowRoots(Builder $query, Carbon $start, Carbon $end): void
+    public function scopeWindowRoots(Builder $query, CarbonInterface $start, CarbonInterface $end): void
     {
         $query
             ->whereNull('recurring_parent_id')

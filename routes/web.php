@@ -4,7 +4,10 @@ use App\Http\Controllers\Api\CalendarListController;
 use App\Http\Controllers\Api\CalendarPreferenceController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventOccurrenceController;
+use App\Http\Controllers\Api\EventRsvpController;
 use App\Http\Controllers\Api\EventWindowController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\UserSearchController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\InvitationAcceptanceController;
 use App\Http\Controllers\Calendar\CalendarShareController;
@@ -56,6 +59,14 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         Route::delete('events/{event}', [EventController::class, 'destroy'])->name('events.destroy');
         Route::patch('events/{event}/occurrence', [EventOccurrenceController::class, 'update'])->name('events.occurrence.update');
         Route::delete('events/{event}/occurrence', [EventOccurrenceController::class, 'destroy'])->name('events.occurrence.destroy');
+        Route::put('events/{event}/rsvp', [EventRsvpController::class, 'update'])->name('events.rsvp');
+
+        Route::get('users/search', UserSearchController::class)->name('users.search');
+
+        Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+        Route::post('notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+        Route::delete('notifications', [NotificationController::class, 'destroyAll'])->name('notifications.clear');
     });
 });
 
