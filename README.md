@@ -14,29 +14,64 @@ Internal calendar and resource booking platform for the Film Development Council
 
 ## Requirements
 
-- PHP 8.4+, Composer
+- PHP 8.4+ with extensions: bcmath, ctype, curl, dom, fileinfo, gd, intl, mbstring, mysql (pdo_mysql), opcache, sqlite3 (for tests), xml, zip
+- Composer 2
 - Node.js 22+, npm
 - MySQL 8 or MariaDB 10.6+ (tests use in-memory SQLite)
 - Mailpit for local email (optional but recommended)
 
-## Local setup
+## Local setup (step by step)
 
-```bash
-composer install
-npm install
-cp .env.example .env
-php artisan key:generate
+Works the same on Windows, macOS, and Linux. On Windows, get PHP + Composer + Node the easy way with [Laravel Herd](https://herd.laravel.com/windows), and MySQL via the MySQL Installer or XAMPP.
 
-# create the database named in .env, then:
-php artisan migrate --seed
+1. **Clone and enter the project**
 
-# optional demo data (sample users, events, bookings in every status):
-php artisan db:seed --class=DemoSeeder
+   ```bash
+   git clone <repository-url> Calendar-system
+   cd Calendar-system
+   ```
 
-composer dev
-```
+2. **Install dependencies**
 
-`composer dev` runs the PHP server, queue worker, log tail, and Vite together. The app is at http://localhost:8000.
+   ```bash
+   composer install
+   npm install
+   ```
+
+3. **Create your environment file and app key**
+
+   ```bash
+   cp .env.example .env        # Windows PowerShell: copy .env.example .env
+   php artisan key:generate
+   ```
+
+4. **Create the database**, then make sure `.env` matches your MySQL credentials (`DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`):
+
+   ```sql
+   CREATE DATABASE fdcp_calendar CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+
+5. **Migrate and seed** (roles, permissions, divisions, calendars, event types, PH holidays, resources, and the super admin account):
+
+   ```bash
+   php artisan migrate --seed
+   ```
+
+6. **Optional demo data** (sample users for every role, a month of events, bookings in every status):
+
+   ```bash
+   php artisan db:seed --class=DemoSeeder
+   ```
+
+7. **Run the app**
+
+   ```bash
+   composer dev
+   ```
+
+   This starts the PHP server, queue worker, log tail, and Vite together. Open http://localhost:8000 and sign in as `admin@fdcp.gov.ph` / `password`.
+
+8. **Optional: local email.** Run [Mailpit](https://mailpit.axllent.org/) and set `MAIL_MAILER=smtp`, `MAIL_PORT=1025` in `.env`; sent mail appears at http://localhost:8025. The default `.env` uses `MAIL_MAILER=log` (mail goes to `storage/logs/laravel.log`).
 
 ### Seeded accounts
 
@@ -55,6 +90,180 @@ All seeded accounts use the password `password`.
 
 Create OAuth 2.0 credentials in the Google Cloud console with the redirect URI `APP_URL/auth/google/callback`, then set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. Unknown Google emails create pending accounts that an admin approves. An allowed email domain can be enforced under Admin, Settings.
 
+## Deploying to Ubuntu on AWS (step by step)
+
+Tested layout: one EC2 instance (Ubuntu 24.04 LTS, t3.small or larger) running nginx + PHP-FPM + MySQL. For a managed database, point `DB_HOST` at an RDS MySQL instance instead of installing MySQL locally and skip step 3.
+
+1. **Launch the instance.** Ubuntu 24.04 LTS AMI. In the security group, allow inbound 22 (SSH, your IP only), 80, and 443. Associate an Elastic IP and point your DNS record (e.g. `calendar.fdcp.gov.ph`) at it. Then connect:
+
+   ```bash
+   ssh -i your-key.pem ubuntu@<elastic-ip>
+   ```
+
+2. **Install PHP 8.4, nginx, Composer, Node 22**
+
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   sudo add-apt-repository ppa:ondrej/php -y
+   sudo apt install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-mbstring \
+       php8.4-xml php8.4-curl php8.4-zip php8.4-intl php8.4-bcmath php8.4-gd \
+       php8.4-sqlite3 php8.4-opcache unzip
+
+   # Composer
+   curl -sS https://getcomposer.org/installer | php
+   sudo mv composer.phar /usr/local/bin/composer
+
+   # Node.js 22
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt install -y nodejs
+   ```
+
+3. **Install MySQL and create the database** (skip if using RDS):
+
+   ```bash
+   sudo apt install -y mysql-server
+   sudo mysql_secure_installation
+   sudo mysql
+   ```
+
+   ```sql
+   CREATE DATABASE fdcp_calendar CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   CREATE USER 'fdcp'@'localhost' IDENTIFIED BY 'a-strong-password';
+   GRANT ALL PRIVILEGES ON fdcp_calendar.* TO 'fdcp'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+
+4. **Deploy the code**
+
+   ```bash
+   sudo mkdir -p /var/www/calendar && sudo chown ubuntu:ubuntu /var/www/calendar
+   git clone <repository-url> /var/www/calendar
+   cd /var/www/calendar
+   composer install --no-dev --optimize-autoloader
+   npm ci && npm run build
+   ```
+
+5. **Configure the environment**
+
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   nano .env
+   ```
+
+   Set at minimum:
+
+   ```ini
+   APP_ENV=production
+   APP_DEBUG=false
+   APP_URL=https://calendar.fdcp.gov.ph
+   DB_DATABASE=fdcp_calendar
+   DB_USERNAME=fdcp
+   DB_PASSWORD=a-strong-password
+   SESSION_ENCRYPT=true
+   MAIL_MAILER=smtp        # plus your real MAIL_HOST/PORT/USERNAME/PASSWORD
+   ```
+
+6. **Migrate, seed, and set permissions**
+
+   ```bash
+   php artisan migrate --seed --force
+   sudo chown -R www-data:www-data storage bootstrap/cache
+   ```
+
+   Do NOT run `DemoSeeder` in production. Sign in as `admin@fdcp.gov.ph` / `password` and change the password immediately.
+
+7. **nginx server block** — create `/etc/nginx/sites-available/calendar`:
+
+   ```nginx
+   server {
+       listen 80;
+       server_name calendar.fdcp.gov.ph;
+       root /var/www/calendar/public;
+
+       index index.php;
+       charset utf-8;
+       client_max_body_size 10m;
+
+       location / {
+           try_files $uri $uri/ /index.php?$query_string;
+       }
+
+       location ~ \.php$ {
+           include snippets/fastcgi-php.conf;
+           fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+       }
+
+       location ~ /\.(?!well-known).* {
+           deny all;
+       }
+   }
+   ```
+
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/calendar /etc/nginx/sites-enabled/
+   sudo rm -f /etc/nginx/sites-enabled/default
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+8. **HTTPS with Let's Encrypt**
+
+   ```bash
+   sudo apt install -y certbot python3-certbot-nginx
+   sudo certbot --nginx -d calendar.fdcp.gov.ph
+   ```
+
+9. **Queue worker as a systemd service** — reminders, emails, and in-app notifications are queued and will not send without it. Create `/etc/systemd/system/calendar-queue.service`:
+
+   ```ini
+   [Unit]
+   Description=FDCP Calendar queue worker
+   After=network.target mysql.service
+
+   [Service]
+   User=www-data
+   Group=www-data
+   Restart=always
+   RestartSec=3
+   ExecStart=/usr/bin/php /var/www/calendar/artisan queue:work --tries=3 --max-time=3600
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now calendar-queue
+   ```
+
+10. **Scheduler cron** — dispatches due event reminders and prunes expired invitations:
+
+    ```bash
+    sudo crontab -u www-data -e
+    # add:
+    * * * * * cd /var/www/calendar && php artisan schedule:run >> /dev/null 2>&1
+    ```
+
+11. **Cache for speed**
+
+    ```bash
+    php artisan optimize        # caches config, routes, views, events
+    ```
+
+12. **Updating a running deployment**
+
+    ```bash
+    cd /var/www/calendar
+    php artisan down
+    git pull
+    composer install --no-dev --optimize-autoloader
+    npm ci && npm run build
+    php artisan migrate --force
+    php artisan optimize
+    sudo systemctl restart calendar-queue    # workers must reload new code
+    php artisan up
+    ```
+
 ## Performance
 
 Local development on Windows has two structural bottlenecks worth knowing about:
@@ -62,22 +271,7 @@ Local development on Windows has two structural bottlenecks worth knowing about:
 - `php artisan serve` (what `composer dev` runs) handles **one request at a time on Windows**; PHP's built-in server cannot fork workers there. The app minimizes concurrent requests (the dashboard inlines its initial data, and month windows fetch as one spanning request), but for a much faster dev loop use [Laravel Herd](https://herd.laravel.com/windows) (nginx + PHP-FPM + OPcache) and point it at this folder instead of `artisan serve`.
 - Keeping the repository inside a OneDrive-synced folder slows every request: PHP stats thousands of files per request, and OneDrive plus Windows Defender intercept each one. Move the project outside OneDrive if you can, or at least add an exclusion for the folder in Windows Security and pause OneDrive sync while developing.
 
-In production, always run:
-
-```bash
-composer install --no-dev --optimize-autoloader
-php artisan optimize        # caches config, routes, views, events
-npm run build
-```
-
-and enable OPcache in `php.ini`. Settings are cached (`SETTINGS_CACHE_ENABLED=true`) and each user's accessible-calendar set is cached for five minutes; both invalidate automatically on change.
-
-## Production notes
-
-- Scheduler: add a cron entry running `php artisan schedule:run` every minute. It dispatches due event reminders and prunes expired invitations.
-- Queue: run a supervised worker, `php artisan queue:work --tries=3`. Reminders, emails, and in-app notifications are all queued. Failed jobs are visible (and retryable) under Admin, System Health.
-- Set `APP_ENV=production`, `APP_DEBUG=false`, a real `MAIL_*` relay, and `SESSION_ENCRYPT=true` behind HTTPS.
-- Build assets with `npm run build`.
+In production, `composer install --optimize-autoloader`, `php artisan optimize`, and OPcache (steps above) are what make it fast. Settings are cached (`SETTINGS_CACHE_ENABLED=true`) and each user's accessible-calendar set is cached for five minutes; both invalidate automatically on change.
 
 ## Testing and quality gates
 
@@ -97,4 +291,3 @@ npm run build
 - Session-authenticated JSON endpoints live under `/api/v1` inside the web middleware group, so CSRF is enforced everywhere.
 - Authorization is permission-based (spatie/laravel-permission). `super_admin` bypasses permission checks via `Gate::before`; business invariants are enforced as explicit controller guards.
 - Typed settings (spatie/laravel-settings) are injected into validators and services, so admin-configured rules are enforced by construction.
-To try it locally: php artisan migrate --seed, then php artisan db:seed --class=DemoSeeder, then composer dev — sign in as admin@fdcp.gov.ph / password.
