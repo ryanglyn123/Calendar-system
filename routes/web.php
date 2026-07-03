@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\CalendarListController;
 use App\Http\Controllers\Api\CalendarPreferenceController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\EventOccurrenceController;
 use App\Http\Controllers\Api\EventWindowController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\InvitationAcceptanceController;
@@ -53,6 +54,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         Route::post('events', [EventController::class, 'store'])->name('events.store');
         Route::patch('events/{event}', [EventController::class, 'update'])->name('events.update');
         Route::delete('events/{event}', [EventController::class, 'destroy'])->name('events.destroy');
+        Route::patch('events/{event}/occurrence', [EventOccurrenceController::class, 'update'])->name('events.occurrence.update');
+        Route::delete('events/{event}/occurrence', [EventOccurrenceController::class, 'destroy'])->name('events.occurrence.destroy');
     });
 });
 

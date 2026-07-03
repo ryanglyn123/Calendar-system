@@ -25,6 +25,7 @@ const emit = defineEmits<{
     createAt: [date: Date];
     open: [occurrence: EventOccurrence];
     showDay: [date: Date, occurrences: EventOccurrence[]];
+    moveRecurring: [occurrence: EventOccurrence, start: Date, end: Date];
 }>();
 
 const grid = useCalendarGridStore();
@@ -233,13 +234,17 @@ async function onDragUp(): Promise<void> {
     }
 
     const end = new Date(state.occurrence.ends_at);
+    const newStart = new Date(start.getTime() + deltaMs);
+    const newEnd = new Date(end.getTime() + deltaMs);
+
+    if (state.occurrence.is_recurring) {
+        emit('moveRecurring', state.occurrence, newStart, newEnd);
+
+        return;
+    }
 
     try {
-        await grid.moveEvent(
-            state.occurrence,
-            new Date(start.getTime() + deltaMs),
-            new Date(end.getTime() + deltaMs),
-        );
+        await grid.moveEvent(state.occurrence, newStart, newEnd);
     } catch {
         toast.error('Could not reschedule the event.');
     }

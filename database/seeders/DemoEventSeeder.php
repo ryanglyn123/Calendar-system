@@ -41,6 +41,7 @@ class DemoEventSeeder extends Seeder
             [$mis, 'Sprint Planning', $monday->copy()->addDays(2)->setTime(9, 0), $monday->copy()->addDays(2)->setTime(10, 0), ['event_type_id' => 1]],
             [$personal, 'Dentist', $monday->copy()->addDays(2)->setTime(14, 30), $monday->copy()->addDays(2)->setTime(15, 30), []],
             [$personal, 'Gym', $monday->copy()->addDays(4)->setTime(18, 0), $monday->copy()->addDays(4)->setTime(19, 0), []],
+            [$mis, 'Weekly Staff Meeting', $monday->copy()->setTime(10, 0), $monday->copy()->setTime(11, 0), ['event_type_id' => 1, 'rrule' => 'FREQ=WEEKLY']],
         ];
 
         foreach ($events as [$calendar, $title, $start, $end, $extra]) {

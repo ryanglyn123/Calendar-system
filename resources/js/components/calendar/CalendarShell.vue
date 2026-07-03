@@ -9,6 +9,8 @@ import EventEditorDrawer from '@/components/calendar/EventEditorDrawer.vue';
 import EventQuickView from '@/components/calendar/EventQuickView.vue';
 import MiniMonth from '@/components/calendar/MiniMonth.vue';
 import MonthView from '@/components/calendar/MonthView.vue';
+import RecurrenceScopeDialog from '@/components/calendar/RecurrenceScopeDialog.vue';
+import type {RecurrenceScope} from '@/components/calendar/RecurrenceScopeDialog.vue';
 import TimeGridView from '@/components/calendar/TimeGridView.vue';
 import { Separator } from '@/components/ui/separator';
 import { useConfirm } from '@/composables/useConfirm';
@@ -68,7 +70,71 @@ const showDayOverflow = (day: Date, occurrences: EventOccurrence[]) => {
     overflowItems.value = occurrences;
 };
 
+/** Pending recurring operation awaiting a scope choice. */
+const scopeAction = ref<'edit' | 'delete'>('edit');
+const scopeResolver = ref<((scope: RecurrenceScope | null) => void) | null>(
+    null,
+);
+
+const askScope = (action: 'edit' | 'delete'): Promise<RecurrenceScope | null> => {
+    scopeAction.value = action;
+
+    return new Promise((resolve) => {
+        scopeResolver.value = resolve;
+    });
+};
+
+const settleScope = (scope: RecurrenceScope | null) => {
+    scopeResolver.value?.(scope);
+    scopeResolver.value = null;
+};
+
+const moveRecurring = async (
+    occurrence: EventOccurrence,
+    start: Date,
+    end: Date,
+) => {
+    const scope = await askScope('edit');
+
+    if (scope === null) {
+        return;
+    }
+
+    try {
+        await grid.moveOccurrenceScoped(occurrence, scope, start, end);
+        toast.success('Event rescheduled.');
+    } catch (error) {
+        toast.error(
+            error instanceof ApiError
+                ? error.message
+                : 'Could not reschedule the event.',
+        );
+    }
+};
+
 const removeEvent = async (occurrence: EventOccurrence) => {
+    if (occurrence.is_recurring) {
+        const scope = await askScope('delete');
+
+        if (scope === null) {
+            return;
+        }
+
+        try {
+            await grid.deleteOccurrenceScoped(occurrence, scope);
+            quickViewTarget.value = null;
+            toast.success('Event deleted.');
+        } catch (error) {
+            toast.error(
+                error instanceof ApiError
+                    ? error.message
+                    : 'Could not delete the event.',
+            );
+        }
+
+        return;
+    }
+
     const confirmed = await confirm({
         title: `Delete “${occurrence.title}”?`,
         description: 'The event is removed from the calendar for everyone.',
@@ -118,12 +184,14 @@ const removeEvent = async (occurrence: EventOccurrence) => {
                     @create-at="openCreate"
                     @open="openQuickView"
                     @show-day="showDayOverflow"
+                    @move-recurring="moveRecurring"
                 />
                 <TimeGridView
                     v-else-if="grid.view === 'week' || grid.view === 'day'"
                     :mode="grid.view"
                     @create-range="openCreate"
                     @open="openQuickView"
+                    @move-recurring="moveRecurring"
                 />
                 <AgendaView v-else @open="openQuickView" />
             </div>
@@ -156,6 +224,13 @@ const removeEvent = async (occurrence: EventOccurrence) => {
                     openQuickView(occurrence);
                 }
             "
+        />
+
+        <RecurrenceScopeDialog
+            :open="scopeResolver !== null"
+            :action="scopeAction"
+            @choose="settleScope"
+            @cancel="settleScope(null)"
         />
     </div>
 </template>

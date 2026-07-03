@@ -30,6 +30,7 @@ const props = defineProps<{
 const emit = defineEmits<{
     createRange: [start: Date, end: Date];
     open: [occurrence: EventOccurrence];
+    moveRecurring: [occurrence: EventOccurrence, start: Date, end: Date];
 }>();
 
 const grid = useCalendarGridStore();
@@ -450,6 +451,12 @@ async function onPointerUp(): Promise<void> {
         return;
     }
 
+    if (occurrence.is_recurring) {
+        emit('moveRecurring', occurrence, newStart, newEnd);
+
+        return;
+    }
+
     try {
         await grid.moveEvent(occurrence, newStart, newEnd);
     } catch {
@@ -568,6 +575,12 @@ async function onEventKeydown(
 
         newStart = new Date(start.getTime() + delta);
         newEnd = new Date(end.getTime() + delta);
+    }
+
+    if (box.occurrence.is_recurring) {
+        emit('moveRecurring', box.occurrence, newStart, newEnd);
+
+        return;
     }
 
     try {

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Event;
 
 use App\Models\Calendar;
 use App\Models\Event;
+use App\Rules\ValidRrule;
 use App\Services\Calendar\CalendarAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -33,6 +34,7 @@ class UpdateEventRequest extends FormRequest
             'all_day' => ['sometimes', 'boolean'],
             'color' => ['sometimes', 'nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'visibility' => ['sometimes', Rule::in(['default', 'private'])],
+            'rrule' => ['sometimes', 'nullable', 'string', 'max:500', new ValidRrule],
         ];
     }
 

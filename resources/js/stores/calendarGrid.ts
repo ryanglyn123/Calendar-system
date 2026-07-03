@@ -7,7 +7,17 @@ import {
     index as eventsIndex,
     update as eventsUpdate,
 } from '@/routes/api/events';
+import occurrenceRoutes from '@/routes/api/events/occurrence';
 import type { CalendarView, EventOccurrence } from '@/types/calendar';
+
+export type RecurrenceScope = 'this' | 'following' | 'all';
+
+/** The original start encoded in "{event id}:{ISO start}" occurrence ids. */
+export function originalStartOf(occurrence: EventOccurrence): string {
+    return occurrence.occurrence_id.slice(
+        occurrence.occurrence_id.indexOf(':') + 1,
+    );
+}
 
 type WindowState = {
     status: 'loading' | 'ready' | 'stale';
@@ -205,6 +215,44 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         }
     }
 
+    /**
+     * Reschedule one occurrence of a recurring series with an edit scope.
+     */
+    async function moveOccurrenceScoped(
+        occurrence: EventOccurrence,
+        scope: RecurrenceScope,
+        newStart: Date,
+        newEnd: Date,
+    ): Promise<void> {
+        await api.patch(occurrenceRoutes.update(occurrence.event_id).url, {
+            scope,
+            original_starts_at: originalStartOf(occurrence),
+            starts_at: newStart.toISOString(),
+            ends_at: newEnd.toISOString(),
+        });
+
+        await invalidateAround(newStart);
+    }
+
+    /**
+     * Delete occurrences of a recurring series with an edit scope.
+     */
+    async function deleteOccurrenceScoped(
+        occurrence: EventOccurrence,
+        scope: RecurrenceScope,
+    ): Promise<void> {
+        await api.delete(
+            `${occurrenceRoutes.destroy(occurrence.event_id).url}?${new URLSearchParams(
+                {
+                    scope,
+                    original_starts_at: originalStartOf(occurrence),
+                },
+            )}`,
+        );
+
+        await invalidateAround(new Date(occurrence.starts_at));
+    }
+
     return {
         view,
         focusDate,
@@ -222,6 +270,8 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         replaceOccurrence,
         removeEvent,
         moveEvent,
+        moveOccurrenceScoped,
+        deleteOccurrenceScoped,
         currentMonthKey: computed(() => monthKey(focusDate.value)),
     };
 });

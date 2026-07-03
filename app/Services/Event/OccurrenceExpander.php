@@ -14,6 +14,10 @@ class OccurrenceExpander
      */
     public const MAX_OCCURRENCES_PER_EVENT = 500;
 
+    public function __construct(
+        private readonly RecurrenceService $recurrence,
+    ) {}
+
     /**
      * Expand window-root events into concrete occurrences inside [start, end).
      *
@@ -109,21 +113,13 @@ class OccurrenceExpander
     }
 
     /**
-     * Concrete start times the series produces inside the window.
-     *
-     * P3 note: full RFC-5545 expansion via php-rrule arrives with the
-     * recurrence phase; until events can carry an rrule this yields only the
-     * base start when it overlaps the window.
+     * Concrete start times the series produces inside the window, expanded
+     * from the RFC 5545 rule in the event's own timezone.
      *
      * @return list<CarbonInterface>
      */
     private function occurrenceStarts(Event $parent, CarbonInterface $windowStart, CarbonInterface $windowEnd): array
     {
-        $duration = (int) $parent->starts_at->diffInSeconds($parent->ends_at);
-
-        $overlaps = $parent->starts_at < $windowEnd
-            && $parent->starts_at->avoidMutation()->addSeconds($duration) > $windowStart;
-
-        return $overlaps ? [$parent->starts_at] : [];
+        return $this->recurrence->occurrenceStartsBetween($parent, $windowStart, $windowEnd);
     }
 }

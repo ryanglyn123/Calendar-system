@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import RecurrenceEditor from '@/components/calendar/RecurrenceEditor.vue';
+import RecurrenceScopeDialog from '@/components/calendar/RecurrenceScopeDialog.vue';
+import type {RecurrenceScope} from '@/components/calendar/RecurrenceScopeDialog.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,9 +26,13 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
-import { format } from '@/lib/calendarMath';
-import { store as eventsStore, update as eventsUpdate } from '@/routes/api/events';
-import { useCalendarGridStore } from '@/stores/calendarGrid';
+import { format, parseISO } from '@/lib/calendarMath';
+import {
+    store as eventsStore,
+    update as eventsUpdate,
+} from '@/routes/api/events';
+import occurrenceRoutes from '@/routes/api/events/occurrence';
+import { originalStartOf, useCalendarGridStore } from '@/stores/calendarGrid';
 import { useCalendarListStore } from '@/stores/calendarList';
 import type { EventOccurrence, EventTypeItem } from '@/types/calendar';
 
@@ -72,6 +79,7 @@ type FormState = {
     all_day: boolean;
     color: string | null;
     visibility: 'default' | 'private';
+    rrule: string | null;
 };
 
 const form = reactive<FormState>({
@@ -88,7 +96,14 @@ const form = reactive<FormState>({
     all_day: false,
     color: null,
     visibility: 'default',
+    rrule: null,
 });
+
+const scopeDialogOpen = ref(false);
+
+const startDateAsDate = computed(() =>
+    form.startDate ? parseISO(`${form.startDate}T00:00:00`) : new Date(),
+);
 
 const errors = ref<Record<string, string[]>>({});
 const saving = ref(false);
@@ -126,6 +141,7 @@ watch(
             form.visibility = props.occurrence.is_private
                 ? 'private'
                 : 'default';
+            form.rrule = props.occurrence.rrule;
         } else {
             const start = props.initialStart ?? new Date();
             const end =
@@ -148,6 +164,7 @@ watch(
             form.all_day = false;
             form.color = null;
             form.visibility = 'default';
+            form.rrule = null;
         }
     },
 );
@@ -190,18 +207,59 @@ const payload = () => ({
     all_day: form.all_day,
     color: form.color,
     visibility: form.visibility,
+    rrule: form.rrule,
 });
 
 const save = async () => {
+    // Editing an existing series needs an explicit scope first.
+    if (props.occurrence?.is_recurring) {
+        scopeDialogOpen.value = true;
+
+        return;
+    }
+
+    await submit(() =>
+        props.occurrence
+            ? api.patch(eventsUpdate(props.occurrence.event_id).url, payload())
+            : api.post(eventsStore().url, payload()),
+    );
+};
+
+const saveWithScope = async (scope: RecurrenceScope) => {
+    scopeDialogOpen.value = false;
+
+    const occurrence = props.occurrence!;
+    const body = payload();
+
+    await submit(async () => {
+        // Rule changes only make sense series-wide.
+        if (scope === 'all' && body.rrule !== occurrence.rrule) {
+            await api.patch(eventsUpdate(occurrence.event_id).url, {
+                rrule: body.rrule,
+            });
+        }
+
+        await api.patch(occurrenceRoutes.update(occurrence.event_id).url, {
+            scope,
+            original_starts_at: originalStartOf(occurrence),
+            title: body.title,
+            description: body.description,
+            location: body.location,
+            meeting_url: body.meeting_url,
+            starts_at: body.starts_at,
+            ends_at: body.ends_at,
+            color: body.color,
+            event_type_id: body.event_type_id,
+        });
+    });
+};
+
+const submit = async (action: () => Promise<unknown>) => {
     saving.value = true;
     errors.value = {};
 
     try {
-        if (props.occurrence) {
-            await api.patch(eventsUpdate(props.occurrence.event_id).url, payload());
-        } else {
-            await api.post(eventsStore().url, payload());
-        }
+        await action();
 
         await grid.invalidateAround(new Date(`${form.startDate}T00:00:00`));
 
@@ -385,6 +443,11 @@ const save = async () => {
                     </Select>
                 </div>
 
+                <RecurrenceEditor
+                    v-model="form.rrule"
+                    :start-date="startDateAsDate"
+                />
+
                 <div class="grid gap-2">
                     <Label for="event-location">Location</Label>
                     <Input
@@ -478,4 +541,11 @@ const save = async () => {
             </SheetFooter>
         </SheetContent>
     </Sheet>
+
+    <RecurrenceScopeDialog
+        :open="scopeDialogOpen"
+        action="edit"
+        @choose="saveWithScope"
+        @cancel="scopeDialogOpen = false"
+    />
 </template>

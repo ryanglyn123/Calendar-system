@@ -62,4 +62,11 @@ class EventFactory extends Factory
             'ends_at' => $start->copy()->addMinutes($durationMinutes),
         ]);
     }
+
+    public function recurring(string $rrule = 'FREQ=WEEKLY'): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'rrule' => $rrule,
+        ]);
+    }
 }

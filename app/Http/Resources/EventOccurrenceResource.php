@@ -54,6 +54,7 @@ class EventOccurrenceResource extends JsonResource
                 ? null
                 : EventTypeResource::make($event->eventType)->toArray($request),
             'is_recurring' => $event->isRecurring() || $event->isOverride(),
+            'rrule' => $masked ? null : $event->rrule,
             'is_private' => $event->visibility === 'private',
             'is_masked' => $masked,
             'can_edit' => $this->canEdit && ! $masked,

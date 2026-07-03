@@ -17,6 +17,7 @@ export type EventOccurrence = {
     color: string;
     event_type: EventTypeItem | null;
     is_recurring: boolean;
+    rrule: string | null;
     is_private: boolean;
     is_masked: boolean;
     can_edit: boolean;

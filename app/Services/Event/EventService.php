@@ -8,6 +8,10 @@ use Illuminate\Support\Carbon;
 
 class EventService
 {
+    public function __construct(
+        private readonly RecurrenceService $recurrence,
+    ) {}
+
     /**
      * Expects FormRequest-validated attributes. Datetimes are normalized to
      * UTC before storage (Eloquent's cast keeps wall time as-is, so tz-aware
@@ -21,11 +25,15 @@ class EventService
     {
         $timezone = $creator->timezone ?: 'Asia/Manila';
 
-        return Event::query()->create([
+        $event = Event::query()->create([
             ...$this->normalize($attributes, $timezone),
             'created_by' => $creator->id,
             'timezone' => $timezone,
         ]);
+
+        $this->syncRecurrenceUntil($event);
+
+        return $event;
     }
 
     /**
@@ -33,9 +41,25 @@ class EventService
      */
     public function update(Event $event, array $attributes): Event
     {
+        // Overrides belong to a series; the series carries the rule.
+        if ($event->isOverride()) {
+            unset($attributes['rrule']);
+        }
+
         $event->update($this->normalize($attributes, $event->timezone, $event));
 
+        $this->syncRecurrenceUntil($event);
+
         return $event;
+    }
+
+    private function syncRecurrenceUntil(Event $event): void
+    {
+        $until = $this->recurrence->computeRecurrenceUntil($event);
+
+        if (($until?->toIso8601String()) !== ($event->recurrence_until?->toIso8601String())) {
+            $event->update(['recurrence_until' => $until]);
+        }
     }
 
     public function delete(Event $event): void
