@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
+import { toast } from 'vue-sonner';
 import { layoutWeekLanes } from '@/components/calendar/monthLanes';
 import {
     addDays,
@@ -9,6 +10,7 @@ import {
     isSameMonth,
     monthGridDays,
     occurrenceTouchesDay,
+    parseISO,
     startOfDay,
 } from '@/lib/calendarMath';
 import { useCalendarGridStore } from '@/stores/calendarGrid';
@@ -128,7 +130,10 @@ const weekdayHeaders = computed(() =>
 );
 
 const onCellClick = (day: Date, event: MouseEvent) => {
-    if ((event.target as HTMLElement).closest('[data-event]')) {
+    if (
+        suppressNextClick ||
+        (event.target as HTMLElement).closest('[data-event]')
+    ) {
         return;
     }
 
@@ -136,6 +141,132 @@ const onCellClick = (day: Date, event: MouseEvent) => {
     slot.setHours(9);
 
     emit('createAt', slot);
+};
+
+/* ------------------------------------------------------------------ */
+/* Drag an event chip / bar onto another day (time of day preserved).  */
+/* ------------------------------------------------------------------ */
+
+type MonthDrag = {
+    occurrence: EventOccurrence;
+    originX: number;
+    originY: number;
+    active: boolean;
+};
+
+const monthDrag = ref<MonthDrag | null>(null);
+const dropTargetKey = ref<string | null>(null);
+let suppressNextClick = false;
+
+function onChipPointerDown(
+    event: PointerEvent,
+    occurrence: EventOccurrence,
+): void {
+    if (event.button !== 0 || !occurrence.can_edit) {
+        return;
+    }
+
+    monthDrag.value = {
+        occurrence,
+        originX: event.clientX,
+        originY: event.clientY,
+        active: false,
+    };
+
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragUp);
+    window.addEventListener('keydown', onDragKeydown);
+}
+
+function onDragMove(event: PointerEvent): void {
+    const state = monthDrag.value;
+
+    if (!state) {
+        return;
+    }
+
+    if (!state.active) {
+        const distance = Math.hypot(
+            event.clientX - state.originX,
+            event.clientY - state.originY,
+        );
+
+        if (distance < 4) {
+            return;
+        }
+
+        state.active = true;
+    }
+
+    event.preventDefault();
+
+    const cell = document
+        .elementFromPoint(event.clientX, event.clientY)
+        ?.closest('[data-daycell]');
+
+    dropTargetKey.value = cell?.getAttribute('data-daycell') ?? null;
+}
+
+async function onDragUp(): Promise<void> {
+    const state = monthDrag.value;
+    const target = dropTargetKey.value;
+
+    teardownDrag();
+
+    if (!state?.active) {
+        return;
+    }
+
+    suppressNextClick = true;
+    setTimeout(() => (suppressNextClick = false), 0);
+
+    if (!target) {
+        return;
+    }
+
+    const start = new Date(state.occurrence.starts_at);
+    const targetDay = startOfDay(parseISO(`${target}T00:00:00`));
+    const deltaMs = targetDay.getTime() - startOfDay(start).getTime();
+
+    if (deltaMs === 0) {
+        return;
+    }
+
+    const end = new Date(state.occurrence.ends_at);
+
+    try {
+        await grid.moveEvent(
+            state.occurrence,
+            new Date(start.getTime() + deltaMs),
+            new Date(end.getTime() + deltaMs),
+        );
+    } catch {
+        toast.error('Could not reschedule the event.');
+    }
+}
+
+function onDragKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+        teardownDrag();
+    }
+}
+
+function teardownDrag(): void {
+    monthDrag.value = null;
+    dropTargetKey.value = null;
+    window.removeEventListener('pointermove', onDragMove);
+    window.removeEventListener('pointerup', onDragUp);
+    window.removeEventListener('keydown', onDragKeydown);
+}
+
+onBeforeUnmount(teardownDrag);
+
+const onChipClick = (occurrence: EventOccurrence): void => {
+    if (suppressNextClick) {
+        return;
+    }
+
+    emit('open', occurrence);
 };
 </script>
 
@@ -183,7 +314,10 @@ const onCellClick = (day: Date, event: MouseEvent) => {
                         backgroundColor: segment.occurrence.color,
                     }"
                     :aria-label="`${segment.occurrence.title}, ${format(new Date(segment.occurrence.starts_at), 'MMM d')}`"
-                    @click="emit('open', segment.occurrence)"
+                    @pointerdown="
+                        (e) => onChipPointerDown(e, segment.occurrence)
+                    "
+                    @click="onChipClick(segment.occurrence)"
                 >
                     {{ segment.occurrence.title }}
                 </button>
@@ -199,7 +333,10 @@ const onCellClick = (day: Date, event: MouseEvent) => {
                             day,
                             grid.focusDate,
                         ),
+                        'bg-primary/10 ring-2 ring-primary ring-inset':
+                            dropTargetKey === format(day, 'yyyy-MM-dd'),
                     }"
+                    :data-daycell="format(day, 'yyyy-MM-dd')"
                     :aria-label="format(day, 'MMMM d, yyyy')"
                     @click="(e) => onCellClick(day, e)"
                 >
@@ -240,7 +377,10 @@ const onCellClick = (day: Date, event: MouseEvent) => {
                                     occurrence.status === 'cancelled',
                             }"
                             :aria-label="`${occurrence.title}, ${format(new Date(occurrence.starts_at), 'h:mm a')}`"
-                            @click="emit('open', occurrence)"
+                            @pointerdown="
+                                (e) => onChipPointerDown(e, occurrence)
+                            "
+                            @click="onChipClick(occurrence)"
                         >
                             <span
                                 class="size-2 shrink-0 rounded-full"

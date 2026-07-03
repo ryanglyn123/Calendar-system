@@ -39,6 +39,7 @@ const quickViewTarget = ref<EventOccurrence | null>(null);
 const editorOpen = ref(false);
 const editorTarget = ref<EventOccurrence | null>(null);
 const editorInitialStart = ref<Date | null>(null);
+const editorInitialEnd = ref<Date | null>(null);
 
 const overflowDay = ref<Date | null>(null);
 const overflowItems = ref<EventOccurrence[]>([]);
@@ -47,9 +48,10 @@ const openQuickView = (occurrence: EventOccurrence) => {
     quickViewTarget.value = occurrence;
 };
 
-const openCreate = (start?: Date) => {
+const openCreate = (start?: Date, end?: Date) => {
     editorTarget.value = null;
     editorInitialStart.value = start ?? null;
+    editorInitialEnd.value = end ?? null;
     editorOpen.value = true;
 };
 
@@ -57,6 +59,7 @@ const openEdit = (occurrence: EventOccurrence) => {
     quickViewTarget.value = null;
     editorTarget.value = occurrence;
     editorInitialStart.value = null;
+    editorInitialEnd.value = null;
     editorOpen.value = true;
 };
 
@@ -119,7 +122,7 @@ const removeEvent = async (occurrence: EventOccurrence) => {
                 <TimeGridView
                     v-else-if="grid.view === 'week' || grid.view === 'day'"
                     :mode="grid.view"
-                    @create-at="openCreate"
+                    @create-range="openCreate"
                     @open="openQuickView"
                 />
                 <AgendaView v-else @open="openQuickView" />
@@ -137,6 +140,7 @@ const removeEvent = async (occurrence: EventOccurrence) => {
             :open="editorOpen"
             :occurrence="editorTarget"
             :initial-start="editorInitialStart"
+            :initial-end="editorInitialEnd"
             :event-types="eventTypes"
             @close="editorOpen = false"
             @saved="quickViewTarget = null"

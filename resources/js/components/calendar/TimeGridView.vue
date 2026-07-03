@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { toast } from 'vue-sonner';
 import { layoutWeekLanes } from '@/components/calendar/monthLanes';
 import {
     addDays,
@@ -18,13 +19,16 @@ import type { EventOccurrence } from '@/types/calendar';
 
 const HOUR_HEIGHT = 48;
 const SNAP_MINUTES = 30;
+const DRAG_THRESHOLD_PX = 4;
+const TOUCH_HOLD_MS = 350;
+const MIN_EVENT_MINUTES = 30;
 
 const props = defineProps<{
     mode: 'week' | 'day';
 }>();
 
 const emit = defineEmits<{
-    createAt: [date: Date];
+    createRange: [start: Date, end: Date];
     open: [occurrence: EventOccurrence];
 }>();
 
@@ -57,9 +61,7 @@ const laneItems = computed(() =>
 );
 
 const timedItems = computed(() =>
-    visible.value.filter(
-        (o) => !laneItems.value.includes(o),
-    ),
+    visible.value.filter((o) => !laneItems.value.includes(o)),
 );
 
 const laneSegments = computed(() => {
@@ -112,7 +114,10 @@ const columns = computed<PositionedBox[][]>(() =>
             )
             .map((o) => {
                 const start = new Date(
-                    Math.max(new Date(o.starts_at).getTime(), dayStart.getTime()),
+                    Math.max(
+                        new Date(o.starts_at).getTime(),
+                        dayStart.getTime(),
+                    ),
                 );
                 const end = new Date(
                     Math.min(new Date(o.ends_at).getTime(), dayEnd.getTime()),
@@ -136,7 +141,9 @@ const columns = computed<PositionedBox[][]>(() =>
             })),
         );
 
-        const byKey = new Map(items.map((i) => [i.occurrence.occurrence_id, i]));
+        const byKey = new Map(
+            items.map((i) => [i.occurrence.occurrence_id, i]),
+        );
 
         return boxes.map((box) => ({
             occurrence: byKey.get(box.key)!.occurrence,
@@ -157,26 +164,324 @@ const today = new Date();
 
 const now = ref(new Date());
 
+let nowInterval: ReturnType<typeof setInterval> | undefined;
+
 onMounted(() => {
-    const interval = setInterval(() => {
+    nowInterval = setInterval(() => {
         now.value = new Date();
     }, 60_000);
 
-    scroller.value?.scrollTo({
-        top: 7 * HOUR_HEIGHT,
-    });
+    scroller.value?.scrollTo({ top: 7 * HOUR_HEIGHT });
+});
 
-    return () => clearInterval(interval);
+onBeforeUnmount(() => {
+    clearInterval(nowInterval);
 });
 
 const scroller = ref<HTMLElement | null>(null);
+const bodyRef = ref<HTMLElement | null>(null);
 
-const nowTop = computed(
-    () => (minutesIntoDay(now.value) / 60) * HOUR_HEIGHT,
-);
+const nowTop = computed(() => (minutesIntoDay(now.value) / 60) * HOUR_HEIGHT);
 
-const onSlotClick = (day: Date, event: MouseEvent) => {
-    if ((event.target as HTMLElement).closest('[data-event]')) {
+const timeLabel = (occurrence: EventOccurrence) =>
+    `${format(new Date(occurrence.starts_at), 'HH:mm')} - ${format(new Date(occurrence.ends_at), 'HH:mm')}`;
+
+/* ------------------------------------------------------------------ */
+/* Drag interactions: create on empty slots, move / resize on events.  */
+/* ------------------------------------------------------------------ */
+
+type DragState = {
+    mode: 'create' | 'move' | 'resize';
+    occurrence: EventOccurrence | null;
+    dayIndex: number;
+    startMinutes: number;
+    endMinutes: number;
+    /** Where inside the event the pointer grabbed it (move only). */
+    grabOffsetMinutes: number;
+    anchorMinutes: number;
+    active: boolean;
+    originX: number;
+    originY: number;
+};
+
+const drag = ref<DragState | null>(null);
+let suppressNextClick = false;
+let touchHoldTimer: ReturnType<typeof setTimeout> | undefined;
+
+const snap = (minutes: number) =>
+    Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
+
+const clampMinutes = (minutes: number) =>
+    Math.min(1440, Math.max(0, minutes));
+
+function pointerPosition(event: PointerEvent): {
+    dayIndex: number;
+    minutes: number;
+} | null {
+    const body = bodyRef.value;
+
+    if (!body) {
+        return null;
+    }
+
+    const bounds = body.getBoundingClientRect();
+    const gutter = 64;
+    const usable = bounds.width - gutter;
+    const x = event.clientX - bounds.left - gutter;
+    const y = event.clientY - bounds.top;
+
+    const dayIndex = Math.min(
+        days.value.length - 1,
+        Math.max(0, Math.floor((x / usable) * days.value.length)),
+    );
+
+    const minutes = clampMinutes((y / HOUR_HEIGHT) * 60);
+
+    return { dayIndex, minutes };
+}
+
+const dateAt = (dayIndex: number, minutes: number): Date => {
+    const date = startOfDay(days.value[dayIndex]);
+    date.setMinutes(minutes);
+
+    return date;
+};
+
+function beginDrag(event: PointerEvent, state: DragState): void {
+    if (event.pointerType === 'touch') {
+        // Long-press before dragging so scrolling wins by default.
+        touchHoldTimer = setTimeout(() => {
+            drag.value = { ...state, active: true };
+        }, TOUCH_HOLD_MS);
+    }
+
+    drag.value = state;
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('keydown', onDragKeydown);
+}
+
+function onEmptyPointerDown(event: PointerEvent): void {
+    if (
+        event.button !== 0 ||
+        (event.target as HTMLElement).closest('[data-event]')
+    ) {
+        return;
+    }
+
+    const position = pointerPosition(event);
+
+    if (!position) {
+        return;
+    }
+
+    const start = snap(position.minutes);
+
+    beginDrag(event, {
+        mode: 'create',
+        occurrence: null,
+        dayIndex: position.dayIndex,
+        startMinutes: start,
+        endMinutes: start + SNAP_MINUTES,
+        grabOffsetMinutes: 0,
+        anchorMinutes: start,
+        active: false,
+        originX: event.clientX,
+        originY: event.clientY,
+    });
+}
+
+function onEventPointerDown(
+    event: PointerEvent,
+    box: PositionedBox,
+    dayIndex: number,
+): void {
+    if (event.button !== 0 || !box.occurrence.can_edit) {
+        return;
+    }
+
+    event.stopPropagation();
+
+    const startMinutes = box.top / (HOUR_HEIGHT / 60);
+    const endMinutes = startMinutes + box.height / (HOUR_HEIGHT / 60);
+    const position = pointerPosition(event);
+
+    beginDrag(event, {
+        mode: 'move',
+        occurrence: box.occurrence,
+        dayIndex,
+        startMinutes,
+        endMinutes,
+        grabOffsetMinutes: (position?.minutes ?? startMinutes) - startMinutes,
+        anchorMinutes: startMinutes,
+        active: false,
+        originX: event.clientX,
+        originY: event.clientY,
+    });
+}
+
+function onResizePointerDown(
+    event: PointerEvent,
+    box: PositionedBox,
+    dayIndex: number,
+): void {
+    if (event.button !== 0 || !box.occurrence.can_edit) {
+        return;
+    }
+
+    event.stopPropagation();
+
+    const startMinutes = box.top / (HOUR_HEIGHT / 60);
+    const endMinutes = startMinutes + box.height / (HOUR_HEIGHT / 60);
+
+    beginDrag(event, {
+        mode: 'resize',
+        occurrence: box.occurrence,
+        dayIndex,
+        startMinutes,
+        endMinutes,
+        grabOffsetMinutes: 0,
+        anchorMinutes: startMinutes,
+        active: false,
+        originX: event.clientX,
+        originY: event.clientY,
+    });
+}
+
+function onPointerMove(event: PointerEvent): void {
+    const state = drag.value;
+
+    if (!state) {
+        return;
+    }
+
+    if (!state.active) {
+        const distance = Math.hypot(
+            event.clientX - state.originX,
+            event.clientY - state.originY,
+        );
+
+        if (event.pointerType === 'touch') {
+            // Scrolling gesture: give up the pending long-press drag.
+            if (distance > DRAG_THRESHOLD_PX * 3) {
+                cancelDrag();
+            }
+
+            return;
+        }
+
+        if (distance < DRAG_THRESHOLD_PX) {
+            return;
+        }
+
+        state.active = true;
+    }
+
+    event.preventDefault();
+
+    const position = pointerPosition(event);
+
+    if (!position) {
+        return;
+    }
+
+    if (state.mode === 'create') {
+        const pointerSnap = snap(position.minutes);
+
+        state.startMinutes = Math.min(state.anchorMinutes, pointerSnap);
+        state.endMinutes = Math.max(
+            state.anchorMinutes + SNAP_MINUTES,
+            pointerSnap,
+        );
+    } else if (state.mode === 'move') {
+        const duration = state.endMinutes - state.startMinutes;
+        const nextStart = clampMinutes(
+            snap(position.minutes - state.grabOffsetMinutes),
+        );
+
+        state.dayIndex = position.dayIndex;
+        state.startMinutes = Math.min(nextStart, 1440 - duration);
+        state.endMinutes = state.startMinutes + duration;
+    } else {
+        state.endMinutes = Math.max(
+            state.startMinutes + MIN_EVENT_MINUTES,
+            snap(position.minutes),
+        );
+    }
+}
+
+async function onPointerUp(): Promise<void> {
+    const state = drag.value;
+
+    teardownListeners();
+
+    if (!state) {
+        return;
+    }
+
+    drag.value = null;
+
+    if (!state.active) {
+        return;
+    }
+
+    suppressNextClick = true;
+    setTimeout(() => (suppressNextClick = false), 0);
+
+    if (state.mode === 'create') {
+        emit(
+            'createRange',
+            dateAt(state.dayIndex, state.startMinutes),
+            dateAt(state.dayIndex, state.endMinutes),
+        );
+
+        return;
+    }
+
+    const occurrence = state.occurrence!;
+    const newStart = dateAt(state.dayIndex, state.startMinutes);
+    const newEnd = dateAt(state.dayIndex, state.endMinutes);
+
+    if (
+        newStart.toISOString() === occurrence.starts_at &&
+        newEnd.toISOString() === occurrence.ends_at
+    ) {
+        return;
+    }
+
+    try {
+        await grid.moveEvent(occurrence, newStart, newEnd);
+    } catch {
+        toast.error('Could not reschedule the event.');
+    }
+}
+
+function onDragKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+        cancelDrag();
+    }
+}
+
+function cancelDrag(): void {
+    drag.value = null;
+    teardownListeners();
+}
+
+function teardownListeners(): void {
+    clearTimeout(touchHoldTimer);
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('keydown', onDragKeydown);
+}
+
+onBeforeUnmount(teardownListeners);
+
+function onSlotClick(day: Date, event: MouseEvent): void {
+    if (
+        suppressNextClick ||
+        (event.target as HTMLElement).closest('[data-event]')
+    ) {
         return;
     }
 
@@ -184,18 +489,117 @@ const onSlotClick = (day: Date, event: MouseEvent) => {
         event.currentTarget as HTMLElement
     ).getBoundingClientRect();
 
-    const minutes = Math.floor(
-        (((event.clientY - bounds.top) / HOUR_HEIGHT) * 60) / SNAP_MINUTES,
-    ) * SNAP_MINUTES;
+    const minutes =
+        Math.floor(
+            ((event.clientY - bounds.top) / HOUR_HEIGHT) * 60 / SNAP_MINUTES,
+        ) * SNAP_MINUTES;
 
-    const slot = startOfDay(day);
-    slot.setMinutes(minutes);
+    const start = startOfDay(day);
+    start.setMinutes(minutes);
 
-    emit('createAt', slot);
-};
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
 
-const timeLabel = (occurrence: EventOccurrence) =>
-    `${format(new Date(occurrence.starts_at), 'HH:mm')} - ${format(new Date(occurrence.ends_at), 'HH:mm')}`;
+    emit('createRange', start, end);
+}
+
+function onEventClick(occurrence: EventOccurrence): void {
+    if (suppressNextClick) {
+        return;
+    }
+
+    emit('open', occurrence);
+}
+
+/**
+ * Keyboard rescheduling on a focused event block:
+ * Ctrl+Arrows move by one snap step (or one day), Shift+Up/Down resize.
+ */
+async function onEventKeydown(
+    event: KeyboardEvent,
+    box: PositionedBox,
+): Promise<void> {
+    if (!box.occurrence.can_edit) {
+        return;
+    }
+
+    const isArrow = [
+        'ArrowUp',
+        'ArrowDown',
+        'ArrowLeft',
+        'ArrowRight',
+    ].includes(event.key);
+
+    if (!isArrow || (!event.ctrlKey && !event.shiftKey)) {
+        return;
+    }
+
+    event.preventDefault();
+
+    const start = new Date(box.occurrence.starts_at);
+    const end = new Date(box.occurrence.ends_at);
+    const step = SNAP_MINUTES * 60 * 1000;
+    const day = 24 * 60 * 60 * 1000;
+
+    let newStart = start;
+    let newEnd = end;
+
+    if (event.shiftKey && !event.ctrlKey) {
+        if (event.key === 'ArrowDown') {
+            newEnd = new Date(end.getTime() + step);
+        } else if (event.key === 'ArrowUp') {
+            newEnd = new Date(
+                Math.max(
+                    start.getTime() + MIN_EVENT_MINUTES * 60 * 1000,
+                    end.getTime() - step,
+                ),
+            );
+        } else {
+            return;
+        }
+    } else if (event.ctrlKey) {
+        const delta =
+            event.key === 'ArrowUp'
+                ? -step
+                : event.key === 'ArrowDown'
+                  ? step
+                  : event.key === 'ArrowLeft'
+                    ? -day
+                    : day;
+
+        newStart = new Date(start.getTime() + delta);
+        newEnd = new Date(end.getTime() + delta);
+    }
+
+    try {
+        await grid.moveEvent(box.occurrence, newStart, newEnd);
+    } catch {
+        toast.error('Could not reschedule the event.');
+    }
+}
+
+const ghost = computed(() => {
+    const state = drag.value;
+
+    if (!state || !state.active) {
+        return null;
+    }
+
+    return {
+        dayIndex: state.dayIndex,
+        top: (state.startMinutes / 60) * HOUR_HEIGHT,
+        height: Math.max(
+            14,
+            ((state.endMinutes - state.startMinutes) / 60) * HOUR_HEIGHT,
+        ),
+        label: `${format(dateAt(state.dayIndex, state.startMinutes), 'HH:mm')} - ${format(dateAt(state.dayIndex, state.endMinutes), 'HH:mm')}`,
+        color: state.occurrence?.color ?? null,
+        mode: state.mode,
+    };
+});
+
+const draggingEventId = computed(() =>
+    drag.value?.active ? drag.value.occurrence?.event_id : undefined,
+);
 </script>
 
 <template>
@@ -286,6 +690,7 @@ const timeLabel = (occurrence: EventOccurrence) =>
         <!-- Scrollable time grid -->
         <div ref="scroller" class="flex-1 overflow-y-auto">
             <div
+                ref="bodyRef"
                 class="relative grid"
                 :style="{
                     gridTemplateColumns: `64px repeat(${days.length}, minmax(0, 1fr))`,
@@ -310,9 +715,10 @@ const timeLabel = (occurrence: EventOccurrence) =>
                 <div
                     v-for="(day, d) in days"
                     :key="day.toISOString()"
-                    class="relative cursor-pointer border-l"
+                    class="relative cursor-pointer touch-pan-y border-l"
                     role="gridcell"
                     :aria-label="format(day, 'EEEE, MMMM d')"
+                    @pointerdown="onEmptyPointerDown"
                     @click="(e) => onSlotClick(day, e)"
                 >
                     <!-- Hour lines -->
@@ -325,15 +731,16 @@ const timeLabel = (occurrence: EventOccurrence) =>
                     />
 
                     <!-- Events -->
-                    <button
+                    <div
                         v-for="box in columns[d]"
                         :key="box.occurrence.occurrence_id"
-                        type="button"
                         data-event
-                        class="absolute overflow-hidden rounded-md border-l-3 px-1.5 py-0.5 text-left text-xs transition-shadow hover:shadow-md"
+                        class="group absolute overflow-hidden rounded-md border-l-3"
                         :class="{
-                            'opacity-70 line-through':
-                                box.occurrence.status === 'cancelled',
+                            'opacity-40':
+                                draggingEventId === box.occurrence.event_id,
+                            'cursor-grab active:cursor-grabbing':
+                                box.occurrence.can_edit,
                         }"
                         :style="{
                             top: `${box.top}px`,
@@ -343,19 +750,60 @@ const timeLabel = (occurrence: EventOccurrence) =>
                             backgroundColor: box.occurrence.color + '26',
                             borderLeftColor: box.occurrence.color,
                         }"
-                        :aria-label="`${box.occurrence.title}, ${timeLabel(box.occurrence)}`"
-                        @click="emit('open', box.occurrence)"
+                        @pointerdown="
+                            (e) => onEventPointerDown(e, box, d)
+                        "
                     >
-                        <div class="truncate font-medium">
-                            {{ box.occurrence.title }}
-                        </div>
-                        <div
-                            v-if="box.height > 32"
-                            class="truncate text-[10px] text-muted-foreground"
+                        <button
+                            type="button"
+                            class="block h-full w-full px-1.5 py-0.5 text-left text-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            :class="{
+                                'line-through opacity-70':
+                                    box.occurrence.status === 'cancelled',
+                            }"
+                            :aria-label="`${box.occurrence.title}, ${timeLabel(box.occurrence)}${box.occurrence.can_edit ? '. Ctrl+arrows to move, Shift+arrows to resize' : ''}`"
+                            @click="onEventClick(box.occurrence)"
+                            @keydown="(e) => onEventKeydown(e, box)"
                         >
-                            {{ timeLabel(box.occurrence) }}
-                        </div>
-                    </button>
+                            <span class="block truncate font-medium">
+                                {{ box.occurrence.title }}
+                            </span>
+                            <span
+                                v-if="box.height > 32"
+                                class="block truncate text-[10px] text-muted-foreground"
+                            >
+                                {{ timeLabel(box.occurrence) }}
+                            </span>
+                        </button>
+
+                        <!-- Resize handle -->
+                        <div
+                            v-if="box.occurrence.can_edit"
+                            class="absolute right-0 bottom-0 left-0 h-2 cursor-ns-resize opacity-0 transition-opacity group-hover:opacity-100"
+                            :style="{
+                                backgroundColor: box.occurrence.color + '55',
+                            }"
+                            aria-hidden="true"
+                            @pointerdown="
+                                (e) => onResizePointerDown(e, box, d)
+                            "
+                        />
+                    </div>
+
+                    <!-- Drag ghost -->
+                    <div
+                        v-if="ghost && ghost.dayIndex === d"
+                        class="pointer-events-none absolute right-1 left-1 z-30 rounded-md border-2 border-dashed px-1.5 py-0.5 text-xs font-medium"
+                        :style="{
+                            top: `${ghost.top}px`,
+                            height: `${ghost.height}px`,
+                            borderColor: ghost.color ?? 'var(--primary)',
+                            backgroundColor: (ghost.color ?? '#CC8500') + '22',
+                        }"
+                        aria-hidden="true"
+                    >
+                        {{ ghost.label }}
+                    </div>
 
                     <!-- Now indicator -->
                     <div

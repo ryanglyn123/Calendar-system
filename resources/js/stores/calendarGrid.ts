@@ -1,14 +1,12 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { api } from '@/lib/api';
+import { monthFetchRange, monthKey, windowKeysAround } from '@/lib/calendarMath';
+import type { WeekStart } from '@/lib/calendarMath';
 import {
-    monthFetchRange,
-    monthKey,
-    windowKeysAround
-    
-} from '@/lib/calendarMath';
-import type {WeekStart} from '@/lib/calendarMath';
-import { index as eventsIndex } from '@/routes/api/events';
+    index as eventsIndex,
+    update as eventsUpdate,
+} from '@/routes/api/events';
 import type { CalendarView, EventOccurrence } from '@/types/calendar';
 
 type WindowState = {
@@ -154,6 +152,59 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         version.value++;
     }
 
+    /**
+     * Optimistically move/resize an event: the grid updates instantly, the
+     * PATCH runs in the background, and on failure the snapshot is restored.
+     */
+    async function moveEvent(
+        occurrence: EventOccurrence,
+        newStart: Date,
+        newEnd: Date,
+    ): Promise<void> {
+        const snapshot: [EventOccurrence[], EventOccurrence][] = [];
+
+        for (const window of windows.value.values()) {
+            for (let i = 0; i < window.occurrences.length; i++) {
+                const current = window.occurrences[i];
+
+                if (current.event_id === occurrence.event_id) {
+                    snapshot.push([window.occurrences, current]);
+                    window.occurrences.splice(i, 1, {
+                        ...current,
+                        starts_at: newStart.toISOString(),
+                        ends_at: newEnd.toISOString(),
+                    });
+                }
+            }
+        }
+
+        version.value++;
+
+        try {
+            await api.patch(eventsUpdate(occurrence.event_id).url, {
+                starts_at: newStart.toISOString(),
+                ends_at: newEnd.toISOString(),
+            });
+
+            // Reconcile occurrence ids and window membership in the background.
+            void invalidateAround(newStart);
+        } catch (error) {
+            for (const [occurrences, original] of snapshot) {
+                const index = occurrences.findIndex(
+                    (o) => o.event_id === original.event_id,
+                );
+
+                if (index !== -1) {
+                    occurrences.splice(index, 1, original);
+                }
+            }
+
+            version.value++;
+
+            throw error;
+        }
+    }
+
     return {
         view,
         focusDate,
@@ -170,6 +221,7 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         goToday,
         replaceOccurrence,
         removeEvent,
+        moveEvent,
         currentMonthKey: computed(() => monthKey(focusDate.value)),
     };
 });

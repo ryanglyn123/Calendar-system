@@ -33,8 +33,9 @@ const props = defineProps<{
     open: boolean;
     /** Editing target; null means creating. */
     occurrence: EventOccurrence | null;
-    /** Prefilled start for creation. */
+    /** Prefilled range for creation. */
     initialStart: Date | null;
+    initialEnd: Date | null;
     eventTypes: EventTypeItem[];
 }>();
 
@@ -127,7 +128,8 @@ watch(
                 : 'default';
         } else {
             const start = props.initialStart ?? new Date();
-            const end = new Date(start.getTime() + 60 * 60 * 1000);
+            const end =
+                props.initialEnd ?? new Date(start.getTime() + 60 * 60 * 1000);
 
             form.calendar_id =
                 list.writableCalendars.find((c) => c.type === 'personal')
