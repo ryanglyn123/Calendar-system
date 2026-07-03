@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from '@lucide/vue';
+import {
+    Building2,
+    CalendarDays,
+    LayoutGrid,
+    MailPlus,
+    ShieldCheck,
+    UserCheck,
+    Users,
+} from '@lucide/vue';
+import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
-import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import {
@@ -14,29 +22,80 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { useAuth } from '@/composables/useAuth';
 import { dashboard } from '@/routes';
+import admin from '@/routes/admin';
+import adminDivisions from '@/routes/admin/divisions';
+import adminInvitations from '@/routes/admin/invitations';
+import adminPending from '@/routes/admin/pending-registrations';
+import adminRoles from '@/routes/admin/roles';
+import adminUsers from '@/routes/admin/users';
 import type { NavItem } from '@/types';
+
+const { hasPermission, hasAnyPermission } = useAuth();
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Calendar',
         href: dashboard(),
-        icon: LayoutGrid,
+        icon: CalendarDays,
     },
 ];
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
-];
+const adminNavItems = computed<NavItem[]>(() => {
+    if (!hasPermission('admin.access')) {
+        return [];
+    }
+
+    const items: NavItem[] = [
+        {
+            title: 'Admin Dashboard',
+            href: admin.dashboard(),
+            icon: LayoutGrid,
+        },
+    ];
+
+    if (hasAnyPermission('users.manage', 'users.approve')) {
+        items.push(
+            {
+                title: 'Users',
+                href: adminUsers.index(),
+                icon: Users,
+            },
+            {
+                title: 'Pending Registrations',
+                href: adminPending.index(),
+                icon: UserCheck,
+            },
+        );
+    }
+
+    if (hasPermission('users.manage')) {
+        items.push({
+            title: 'Invitations',
+            href: adminInvitations.index(),
+            icon: MailPlus,
+        });
+    }
+
+    if (hasPermission('divisions.manage')) {
+        items.push({
+            title: 'Divisions',
+            href: adminDivisions.index(),
+            icon: Building2,
+        });
+    }
+
+    if (hasPermission('roles.manage')) {
+        items.push({
+            title: 'Roles & Permissions',
+            href: adminRoles.index(),
+            icon: ShieldCheck,
+        });
+    }
+
+    return items;
+});
 </script>
 
 <template>
@@ -55,10 +114,14 @@ const footerNavItems: NavItem[] = [
 
         <SidebarContent>
             <NavMain :items="mainNavItems" />
+            <NavMain
+                v-if="adminNavItems.length > 0"
+                :items="adminNavItems"
+                label="Administration"
+            />
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>
