@@ -46,13 +46,23 @@ class BookingDecidedNotification extends Notification implements ShouldQueue
         };
     }
 
+    /** The booking's own section page (Boardroom, Carpool, ...). */
+    private function sectionPath(): string
+    {
+        $slug = $this->booking->resource?->type?->slug;
+
+        return $slug === null
+            ? route('dashboard', absolute: false)
+            : route('resources.section', $slug, absolute: false);
+    }
+
     public function toMail(User $notifiable): MailMessage
     {
         return (new MailMessage)
             ->subject('Booking '.$this->booking->status->label())
             ->greeting("Hello {$notifiable->name},")
             ->line($this->summary())
-            ->action('View my bookings', route('bookings.index'));
+            ->action('View my bookings', url($this->sectionPath()));
     }
 
     /**
@@ -64,7 +74,7 @@ class BookingDecidedNotification extends Notification implements ShouldQueue
             'key' => $this->key(),
             'title' => 'Booking '.$this->booking->status->label(),
             'message' => $this->summary(),
-            'action_url' => route('bookings.index', absolute: false),
+            'action_url' => $this->sectionPath(),
             'booking_id' => $this->booking->id,
         ];
     }

@@ -17,7 +17,8 @@ defineProps<{
 defineOptions({
     layout: {
         title: 'Create an account',
-        description: 'Enter your details below to create your account',
+        description:
+            'An administrator reviews new registrations before your first sign-in.',
     },
 });
 </script>
@@ -42,7 +43,7 @@ defineOptions({
                     :tabindex="1"
                     autocomplete="name"
                     name="name"
-                    placeholder="Full name"
+                    placeholder="Juan J. Dela Cruz"
                 />
                 <InputError :message="errors.name" />
             </div>
@@ -56,7 +57,7 @@ defineOptions({
                     :tabindex="2"
                     autocomplete="email"
                     name="email"
-                    placeholder="email@example.com"
+                    placeholder="name@fdcp.gov.ph"
                 />
                 <InputError :message="errors.email" />
             </div>
@@ -69,7 +70,6 @@ defineOptions({
                     :tabindex="3"
                     autocomplete="new-password"
                     name="password"
-                    placeholder="Password"
                     :passwordrules="passwordRules"
                 />
                 <InputError :message="errors.password" />
@@ -83,7 +83,6 @@ defineOptions({
                     :tabindex="4"
                     autocomplete="new-password"
                     name="password_confirmation"
-                    placeholder="Confirm password"
                     :passwordrules="passwordRules"
                 />
                 <InputError :message="errors.password_confirmation" />

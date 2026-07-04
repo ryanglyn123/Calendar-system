@@ -2,13 +2,54 @@ import type { CalendarItem, EventTypeItem } from './admin';
 
 export type CalendarView = 'month' | 'week' | 'day' | 'agenda';
 
+/**
+ * Narrows a calendar page to a subset of the accessible calendars: the
+ * merged dashboard, the FDCP public calendar, and each resource type's
+ * section page all render the same shell under different scopes.
+ */
+export type CalendarScope = {
+    types?: ('organization' | 'division' | 'personal' | 'resource')[];
+    resourceTypeId?: number;
+};
+
+export type CalendarPanelGroup = {
+    key: 'organization' | 'division' | 'personal' | 'resource';
+    label: string;
+};
+
 export type RsvpStatus = 'pending' | 'accepted' | 'declined' | 'tentative';
 
 export type EventAttendee = {
     user_id: number | null;
     name: string;
+    avatar_path: string | null;
     rsvp_status: RsvpStatus;
     is_organizer: boolean;
+};
+
+export type EventOrganizer = {
+    user_id: number | null;
+    name: string;
+    avatar_path: string | null;
+};
+
+export type BookingStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export type EventBookingInfo = {
+    id: number;
+    status: BookingStatus;
+    status_label: string;
+    status_color: string;
+    resource: string | null;
+    resource_type: string | null;
+    capacity: number | null;
+    purpose: string | null;
+    attendee_count: number | null;
+    requested_by: string | null;
+    reviewed_by: string | null;
+    reviewed_at: string | null;
+    rejection_reason: string | null;
+    cancellation_reason: string | null;
 };
 
 export type UserSearchResult = {
@@ -44,6 +85,8 @@ export type EventOccurrence = {
     is_recurring: boolean;
     rrule: string | null;
     attendees: EventAttendee[];
+    organizer: EventOrganizer | null;
+    booking: EventBookingInfo | null;
     my_rsvp: RsvpStatus | null;
     my_reminder_minutes: number[];
     is_private: boolean;

@@ -52,12 +52,29 @@ class EventOccurrenceResource extends JsonResource
                 ?? $event->eventType->color
                 ?? $this->preferenceColor
                 ?? $event->calendar->color,
-            'booking' => ! $event->relationLoaded('booking') || $event->booking === null
+            'booking' => $masked || ! $event->relationLoaded('booking') || $event->booking === null
                 ? null
                 : [
                     'id' => $event->booking->id,
                     'status' => $event->booking->status->value,
+                    'status_label' => $event->booking->status->label(),
+                    'status_color' => $event->booking->status->color(),
                     'resource' => $event->booking->resource?->name,
+                    'resource_type' => $event->booking->resource?->relationLoaded('type')
+                        ? $event->booking->resource->type?->name
+                        : null,
+                    'capacity' => $event->booking->resource?->capacity,
+                    'purpose' => $event->booking->purpose,
+                    'attendee_count' => $event->booking->attendee_count,
+                    'requested_by' => $event->booking->relationLoaded('requester')
+                        ? $event->booking->requester?->name
+                        : null,
+                    'reviewed_by' => $event->booking->relationLoaded('reviewer')
+                        ? $event->booking->reviewer?->name
+                        : null,
+                    'reviewed_at' => $event->booking->reviewed_at?->toIso8601String(),
+                    'rejection_reason' => $event->booking->rejection_reason,
+                    'cancellation_reason' => $event->booking->cancellation_reason,
                 ],
             'event_type' => $masked || ! $event->relationLoaded('eventType') || $event->eventType === null
                 ? null
@@ -69,9 +86,17 @@ class EventOccurrenceResource extends JsonResource
                 : $event->attendees->map(fn ($attendee) => [
                     'user_id' => $attendee->user_id,
                     'name' => $attendee->user->name ?? $attendee->name,
+                    'avatar_path' => $attendee->user?->avatar_path,
                     'rsvp_status' => $attendee->rsvp_status->value,
                     'is_organizer' => $attendee->is_organizer,
                 ])->values()->all(),
+            'organizer' => $masked || ! $event->relationLoaded('creator') || $event->creator === null
+                ? null
+                : [
+                    'user_id' => $event->creator->id,
+                    'name' => $event->creator->name,
+                    'avatar_path' => $event->creator->avatar_path,
+                ],
             'my_rsvp' => $event->relationLoaded('attendees')
                 ? $event->attendees->firstWhere('user_id', $user->id)?->rsvp_status->value
                 : null,

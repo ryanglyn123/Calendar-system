@@ -16,8 +16,8 @@ import { request } from '@/routes/password';
 
 defineOptions({
     layout: {
-        title: 'Log in to your account',
-        description: 'Enter your email and password below to log in',
+        title: 'Log in to FDCP Calendar',
+        description: 'Use your FDCP account to continue.',
     },
 });
 
@@ -32,14 +32,12 @@ defineProps<{
 
     <div
         v-if="status"
-        class="mb-4 text-center text-sm font-medium text-green-600"
+        class="mb-4 text-center text-sm font-medium text-success"
     >
         {{ status }}
     </div>
 
-    <PasskeyVerify />
-
-    <Button variant="outline" class="mb-4 w-full" as-child>
+    <Button variant="outline" class="mb-2 w-full" as-child>
         <a :href="googleRedirect().url">
             <svg class="size-4" viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -63,6 +61,17 @@ defineProps<{
         </a>
     </Button>
 
+    <PasskeyVerify separator="" />
+
+    <div class="relative my-6">
+        <div class="absolute inset-x-0 top-1/2 h-px bg-border" />
+        <div class="relative flex justify-center text-xs uppercase">
+            <span class="bg-card px-2 text-muted-foreground">
+                Or use your email
+            </span>
+        </div>
+    </div>
+
     <Form
         v-bind="store.form()"
         :reset-on-success="['password']"
@@ -80,7 +89,7 @@ defineProps<{
                     autofocus
                     :tabindex="1"
                     autocomplete="email"
-                    placeholder="email@example.com"
+                    placeholder="name@fdcp.gov.ph"
                 />
                 <InputError :message="errors.email" />
             </div>
@@ -103,7 +112,6 @@ defineProps<{
                     required
                     :tabindex="2"
                     autocomplete="current-password"
-                    placeholder="Password"
                 />
                 <InputError :message="errors.password" />
             </div>

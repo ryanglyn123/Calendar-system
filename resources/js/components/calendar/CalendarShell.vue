@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import AgendaView from '@/components/calendar/AgendaView.vue';
 import CalendarListPanel from '@/components/calendar/CalendarListPanel.vue';
@@ -20,6 +20,8 @@ import { useCalendarGridStore } from '@/stores/calendarGrid';
 import { useCalendarListStore } from '@/stores/calendarList';
 import type {
     CalendarItem,
+    CalendarPanelGroup,
+    CalendarScope,
     EventOccurrence,
     EventTypeItem,
 } from '@/types/calendar';
@@ -29,6 +31,10 @@ const props = defineProps<{
     weekStartsOn: 0 | 1;
     initialCalendars?: CalendarItem[];
     initialEvents?: EventOccurrence[];
+    /** Narrows the shell to a page scope (public calendar, resource section). */
+    scope?: CalendarScope;
+    /** Which calendar groups the side panel renders, with their labels. */
+    panelGroups?: CalendarPanelGroup[];
 }>();
 
 const grid = useCalendarGridStore();
@@ -36,6 +42,11 @@ const list = useCalendarListStore();
 const { confirm } = useConfirm();
 
 grid.weekStartsOn = props.weekStartsOn;
+
+// The scope must be in place before priming: window caches are keyed by it
+// and list refreshes re-request the same subset.
+grid.setScope(props.scope ?? null);
+list.setScope(props.scope ?? null);
 
 // Server-inlined data: the grid and sidebar render full on first paint,
 // with no follow-up API round trips.
@@ -54,6 +65,13 @@ onMounted(() => {
     void grid.ensureWindowsAround(grid.focusDate);
 });
 
+/**
+ * Whether the user can create events anywhere in this scope. Resource
+ * calendars are never writable (bookings own their events), and the public
+ * calendar needs the org-events permission.
+ */
+const canCreate = computed(() => list.writableCalendars.length > 0);
+
 const quickViewTarget = ref<EventOccurrence | null>(null);
 
 const editorOpen = ref(false);
@@ -69,6 +87,10 @@ const openQuickView = (occurrence: EventOccurrence) => {
 };
 
 const openCreate = (start?: Date, end?: Date) => {
+    if (!canCreate.value) {
+        return;
+    }
+
     editorTarget.value = null;
     editorInitialStart.value = start ?? null;
     editorInitialEnd.value = end ?? null;
@@ -189,12 +211,12 @@ const removeEvent = async (occurrence: EventOccurrence) => {
         >
             <MiniMonth />
             <Separator />
-            <CalendarListPanel />
+            <CalendarListPanel :groups="panelGroups" />
         </aside>
 
         <!-- Main area -->
         <div class="flex min-w-0 flex-1 flex-col">
-            <CalendarToolbar @create="openCreate()" />
+            <CalendarToolbar :can-create="canCreate" @create="openCreate()" />
 
             <div class="min-h-0 flex-1">
                 <MonthView

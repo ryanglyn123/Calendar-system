@@ -5,6 +5,7 @@ namespace App\Services\Calendar;
 use App\Enums\CalendarType;
 use App\Enums\SharePermission;
 use App\Models\Calendar;
+use App\Models\Resource;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -40,6 +41,37 @@ class CalendarAccessService
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Narrow an accessible-calendar set to a page scope: calendar types
+     * (dashboard, public calendar) and/or the resource calendars of one
+     * resource type (Boardroom / Carpool section pages).
+     *
+     * @param  Collection<int, Calendar>  $calendars
+     * @param  list<string>|null  $types
+     * @return Collection<int, Calendar>
+     */
+    public function scoped(Collection $calendars, ?array $types = null, ?int $resourceTypeId = null): Collection
+    {
+        if ($types !== null) {
+            $calendars = $calendars->filter(
+                fn (Calendar $calendar) => in_array($calendar->type->value, $types, true),
+            );
+        }
+
+        if ($resourceTypeId !== null) {
+            $calendarIds = Resource::query()
+                ->where('resource_type_id', $resourceTypeId)
+                ->pluck('calendar_id')
+                ->all();
+
+            $calendars = $calendars->filter(
+                fn (Calendar $calendar) => in_array($calendar->id, $calendarIds, true),
+            );
+        }
+
+        return $calendars->values();
     }
 
     /**

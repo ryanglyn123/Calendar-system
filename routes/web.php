@@ -16,6 +16,8 @@ use App\Http\Controllers\Auth\InvitationAcceptanceController;
 use App\Http\Controllers\Calendar\CalendarShareController;
 use App\Http\Controllers\Calendar\PersonalCalendarController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PublicCalendarController;
+use App\Http\Controllers\ResourceSectionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -41,7 +43,11 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
-    Route::inertia('bookings', 'Bookings')->name('bookings.index');
+    Route::get('calendar/public', PublicCalendarController::class)->name('calendar.public');
+
+    // One section page per active resource type (Boardroom, Carpool, ...):
+    // the type's calendar plus booking, linked from the sidebar.
+    Route::get('resources/{resourceType:slug}', ResourceSectionController::class)->name('resources.section');
 
     // Personal calendar management + person-to-person sharing (Inertia forms).
     Route::post('calendars', [PersonalCalendarController::class, 'store'])->name('calendars.store');

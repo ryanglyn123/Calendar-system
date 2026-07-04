@@ -14,6 +14,14 @@ import { addDays, addMonths, format } from '@/lib/calendarMath';
 import { useCalendarGridStore } from '@/stores/calendarGrid';
 import type { CalendarView } from '@/types/calendar';
 
+withDefaults(
+    defineProps<{
+        /** Hidden on scopes with no writable calendars (resource sections). */
+        canCreate?: boolean;
+    }>(),
+    { canCreate: true },
+);
+
 const emit = defineEmits<{
     create: [];
 }>();
@@ -56,7 +64,12 @@ const views: { value: CalendarView; label: string }[] = [
 
 <template>
     <div class="flex flex-wrap items-center gap-2 border-b px-4 py-3">
-        <Button class="mr-2" data-test="create-event" @click="emit('create')">
+        <Button
+            v-if="canCreate"
+            class="mr-2"
+            data-test="create-event"
+            @click="emit('create')"
+        >
             <Plus aria-hidden="true" />
             <span class="hidden sm:inline">Create</span>
         </Button>

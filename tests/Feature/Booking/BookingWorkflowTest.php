@@ -205,6 +205,6 @@ test('booking events adopt the booking status color on the grid', function () {
         ->firstWhere('booking.status', 'pending');
 
     expect($occurrence)->not->toBeNull()
-        ->and($occurrence['color'])->toBe('#f59e0b')
+        ->and($occurrence['color'])->toBe(BookingStatus::Pending->color())
         ->and($occurrence['can_edit'])->toBeFalse();
 });

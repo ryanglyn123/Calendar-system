@@ -12,3 +12,11 @@ export type NavItem = {
     icon?: LucideIcon;
     isActive?: boolean;
 };
+
+/** Shared by the backend for the per-resource-type sidebar sections. */
+export type ResourceTypeNav = {
+    id: number;
+    name: string;
+    slug: string;
+    icon: string | null;
+};

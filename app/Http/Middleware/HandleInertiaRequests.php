@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Announcement;
+use App\Models\ResourceType;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -68,6 +69,16 @@ class HandleInertiaRequests extends Middleware
                     ->orderByDesc('level')
                     ->limit(3)
                     ->get(['id', 'title', 'body', 'level', 'is_dismissible'])
+                    ->toArray(),
+            // Each active resource type gets its own sidebar section
+            // (Boardroom, Carpool, ...) with a calendar + booking page.
+            'resourceTypes' => $user === null || ! $user->isActive()
+                ? []
+                : ResourceType::query()
+                    ->active()
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'slug', 'icon'])
                     ->toArray(),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];

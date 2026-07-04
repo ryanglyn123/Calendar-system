@@ -47,8 +47,19 @@ class BookingController extends Controller
 
     public function mine(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'resource_type_id' => ['sometimes', 'integer'],
+        ]);
+
         $bookings = Booking::query()
             ->where('requested_by', $request->user()->id)
+            ->when(
+                isset($validated['resource_type_id']),
+                fn ($query) => $query->whereHas(
+                    'resource',
+                    fn ($q) => $q->where('resource_type_id', (int) $validated['resource_type_id']),
+                ),
+            )
             ->with(['resource.type', 'editRequests'])
             ->orderByDesc('starts_at')
             ->limit(100)

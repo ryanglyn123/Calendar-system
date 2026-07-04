@@ -50,7 +50,7 @@ const props = defineProps<{
                     required
                     autofocus
                     autocomplete="name"
-                    placeholder="Juan dela Cruz"
+                    placeholder="Juan J. Dela Cruz"
                 />
                 <InputError :message="errors.name" />
             </div>

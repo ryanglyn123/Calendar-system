@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3';
 import CalendarShell from '@/components/calendar/CalendarShell.vue';
 import type {
     CalendarItem,
+    CalendarScope,
     EventOccurrence,
     EventTypeItem,
 } from '@/types/calendar';
@@ -13,15 +14,22 @@ defineProps<{
     initialCalendars: CalendarItem[];
     initialEvents: EventOccurrence[];
 }>();
+
+// Resource calendars live on their own section pages; the merged calendar
+// carries everything else.
+const scope: CalendarScope = {
+    types: ['organization', 'division', 'personal'],
+};
 </script>
 
 <template>
-    <Head title="Calendar" />
+    <Head title="My Calendar" />
 
     <CalendarShell
         :event-types="eventTypes.data"
         :week-starts-on="weekStartsOn"
         :initial-calendars="initialCalendars"
         :initial-events="initialEvents"
+        :scope="scope"
     />
 </template>

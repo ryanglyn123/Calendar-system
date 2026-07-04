@@ -130,7 +130,7 @@ export function eventInk(hex: string | null | undefined): string {
     const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
     return luminance > 0.45
-        ? `color-mix(in oklch, #${c} 38%, oklch(0.22 0.02 none))`
+        ? `color-mix(in oklch, #${c} 26%, oklch(0.18 0.035 none))`
         : '#ffffff';
 }
 

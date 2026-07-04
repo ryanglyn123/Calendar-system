@@ -42,13 +42,23 @@ class EditRequestDecidedNotification extends Notification implements ShouldQueue
             : "Your change to the {$resource} booking was rejected: {$this->editRequest->rejection_reason}";
     }
 
+    /** The booking's own section page (Boardroom, Carpool, ...). */
+    private function sectionPath(): string
+    {
+        $slug = $this->editRequest->booking?->resource?->type?->slug;
+
+        return $slug === null
+            ? route('dashboard', absolute: false)
+            : route('resources.section', $slug, absolute: false);
+    }
+
     public function toMail(User $notifiable): MailMessage
     {
         return (new MailMessage)
             ->subject('Booking change '.$this->editRequest->status->value)
             ->greeting("Hello {$notifiable->name},")
             ->line($this->summary())
-            ->action('View my bookings', route('bookings.index'));
+            ->action('View my bookings', url($this->sectionPath()));
     }
 
     /**
@@ -60,7 +70,7 @@ class EditRequestDecidedNotification extends Notification implements ShouldQueue
             'key' => $this->key(),
             'title' => 'Booking change '.$this->editRequest->status->value,
             'message' => $this->summary(),
-            'action_url' => route('bookings.index', absolute: false),
+            'action_url' => $this->sectionPath(),
             'edit_request_id' => $this->editRequest->id,
         ];
     }

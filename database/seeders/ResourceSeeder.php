@@ -17,7 +17,7 @@ class ResourceSeeder extends Seeder
         $boardRooms = ResourceType::query()->firstOrCreate(
             ['slug' => 'board-room'],
             [
-                'name' => 'Board Rooms',
+                'name' => 'Boardroom',
                 'icon' => 'presentation',
                 'description' => 'Meeting and conference rooms.',
                 'approver_role_id' => Role::query()->where('name', 'board_room_approver')->value('id'),
@@ -34,7 +34,7 @@ class ResourceSeeder extends Seeder
         $vehicles = ResourceType::query()->firstOrCreate(
             ['slug' => 'vehicle'],
             [
-                'name' => 'Vehicles',
+                'name' => 'Carpool',
                 'icon' => 'car',
                 'description' => 'FDCP service vehicles.',
                 'approver_role_id' => Role::query()->where('name', 'vehicle_approver')->value('id'),

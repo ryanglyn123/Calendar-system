@@ -2,6 +2,7 @@
 
 use App\Models\Calendar;
 use App\Models\Event;
+use App\Models\Resource;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 
@@ -32,4 +33,13 @@ test('inlined dashboard events never include other users\' personal events', fun
 
     expect(collect($props['initialEvents'])->pluck('event_id'))->not->toContain($secret->id)
         ->and(collect($props['initialCalendars'])->pluck('id'))->not->toContain($calendar->id);
+});
+
+test('the dashboard leaves resource calendars to their section pages', function () {
+    $user = User::factory()->create();
+    Resource::factory()->create();
+
+    $props = $this->actingAs($user)->get(route('dashboard'))->inertiaProps();
+
+    expect(collect($props['initialCalendars'])->pluck('type'))->not->toContain('resource');
 });

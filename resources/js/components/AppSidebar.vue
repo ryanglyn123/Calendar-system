@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import {
     CalendarDays,
-    ClipboardCheck,
     FileDiff,
+    Globe,
     LayoutGrid,
     MailPlus,
     Megaphone,
@@ -26,6 +26,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/composables/useAuth';
+import { resourceTypeIcon } from '@/lib/resourceTypeIcon';
 import { dashboard } from '@/routes';
 import admin from '@/routes/admin';
 import adminAnnouncements from '@/routes/admin/announcements';
@@ -35,23 +36,38 @@ import adminInvitations from '@/routes/admin/invitations';
 import adminPending from '@/routes/admin/pending-registrations';
 import adminSettings from '@/routes/admin/settings';
 import adminUsers from '@/routes/admin/users';
-import bookingsPage from '@/routes/bookings';
-import type { NavItem } from '@/types';
+import calendarPage from '@/routes/calendar';
+import resourcesPage from '@/routes/resources';
+import type { NavItem, ResourceTypeNav } from '@/types';
 
 const { hasPermission, hasAnyPermission } = useAuth();
 
-const mainNavItems: NavItem[] = [
+const page = usePage();
+
+// One sidebar section per active resource type (Boardroom, Carpool, ...).
+const resourceTypes = computed(
+    () => (page.props.resourceTypes as ResourceTypeNav[] | undefined) ?? [],
+);
+
+const mainNavItems = computed<NavItem[]>(() => [
     {
-        title: 'Calendar',
+        title: 'My Calendar',
         href: dashboard(),
         icon: CalendarDays,
     },
     {
-        title: 'Bookings',
-        href: bookingsPage.index(),
-        icon: ClipboardCheck,
+        title: 'Public Calendar',
+        href: calendarPage.public(),
+        icon: Globe,
     },
-];
+    ...resourceTypes.value.map(
+        (type): NavItem => ({
+            title: type.name,
+            href: resourcesPage.section(type.slug),
+            icon: resourceTypeIcon(type),
+        }),
+    ),
+]);
 
 const adminNavItems = computed<NavItem[]>(() => {
     if (!hasPermission('admin.access')) {

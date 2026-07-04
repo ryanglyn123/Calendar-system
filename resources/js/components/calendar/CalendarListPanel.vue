@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
 import { Plus } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -16,19 +16,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { store as calendarsStore } from '@/routes/calendars';
 import { useCalendarListStore } from '@/stores/calendarList';
-import type { CalendarItem } from '@/types/calendar';
+import type { CalendarItem, CalendarPanelGroup } from '@/types/calendar';
 
 const list = useCalendarListStore();
 
-const groups: {
-    key: 'organization' | 'division' | 'personal' | 'resource';
-    label: string;
-}[] = [
-    { key: 'organization', label: 'FDCP' },
-    { key: 'division', label: 'Division' },
-    { key: 'personal', label: 'My calendars' },
-    { key: 'resource', label: 'Rooms & vehicles' },
-];
+// Resource calendars are absent from the default (merged) panel on purpose:
+// each resource type has its own section page now.
+const props = withDefaults(
+    defineProps<{
+        groups?: CalendarPanelGroup[];
+    }>(),
+    {
+        groups: () => [
+            { key: 'organization', label: 'FDCP' },
+            { key: 'division', label: 'Division' },
+            { key: 'personal', label: 'My calendars' },
+        ],
+    },
+);
+
+const hasPersonalGroup = computed(() =>
+    props.groups.some((group) => group.key === 'personal'),
+);
 
 const swatches = [
     '#EFD95F',
@@ -110,7 +119,11 @@ const toggle = (calendar: CalendarItem) => {
         </template>
 
         <section
-            v-if="list.grouped.personal.length === 0 && list.loaded"
+            v-if="
+                hasPersonalGroup &&
+                list.grouped.personal.length === 0 &&
+                list.loaded
+            "
             class="px-1"
         >
             <Button

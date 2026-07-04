@@ -27,8 +27,10 @@ class EventWindowService
      * Occurrences in [start, end) across the user's calendars. Requested
      * calendar ids are intersected with the accessible set, so an
      * inaccessible id silently yields nothing rather than leaking existence.
+     * Types and resource type narrow the set the same way for scoped pages.
      *
      * @param  list<int>|null  $requestedCalendarIds
+     * @param  list<string>|null  $types
      * @return list<array<string, mixed>>
      */
     public function occurrences(
@@ -37,8 +39,12 @@ class EventWindowService
         CarbonInterface $start,
         CarbonInterface $end,
         ?array $requestedCalendarIds = null,
+        ?array $types = null,
+        ?int $resourceTypeId = null,
     ): array {
-        $accessible = $this->access->accessibleCalendars($user)->keyBy('id');
+        $accessible = $this->access
+            ->scoped($this->access->accessibleCalendars($user), $types, $resourceTypeId)
+            ->keyBy('id');
 
         $calendarIds = $requestedCalendarIds === null
             ? $accessible->keys()->all()
@@ -54,7 +60,10 @@ class EventWindowService
         $roots = Event::query()
             ->whereIn('calendar_id', $calendarIds)
             ->windowRoots($start, $end)
-            ->with(['eventType', 'calendar', 'overrides', 'attendees.user', 'reminders', 'booking.resource'])
+            ->with([
+                'eventType', 'calendar', 'overrides', 'attendees.user', 'reminders',
+                'creator', 'booking.resource.type', 'booking.requester', 'booking.reviewer',
+            ])
             ->get();
 
         $preferences = CalendarUserPreference::query()

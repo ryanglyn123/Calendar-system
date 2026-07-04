@@ -8,7 +8,11 @@ import {
     update as eventsUpdate,
 } from '@/routes/api/events';
 import occurrenceRoutes from '@/routes/api/events/occurrence';
-import type { CalendarView, EventOccurrence } from '@/types/calendar';
+import type {
+    CalendarScope,
+    CalendarView,
+    EventOccurrence,
+} from '@/types/calendar';
 
 export type RecurrenceScope = 'this' | 'following' | 'all';
 
@@ -30,11 +34,48 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
     const weekStartsOn = ref<WeekStart>(1);
     const windows = ref(new Map<string, WindowState>());
 
+    /**
+     * The page's calendar scope. Windows are cached per scope so switching
+     * between the dashboard, public calendar and resource sections never
+     * mixes their event sets or reuses the wrong cache.
+     */
+    const scope = ref<CalendarScope | null>(null);
+
+    const scopeKey = computed(() => {
+        if (scope.value === null) {
+            return 'all';
+        }
+
+        return `${scope.value.types?.join('+') ?? ''}#${scope.value.resourceTypeId ?? ''}`;
+    });
+
+    function setScope(next: CalendarScope | null): void {
+        scope.value = next;
+        version.value++;
+    }
+
+    function scopeQuery(): Record<string, (string | number)[] | number> {
+        const query: Record<string, (string | number)[] | number> = {};
+
+        if (scope.value?.types !== undefined) {
+            query.types = scope.value.types;
+        }
+
+        if (scope.value?.resourceTypeId !== undefined) {
+            query.resource_type_id = scope.value.resourceTypeId;
+        }
+
+        return query;
+    }
+
     /** Bumps whenever any window's contents change so views recompute. */
     const version = ref(0);
 
     const isLoading = computed(() =>
-        [...windows.value.values()].some((w) => w.status === 'loading'),
+        [...windows.value.entries()].some(
+            ([key, w]) =>
+                key.startsWith(`${scopeKey.value}|`) && w.status === 'loading',
+        ),
     );
 
     function occurrencesBetween(start: Date, end: Date): EventOccurrence[] {
@@ -44,8 +85,11 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         const seen = new Set<string>();
         const result: EventOccurrence[] = [];
 
-        for (const window of windows.value.values()) {
-            if (window.status === 'loading') {
+        for (const [key, window] of windows.value.entries()) {
+            if (
+                !key.startsWith(`${scopeKey.value}|`) ||
+                window.status === 'loading'
+            ) {
                 continue;
             }
 
@@ -87,8 +131,13 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
      * One round trip instead of one per month.
      */
     async function fetchWindows(keys: string[]): Promise<void> {
-        const missing = keys.filter((key) => {
-            const existing = windows.value.get(key);
+        // Capture the scope at call time: a page switch mid-flight must not
+        // write this response into the new scope's cache.
+        const prefix = scopeKey.value;
+        const scopedKey = (month: string) => `${prefix}|${month}`;
+
+        const missing = keys.filter((month) => {
+            const existing = windows.value.get(scopedKey(month));
 
             return !existing || existing.status === 'stale';
         });
@@ -98,9 +147,9 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         }
 
         const ranges = new Map(
-            missing.map((key) => [
-                key,
-                monthFetchRange(key, weekStartsOn.value),
+            missing.map((month) => [
+                month,
+                monthFetchRange(month, weekStartsOn.value),
             ]),
         );
 
@@ -111,10 +160,11 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
             Math.max(...[...ranges.values()].map((r) => r.end.getTime())),
         );
 
-        for (const key of missing) {
-            windows.value.set(key, {
+        for (const month of missing) {
+            windows.value.set(scopedKey(month), {
                 status: 'loading',
-                occurrences: windows.value.get(key)?.occurrences ?? [],
+                occurrences:
+                    windows.value.get(scopedKey(month))?.occurrences ?? [],
             });
         }
 
@@ -124,14 +174,15 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
                     query: {
                         start: start.toISOString(),
                         end: end.toISOString(),
+                        ...scopeQuery(),
                     },
                 }).url,
             );
 
-            for (const key of missing) {
-                const range = ranges.get(key)!;
+            for (const month of missing) {
+                const range = ranges.get(month)!;
 
-                windows.value.set(key, {
+                windows.value.set(scopedKey(month), {
                     status: 'ready',
                     occurrences: response.data.filter((occurrence) =>
                         overlapsRange(occurrence, range),
@@ -139,8 +190,8 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
                 });
             }
         } catch (error) {
-            for (const key of missing) {
-                windows.value.delete(key);
+            for (const month of missing) {
+                windows.value.delete(scopedKey(month));
             }
 
             throw error;
@@ -163,10 +214,10 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
      * render without any API round trip.
      */
     function primeAround(date: Date, occurrences: EventOccurrence[]): void {
-        for (const key of windowKeysAround(date)) {
-            const range = monthFetchRange(key, weekStartsOn.value);
+        for (const month of windowKeysAround(date)) {
+            const range = monthFetchRange(month, weekStartsOn.value);
 
-            windows.value.set(key, {
+            windows.value.set(`${scopeKey.value}|${month}`, {
                 status: 'ready',
                 occurrences: occurrences.filter((occurrence) =>
                     overlapsRange(occurrence, range),
@@ -323,6 +374,8 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         focusDate,
         weekStartsOn,
         windows,
+        scope,
+        setScope,
         version,
         isLoading,
         occurrencesBetween,

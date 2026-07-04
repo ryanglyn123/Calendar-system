@@ -2,12 +2,29 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { api } from '@/lib/api';
 import { index as calendarsIndex, preference } from '@/routes/api/calendars';
-import type { CalendarItem } from '@/types/calendar';
+import type { CalendarItem, CalendarScope } from '@/types/calendar';
 
 export const useCalendarListStore = defineStore('calendarList', () => {
     const calendars = ref<CalendarItem[]>([]);
     const loaded = ref(false);
     const loading = ref(false);
+
+    /**
+     * The page's calendar scope; refreshes request the same subset the page
+     * inlined, so a scoped page never flashes back to the full list.
+     */
+    const scope = ref<CalendarScope | null>(null);
+
+    function setScope(next: CalendarScope | null): void {
+        const changed = JSON.stringify(next) !== JSON.stringify(scope.value);
+
+        scope.value = next;
+
+        if (changed) {
+            calendars.value = [];
+            loaded.value = false;
+        }
+    }
 
     const visibleCalendarIds = computed(() =>
         calendars.value.filter((c) => c.is_visible).map((c) => c.id),
@@ -41,13 +58,29 @@ export const useCalendarListStore = defineStore('calendarList', () => {
 
         loading.value = true;
 
+        const requestedScope = JSON.stringify(scope.value);
+
+        const query: Record<string, (string | number)[] | number> = {};
+
+        if (scope.value?.types !== undefined) {
+            query.types = scope.value.types;
+        }
+
+        if (scope.value?.resourceTypeId !== undefined) {
+            query.resource_type_id = scope.value.resourceTypeId;
+        }
+
         try {
             const response = await api.get<{ data: CalendarItem[] }>(
-                calendarsIndex().url,
+                calendarsIndex({ query }).url,
             );
 
-            calendars.value = response.data;
-            loaded.value = true;
+            // A page switch mid-flight changes the scope; drop the response
+            // rather than overwrite the new page's list.
+            if (JSON.stringify(scope.value) === requestedScope) {
+                calendars.value = response.data;
+                loaded.value = true;
+            }
         } finally {
             loading.value = false;
         }
@@ -71,6 +104,8 @@ export const useCalendarListStore = defineStore('calendarList', () => {
         calendars,
         loaded,
         loading,
+        scope,
+        setScope,
         visibleCalendarIds,
         byId,
         grouped,

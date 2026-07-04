@@ -7,6 +7,7 @@ use App\Services\Event\EventWindowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 
 class EventWindowController extends Controller
 {
@@ -20,6 +21,9 @@ class EventWindowController extends Controller
             'end' => ['required', 'date', 'after:start'],
             'calendars' => ['sometimes', 'array'],
             'calendars.*' => ['integer'],
+            'types' => ['sometimes', 'array'],
+            'types.*' => ['string', Rule::in(['organization', 'division', 'personal', 'resource'])],
+            'resource_type_id' => ['sometimes', 'integer'],
         ]);
 
         $start = Carbon::parse($validated['start']);
@@ -34,6 +38,8 @@ class EventWindowController extends Controller
                 $start,
                 $end,
                 $validated['calendars'] ?? null,
+                $validated['types'] ?? null,
+                isset($validated['resource_type_id']) ? (int) $validated['resource_type_id'] : null,
             ),
         ]);
     }
