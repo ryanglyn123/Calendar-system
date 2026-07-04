@@ -36,8 +36,10 @@ import { api, ApiError } from '@/lib/api';
 import { format, isSameDay, parseISO } from '@/lib/calendarMath';
 import {
     describeRecurrence,
+    eventTiming,
     formatDuration,
     formatReminder,
+    formatTimezone,
 } from '@/lib/eventDisplay';
 import { rsvp as eventsRsvp } from '@/routes/api/events';
 import { useCalendarListStore } from '@/stores/calendarList';
@@ -90,6 +92,37 @@ const durationText = computed(() =>
         : null,
 );
 
+const timezoneText = computed(() =>
+    props.occurrence && !props.occurrence.all_day
+        ? formatTimezone(props.occurrence.timezone, props.occurrence.starts_at)
+        : null,
+);
+
+const timing = computed(() =>
+    props.occurrence
+        ? eventTiming(
+              props.occurrence.starts_at,
+              props.occurrence.ends_at,
+              props.occurrence.all_day,
+              Date.now(),
+          )
+        : null,
+);
+
+const statusPill = computed(() => {
+    const state = timing.value?.state;
+
+    if (state === 'now') {
+        return 'bg-success/10 text-success';
+    }
+
+    if (state === 'upcoming') {
+        return 'bg-foreground/[0.06] text-foreground/80';
+    }
+
+    return 'bg-muted text-muted-foreground';
+});
+
 const recurrenceText = computed(() => {
     if (!props.occurrence?.is_recurring) {
         return null;
@@ -104,10 +137,26 @@ const reminders = computed(() =>
         .map((minutes) => formatReminder(minutes)),
 );
 
+const peopleCount = computed(() => {
+    if (!props.occurrence) {
+        return 0;
+    }
+
+    return (
+        (props.occurrence.organizer ? 1 : 0) + props.occurrence.attendees.length
+    );
+});
+
 const reviewedAt = computed(() => {
     const at = props.occurrence?.booking?.reviewed_at;
 
     return at ? format(parseISO(at), 'MMM d, yyyy · HH:mm') : null;
+});
+
+const createdLabel = computed(() => {
+    const at = props.occurrence?.created_at;
+
+    return at ? `Added ${format(parseISO(at), 'MMM d, yyyy')}` : null;
 });
 
 /** Mix an arbitrary event/status color toward the surface for soft tints. */
@@ -116,7 +165,7 @@ const mix = (color: string, percent: number) =>
 
 const headerStyle = computed(() => ({
     background: props.occurrence
-        ? `linear-gradient(180deg, ${mix(props.occurrence.color, 14)}, ${mix(props.occurrence.color, 5)})`
+        ? `linear-gradient(180deg, ${mix(props.occurrence.color, 14)}, ${mix(props.occurrence.color, 4)})`
         : undefined,
 }));
 
@@ -158,37 +207,27 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
             v-if="occurrence"
             class="max-w-lg gap-0 overflow-hidden p-0"
         >
-            <!-- Header: color-washed band with title, timing and status -->
-            <header
-                class="relative border-b px-6 pt-6 pb-5 pl-7"
-                :style="headerStyle"
-            >
-                <span
-                    class="absolute inset-y-0 left-0 w-1.5"
-                    :style="{ backgroundColor: occurrence.color }"
-                    aria-hidden="true"
-                />
-
-                <div
-                    v-if="
-                        occurrence.status !== 'confirmed' ||
-                        recurrenceText ||
-                        occurrence.is_private
-                    "
-                    class="mb-2 flex flex-wrap items-center gap-1.5"
-                >
-                    <Badge
-                        v-if="occurrence.status === 'tentative'"
-                        variant="secondary"
+            <!-- Header: soft event-color wash carries timing and status -->
+            <header class="border-b px-6 pt-6 pb-5" :style="headerStyle">
+                <div class="mb-3 flex flex-wrap items-center gap-1.5">
+                    <span
+                        v-if="timing"
+                        class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+                        :class="statusPill"
                     >
-                        Tentative
-                    </Badge>
-                    <Badge
-                        v-if="occurrence.status === 'cancelled'"
-                        variant="destructive"
-                    >
-                        Cancelled
-                    </Badge>
+                        <span
+                            v-if="timing.state === 'now'"
+                            class="size-1.5 rounded-full bg-current motion-safe:animate-pulse"
+                            aria-hidden="true"
+                        />
+                        <span
+                            v-else-if="timing.state === 'upcoming'"
+                            class="size-1.5 rounded-full"
+                            :style="{ backgroundColor: occurrence.color }"
+                            aria-hidden="true"
+                        />
+                        {{ timing.label }}
+                    </span>
                     <Badge
                         v-if="recurrenceText"
                         variant="outline"
@@ -208,15 +247,20 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
                 </div>
 
                 <DialogTitle
-                    class="pr-8 text-lg leading-snug font-semibold tracking-tight"
+                    class="flex items-start gap-2.5 pr-8 text-lg leading-snug font-semibold tracking-tight"
                 >
-                    {{ occurrence.title }}
+                    <span
+                        class="mt-1.5 size-2.5 shrink-0 rounded-full"
+                        :style="{ backgroundColor: occurrence.color }"
+                        aria-hidden="true"
+                    />
+                    <span>{{ occurrence.title }}</span>
                 </DialogTitle>
                 <DialogDescription class="sr-only">
                     Event details
                 </DialogDescription>
 
-                <div class="mt-2.5 flex items-start gap-2.5">
+                <div class="mt-3 flex items-start gap-2.5">
                     <Clock
                         class="mt-0.5 size-4 shrink-0 text-muted-foreground"
                         aria-hidden="true"
@@ -224,16 +268,18 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
                     <div class="text-sm">
                         <p class="font-medium">{{ when }}</p>
                         <p
-                            v-if="durationText || recurrenceText"
+                            v-if="durationText || timezoneText"
                             class="text-xs text-muted-foreground"
                         >
                             <span v-if="durationText">{{ durationText }}</span>
-                            <span v-if="durationText && recurrenceText">
-                                ·
-                            </span>
-                            <span v-if="recurrenceText">
-                                {{ recurrenceText }}
-                            </span>
+                            <span v-if="durationText && timezoneText"> · </span>
+                            <span v-if="timezoneText">{{ timezoneText }}</span>
+                        </p>
+                        <p
+                            v-if="recurrenceText"
+                            class="text-xs text-muted-foreground"
+                        >
+                            {{ recurrenceText }}
                         </p>
                     </div>
                 </div>
@@ -241,7 +287,10 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
 
             <div class="space-y-5 px-6 py-5 text-sm">
                 <!-- Calendar & type -->
-                <div class="flex flex-wrap items-center gap-2.5">
+                <div
+                    class="qv-reveal flex flex-wrap items-center gap-2.5"
+                    style="--i: 0"
+                >
                     <CalendarDays
                         class="size-4 shrink-0 text-muted-foreground"
                         aria-hidden="true"
@@ -266,7 +315,8 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
                 <!-- Where -->
                 <div
                     v-if="occurrence.location || occurrence.meeting_url"
-                    class="space-y-2.5"
+                    class="qv-reveal space-y-2.5"
+                    style="--i: 1"
                 >
                     <div
                         v-if="occurrence.location"
@@ -301,7 +351,8 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
                 <!-- Resource booking -->
                 <section
                     v-if="occurrence.booking"
-                    class="overflow-hidden rounded-xl border"
+                    class="qv-reveal overflow-hidden rounded-xl border"
+                    style="--i: 2"
                 >
                     <div
                         class="flex items-center justify-between gap-3 border-b bg-muted/40 px-3.5 py-2.5"
@@ -460,13 +511,20 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
                 <!-- People -->
                 <section
                     v-if="occurrence.organizer || occurrence.attendees.length"
-                    class="space-y-3"
+                    class="qv-reveal space-y-3"
+                    style="--i: 3"
                 >
                     <h3
                         class="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
                     >
                         <Users class="size-3.5" aria-hidden="true" />
                         People
+                        <span
+                            v-if="peopleCount"
+                            class="font-normal normal-case"
+                        >
+                            · {{ peopleCount }}
+                        </span>
                     </h3>
 
                     <div
@@ -557,7 +615,11 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
                 </section>
 
                 <!-- Reminders -->
-                <div v-if="reminders.length" class="flex items-start gap-2.5">
+                <div
+                    v-if="reminders.length"
+                    class="qv-reveal flex items-start gap-2.5"
+                    style="--i: 4"
+                >
                     <Bell
                         class="mt-1 size-4 shrink-0 text-muted-foreground"
                         aria-hidden="true"
@@ -577,7 +639,8 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
                 <!-- Notes -->
                 <div
                     v-if="occurrence.description"
-                    class="flex items-start gap-2.5"
+                    class="qv-reveal flex items-start gap-2.5"
+                    style="--i: 5"
                 >
                     <AlignLeft
                         class="mt-0.5 size-4 shrink-0 text-muted-foreground"
@@ -589,6 +652,14 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
                         {{ occurrence.description }}
                     </p>
                 </div>
+
+                <!-- Provenance -->
+                <p
+                    v-if="createdLabel"
+                    class="border-t pt-3 text-xs text-muted-foreground"
+                >
+                    {{ createdLabel }}
+                </p>
             </div>
 
             <div
@@ -612,3 +683,26 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
         </DialogScrollContent>
     </Dialog>
 </template>
+
+<style scoped>
+/* Calm staggered reveal for detail rows; static under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+    .qv-reveal {
+        opacity: 0;
+        animation: qv-reveal 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation-delay: calc(var(--i, 0) * 50ms);
+    }
+
+    @keyframes qv-reveal {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+}
+</style>

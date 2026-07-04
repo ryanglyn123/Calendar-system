@@ -1,3 +1,4 @@
+import { differenceInCalendarDays } from 'date-fns';
 import { format, parseISO } from '@/lib/calendarMath';
 
 const FREQ_UNIT: Record<string, { adverb: string; noun: string }> = {
@@ -148,4 +149,108 @@ export function formatDuration(
     return restHours === 0
         ? `${days} day${days === 1 ? '' : 's'}`
         : `${days}d ${restHours}h`;
+}
+
+export type EventState = 'upcoming' | 'now' | 'ended';
+
+const MINUTE = 60_000;
+const HOUR = 3_600_000;
+const DAY = 86_400_000;
+
+const capitalize = (text: string) =>
+    text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Coarse relative phrase between two instants, e.g. "in 3 days", "5 hr ago". */
+const relative = (targetMs: number, nowMs: number): string => {
+    const diff = targetMs - nowMs;
+    const ahead = diff >= 0;
+    const abs = Math.abs(diff);
+
+    if (abs < MINUTE) {
+        return ahead ? 'in moments' : 'moments ago';
+    }
+
+    if (abs < HOUR) {
+        const n = Math.round(abs / MINUTE);
+
+        return ahead ? `in ${n} min` : `${n} min ago`;
+    }
+
+    if (abs < DAY) {
+        const n = Math.round(abs / HOUR);
+
+        return ahead ? `in ${n} hr` : `${n} hr ago`;
+    }
+
+    const n = Math.round(abs / DAY);
+
+    return ahead ? `in ${n} days` : `${n} days ago`;
+};
+
+/**
+ * Where an occurrence sits relative to "now", with a short human label.
+ * Timed events read at hour granularity; all-day events read in whole days
+ * ("Today", "Tomorrow", "3 days ago") since a clock offset is meaningless.
+ */
+export function eventTiming(
+    startIso: string,
+    endIso: string,
+    allDay: boolean,
+    nowMs: number,
+): { state: EventState; label: string } {
+    const start = new Date(startIso).getTime();
+    const end = new Date(endIso).getTime();
+
+    if (allDay) {
+        const now = new Date(nowMs);
+        const days = differenceInCalendarDays(parseISO(startIso), now);
+
+        if (nowMs >= start && nowMs < end) {
+            return { state: 'now', label: 'Today' };
+        }
+
+        if (days > 0) {
+            return {
+                state: 'upcoming',
+                label: days === 1 ? 'Tomorrow' : `In ${days} days`,
+            };
+        }
+
+        return {
+            state: 'ended',
+            label: days === -1 ? 'Yesterday' : `${Math.abs(days)} days ago`,
+        };
+    }
+
+    if (nowMs >= start && nowMs < end) {
+        return { state: 'now', label: 'Happening now' };
+    }
+
+    if (nowMs < start) {
+        return { state: 'upcoming', label: capitalize(relative(start, nowMs)) };
+    }
+
+    return { state: 'ended', label: `Ended ${relative(end, nowMs)}` };
+}
+
+/**
+ * Friendly label for the event's stored timezone at a given instant, e.g.
+ * "Manila · GMT+8". Falls back to the raw zone if the runtime can't resolve
+ * an offset.
+ */
+export function formatTimezone(timezone: string, atIso: string): string {
+    const city = (timezone.split('/').pop() ?? timezone).replace(/_/g, ' ');
+
+    try {
+        const offset = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezone,
+            timeZoneName: 'shortOffset',
+        })
+            .formatToParts(new Date(atIso))
+            .find((part) => part.type === 'timeZoneName')?.value;
+
+        return offset ? `${city} · ${offset}` : city;
+    } catch {
+        return city;
+    }
 }

@@ -113,6 +113,8 @@ class EventOccurrenceResource extends JsonResource
             'is_masked' => $masked,
             'can_edit' => $this->canEdit && ! $masked,
             'created_by' => $event->created_by,
+            'timezone' => $event->timezone,
+            'created_at' => $event->created_at?->toIso8601String(),
         ];
     }
 }

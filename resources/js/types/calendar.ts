@@ -93,6 +93,8 @@ export type EventOccurrence = {
     is_masked: boolean;
     can_edit: boolean;
     created_by: number | null;
+    timezone: string;
+    created_at: string | null;
 };
 
 export type EventDraft = {
