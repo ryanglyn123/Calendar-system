@@ -21,10 +21,10 @@ enum BookingStatus: string
     public function color(): string
     {
         return match ($this) {
-            self::Pending => '#f59e0b',
-            self::Approved => '#10b981',
-            self::Rejected => '#ef4444',
-            self::Cancelled => '#6b7280',
+            self::Pending => '#F5CB81',
+            self::Approved => '#86DBAE',
+            self::Rejected => '#F7A79B',
+            self::Cancelled => '#BFC6CE',
         };
     }
 

@@ -5,6 +5,7 @@ import { layoutWeekLanes } from '@/components/calendar/monthLanes';
 import {
     addDays,
     eventInk,
+    eventWash,
     format,
     isMultiDay,
     isSameDay,
@@ -689,7 +690,7 @@ const draggingEventId = computed(() =>
                         width: `calc(${(segment.span / days.length) * 100}% - 8px)`,
                         top: `${4 + segment.lane * 24}px`,
                         height: '20px',
-                        backgroundColor: segment.occurrence.color,
+                        background: eventWash(segment.occurrence.color),
                         color: eventInk(segment.occurrence.color),
                     }"
                     @click="emit('open', segment.occurrence)"
@@ -747,7 +748,7 @@ const draggingEventId = computed(() =>
                         v-for="box in columns[d]"
                         :key="box.occurrence.occurrence_id"
                         data-event
-                        class="group absolute overflow-hidden rounded-md border-l-3"
+                        class="group absolute overflow-hidden rounded-lg shadow-xs"
                         :class="{
                             'opacity-40':
                                 draggingEventId === box.occurrence.event_id,
@@ -759,8 +760,8 @@ const draggingEventId = computed(() =>
                             height: `${box.height}px`,
                             left: `calc(${box.left * 100}% + 2px)`,
                             width: `calc(${box.width * 100}% - 4px)`,
-                            backgroundColor: box.occurrence.color + '26',
-                            borderLeftColor: box.occurrence.color,
+                            background: eventWash(box.occurrence.color),
+                            color: eventInk(box.occurrence.color),
                         }"
                         @pointerdown="(e) => onEventPointerDown(e, box, d)"
                     >
@@ -780,7 +781,7 @@ const draggingEventId = computed(() =>
                             </span>
                             <span
                                 v-if="box.height > 32"
-                                class="block truncate text-[10px] text-muted-foreground"
+                                class="block truncate text-[10px] opacity-75"
                             >
                                 {{ timeLabel(box.occurrence) }}
                             </span>
@@ -806,7 +807,7 @@ const draggingEventId = computed(() =>
                             top: `${ghost.top}px`,
                             height: `${ghost.height}px`,
                             borderColor: ghost.color ?? 'var(--primary)',
-                            backgroundColor: (ghost.color ?? '#EEE621') + '22',
+                            backgroundColor: (ghost.color ?? '#EFD95F') + '22',
                         }"
                         aria-hidden="true"
                     >
@@ -820,9 +821,9 @@ const draggingEventId = computed(() =>
                         :style="{ top: `${nowTop}px` }"
                         aria-hidden="true"
                     >
-                        <div class="relative border-t-2 border-fdcp-magenta">
+                        <div class="relative border-t-2 border-foreground">
                             <span
-                                class="absolute -top-[5px] -left-1 size-2 rounded-full bg-fdcp-magenta"
+                                class="absolute -top-[5px] -left-1 size-2 rounded-full bg-foreground"
                             />
                         </div>
                     </div>

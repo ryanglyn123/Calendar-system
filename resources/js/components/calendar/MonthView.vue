@@ -5,6 +5,7 @@ import { layoutWeekLanes } from '@/components/calendar/monthLanes';
 import {
     addDays,
     eventInk,
+    eventWash,
     format,
     isMultiDay,
     isSameDay,
@@ -317,7 +318,7 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                         width: `calc(${(segment.span / 7) * 100}% - 8px)`,
                         top: `${28 + segment.lane * LANE_HEIGHT}px`,
                         height: '20px',
-                        backgroundColor: segment.occurrence.color,
+                        background: eventWash(segment.occurrence.color),
                         color: eventInk(segment.occurrence.color),
                     }"
                     :aria-label="`${segment.occurrence.title}, ${format(new Date(segment.occurrence.starts_at), 'MMM d')}`"
@@ -378,10 +379,14 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                             :key="occurrence.occurrence_id"
                             type="button"
                             data-event
-                            class="flex items-center gap-1 truncate rounded px-1 py-0.5 text-left text-xs hover:bg-muted"
+                            class="flex items-center gap-1.5 truncate rounded-md px-1.5 py-0.5 text-left text-xs transition-opacity hover:opacity-90"
                             :class="{
                                 'line-through opacity-70':
                                     occurrence.status === 'cancelled',
+                            }"
+                            :style="{
+                                background: eventWash(occurrence.color),
+                                color: eventInk(occurrence.color),
                             }"
                             :aria-label="`${occurrence.title}, ${format(new Date(occurrence.starts_at), 'h:mm a')}`"
                             @pointerdown="
@@ -389,16 +394,7 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                             "
                             @click="onChipClick(occurrence)"
                         >
-                            <span
-                                class="size-2 shrink-0 rounded-full"
-                                :style="{
-                                    backgroundColor: occurrence.color,
-                                }"
-                                aria-hidden="true"
-                            />
-                            <span
-                                class="shrink-0 text-[10px] text-muted-foreground"
-                            >
+                            <span class="shrink-0 text-[10px] opacity-75">
                                 {{
                                     format(
                                         new Date(occurrence.starts_at),
@@ -406,7 +402,7 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                                     )
                                 }}
                             </span>
-                            <span class="truncate">
+                            <span class="truncate font-medium">
                                 {{ occurrence.title }}
                             </span>
                         </button>

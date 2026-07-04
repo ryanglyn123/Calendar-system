@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('type', 20);
             $table->string('name');
             $table->text('description')->nullable();
-            $table->char('color', 7)->default('#0096E2');
+            $table->char('color', 7)->default('#86C6F5');
             $table->string('icon', 50)->nullable();
             $table->foreignId('owner_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('division_id')->nullable()->constrained()->cascadeOnDelete();

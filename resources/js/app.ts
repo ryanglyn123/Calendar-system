@@ -24,7 +24,7 @@ createInertiaApp({
         app.use(createPinia());
     },
     progress: {
-        color: '#FFCC00',
+        color: '#2A2925',
     },
 });
 

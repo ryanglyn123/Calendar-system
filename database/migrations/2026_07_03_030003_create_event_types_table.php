@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('event_types', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
-            $table->char('color', 7)->default('#0096E2');
+            $table->char('color', 7)->default('#86C6F5');
             $table->string('icon', 50)->nullable();
             $table->string('description')->nullable();
             $table->boolean('is_active')->default(true);

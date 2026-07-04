@@ -19,7 +19,7 @@ class DemoEventSeeder extends Seeder
 
         $personal = Calendar::query()->firstOrCreate(
             ['type' => 'personal', 'owner_id' => $admin->id, 'name' => 'My Projects'],
-            ['color' => '#0096E2', 'is_default' => false, 'is_active' => true],
+            ['color' => '#A8D8F0', 'is_default' => false, 'is_active' => true],
         );
 
         $fdcp = Calendar::query()->where('name', 'FDCP Events')->firstOrFail();

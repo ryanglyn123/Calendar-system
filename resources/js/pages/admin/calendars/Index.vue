@@ -66,7 +66,7 @@ const form = useForm({
     type: 'organization',
     name: '',
     description: '',
-    color: '#EEE621',
+    color: '#EFD95F',
     division_id: null as number | null,
     is_default: false,
     is_active: true,

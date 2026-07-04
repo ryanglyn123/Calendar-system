@@ -109,9 +109,10 @@ export function toIso(date: Date): string {
 }
 
 /**
- * Pick a readable text ink (near-black or white) for text sitting directly on
- * an arbitrary event/calendar color, using WCAG relative luminance. Keeps light
- * colors (e.g. the vivid FDCP yellow) legible instead of forcing white text.
+ * Pick a readable text ink for text sitting directly on an arbitrary
+ * event/calendar color, using WCAG relative luminance. Light pastels get a
+ * dark ink mixed from their own hue (dark purple on lavender, dark blue on
+ * sky) instead of flat black; dark colors keep white text.
  */
 export function eventInk(hex: string | null | undefined): string {
     const c = (hex ?? '').replace('#', '');
@@ -128,7 +129,19 @@ export function eventInk(hex: string | null | undefined): string {
     const b = channel(parseInt(c.slice(4, 6), 16) / 255);
     const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-    return luminance > 0.45 ? '#1c1c17' : '#ffffff';
+    return luminance > 0.45
+        ? `color-mix(in oklch, #${c} 38%, oklch(0.22 0.02 none))`
+        : '#ffffff';
+}
+
+/**
+ * Soft vertical wash for event surfaces: the color lightened at the top,
+ * settling into itself at the bottom.
+ */
+export function eventWash(hex: string | null | undefined): string {
+    const c = hex ?? '#d4d8dd';
+
+    return `linear-gradient(180deg, color-mix(in oklab, ${c} 84%, white) 0%, ${c} 100%)`;
 }
 
 export {

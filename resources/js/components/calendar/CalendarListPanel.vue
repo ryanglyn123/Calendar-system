@@ -31,21 +31,21 @@ const groups: {
 ];
 
 const swatches = [
-    '#EEE621',
-    '#FFCC00',
-    '#580076',
-    '#E200A9',
-    '#0096E2',
-    '#10B981',
-    '#DC2626',
-    '#7C3AED',
+    '#EFD95F',
+    '#F5CD7E',
+    '#BFA8F5',
+    '#F5A6D8',
+    '#86C6F5',
+    '#86DBAE',
+    '#F7A79B',
+    '#B29AF5',
 ];
 
 const creating = ref(false);
 
 const form = useForm({
     name: '',
-    color: '#0096E2',
+    color: '#86C6F5',
 });
 
 const submit = () => {

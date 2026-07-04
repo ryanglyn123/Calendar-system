@@ -4,7 +4,7 @@ import { toast } from 'vue-sonner';
 import AttendeePicker from '@/components/calendar/AttendeePicker.vue';
 import RecurrenceEditor from '@/components/calendar/RecurrenceEditor.vue';
 import RecurrenceScopeDialog from '@/components/calendar/RecurrenceScopeDialog.vue';
-import type {RecurrenceScope} from '@/components/calendar/RecurrenceScopeDialog.vue';
+import type { RecurrenceScope } from '@/components/calendar/RecurrenceScopeDialog.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,14 +56,14 @@ const grid = useCalendarGridStore();
 const list = useCalendarListStore();
 
 const swatches = [
-    '#EEE621',
-    '#FFCC00',
-    '#580076',
-    '#E200A9',
-    '#0096E2',
-    '#10B981',
-    '#DC2626',
-    '#7C3AED',
+    '#EFD95F',
+    '#F5CD7E',
+    '#BFA8F5',
+    '#F5A6D8',
+    '#86C6F5',
+    '#86DBAE',
+    '#F7A79B',
+    '#B29AF5',
 ];
 
 type FormState = {
@@ -170,8 +170,7 @@ watch(
                 props.initialEnd ?? new Date(start.getTime() + 60 * 60 * 1000);
 
             form.calendar_id =
-                list.writableCalendars.find((c) => c.type === 'personal')
-                    ?.id ??
+                list.writableCalendars.find((c) => c.type === 'personal')?.id ??
                 list.writableCalendars[0]?.id ??
                 null;
             form.event_type_id = null;
@@ -201,7 +200,9 @@ watch(
             return;
         }
 
-        const start = new Date(`${form.startDate}T${form.startTime || '00:00'}`);
+        const start = new Date(
+            `${form.startDate}T${form.startTime || '00:00'}`,
+        );
         const end = new Date(`${form.endDate}T${form.endTime || '00:00'}`);
 
         if (end <= start) {
@@ -212,8 +213,7 @@ watch(
     },
 );
 
-const fieldError = (key: string): string | undefined =>
-    errors.value[key]?.[0];
+const fieldError = (key: string): string | undefined => errors.value[key]?.[0];
 
 const payload = () => ({
     calendar_id: form.calendar_id,
@@ -309,10 +309,7 @@ const submit = async (action: () => Promise<unknown>) => {
 </script>
 
 <template>
-    <Sheet
-        :open="open"
-        @update:open="(value) => !value && emit('close')"
-    >
+    <Sheet :open="open" @update:open="(value) => !value && emit('close')">
         <SheetContent
             side="right"
             class="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-md"
@@ -335,7 +332,10 @@ const submit = async (action: () => Promise<unknown>) => {
                         placeholder="Add a title"
                         autofocus
                     />
-                    <p v-if="fieldError('title')" class="text-sm text-destructive">
+                    <p
+                        v-if="fieldError('title')"
+                        class="text-sm text-destructive"
+                    >
                         {{ fieldError('title') }}
                     </p>
                 </div>
@@ -569,8 +569,7 @@ const submit = async (action: () => Promise<unknown>) => {
                     <Switch
                         :model-value="form.visibility === 'private'"
                         @update:model-value="
-                            (v) =>
-                                (form.visibility = v ? 'private' : 'default')
+                            (v) => (form.visibility = v ? 'private' : 'default')
                         "
                     />
                     Private (others see “Busy”)

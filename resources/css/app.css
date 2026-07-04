@@ -100,59 +100,121 @@
             'Noto Color Emoji';
     }
 
-    /* "Today" marker and highlight chips: a single solid brand gold in both
-       themes, paired with dark text. Solid reads as more intentional than a
-       theme-flipping gradient. */
+    /* "Today" marker and highlight chips: the primary ink pill in both themes
+       (near-black in light, near-white in dark), like a selected-day chip. */
     .bg-gradient-accent {
         background-color: var(--primary);
         color: var(--primary-foreground);
     }
 }
 
+/* One continuous brand wash across the whole app: a mint-to-cream veil anchored
+   to the top-left of the viewport, spilling from the sidebar across into the
+   main panel and fading to the neutral canvas by mid-height. The sidebar and
+   main surfaces are transparent so this single gradient reads as one field with
+   no seam. */
+[data-slot='sidebar-wrapper'] {
+    background:
+        linear-gradient(
+            164deg,
+            oklch(0.87 0.09 248 / 0.72) 0%,
+            oklch(0.9 0.075 246 / 0.56) 20%,
+            oklch(0.93 0.055 244 / 0.4) 42%,
+            oklch(0.95 0.032 242 / 0.22) 62%,
+            transparent 84%
+        ),
+        var(--background);
+    background-attachment: fixed;
+}
+
+.dark [data-slot='sidebar-wrapper'] {
+    background:
+        linear-gradient(
+            164deg,
+            oklch(0.5 0.09 250 / 0.42) 0%,
+            oklch(0.46 0.07 248 / 0.28) 22%,
+            oklch(0.42 0.05 246 / 0.15) 46%,
+            transparent 80%
+        ),
+        var(--background);
+    background-attachment: fixed;
+}
+
+/* Only the sidebar is transparent, so the wash shows there. The main panel is
+   an opaque rounded card laid over the top of the wash — the gradient
+   continues behind it but is hidden, and the wash breathes around its edges. */
+[data-sidebar='sidebar'] {
+    background: transparent;
+}
+
+[data-slot='sidebar-inset'] {
+    background: var(--card);
+    margin: 0.5rem 0.5rem 0.5rem 0.25rem;
+    border-radius: 1.1rem;
+    box-shadow:
+        0 1px 2px oklch(0.3 0.03 250 / 0.06),
+        0 0 0 1px oklch(0.3 0.03 250 / 0.04);
+}
+
+/* Fully rounded nav pills, like the reference. */
+[data-sidebar='menu-button'] {
+    border-radius: 9999px;
+}
+
+/* The active nav item is a white pill floating on the sidebar wash; it needs
+   a whisper of elevation to read against the pale lower half. */
+[data-sidebar='menu-button'][data-active='true'] {
+    box-shadow:
+        0 1px 2px oklch(0.2 0.01 90 / 0.07),
+        0 0 0 1px oklch(0.2 0.01 90 / 0.05);
+}
+
+.dark [data-sidebar='menu-button'][data-active='true'] {
+    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.08);
+}
+
 :root {
-    /* Neutrals carry a faint gold tint (hue ~85) so surfaces feel of a piece
-       with the brand rather than clinically gray. */
-    --background: oklch(0.976 0.004 85);
-    --foreground: oklch(0.23 0.006 75);
-    --card: oklch(0.995 0.003 85);
-    --card-foreground: oklch(0.23 0.006 75);
-    --popover: oklch(0.995 0.003 85);
-    --popover-foreground: oklch(0.23 0.006 75);
-    /* Vivid FDCP gold — near-black text rides on it (yellow demands dark ink). */
-    --primary: oklch(0.9 0.19 104);
-    --primary-foreground: oklch(0.24 0.03 78);
-    --secondary: oklch(0.93 0.005 85);
-    --secondary-foreground: oklch(0.25 0.006 75);
-    --muted: oklch(0.955 0.004 85);
-    --muted-foreground: oklch(0.5 0.012 80);
-    --accent: oklch(0.93 0.09 101);
-    --accent-foreground: oklch(0.28 0.04 80);
-    --destructive: oklch(0.55 0.2 27);
-    --destructive-foreground: oklch(0.99 0.005 85);
-    --success: oklch(0.6 0.13 160);
-    --success-foreground: oklch(0.99 0.005 85);
-    /* Warning sits deliberately more orange than the gold primary so the two
-       never read as the same signal. */
-    --warning: oklch(0.68 0.16 62);
-    --warning-foreground: oklch(0.99 0.005 85);
-    --border: oklch(0.9 0.005 85);
-    --input: oklch(0.88 0.006 85);
-    --ring: oklch(0.9 0.19 104);
-    --chart-1: oklch(0.9 0.19 104);
-    --chart-2: oklch(0.65 0.15 235);
-    --chart-3: oklch(0.4 0.19 305);
-    --chart-4: oklch(0.6 0.25 350);
-    --chart-5: oklch(0.86 0.17 92);
-    --radius: 0.5rem;
-    --sidebar-background: oklch(0.985 0.004 85);
-    --sidebar-foreground: oklch(0.32 0.008 80);
-    --sidebar-primary: oklch(0.9 0.19 104);
-    --sidebar-primary-foreground: oklch(0.24 0.03 78);
-    --sidebar-accent: oklch(0.95 0.06 101);
-    --sidebar-accent-foreground: oklch(0.32 0.05 82);
-    --sidebar-border: oklch(0.91 0.005 85);
-    --sidebar-ring: oklch(0.9 0.19 104);
-    --sidebar: oklch(0.985 0.004 85);
+    /* Soft neutral canvas: light gray page, white surfaces, near-black ink.
+       Color arrives through pastel event/calendar hues, not through chrome. */
+    --background: oklch(0.958 0.003 95);
+    --foreground: oklch(0.22 0.008 90);
+    --card: oklch(0.993 0.002 95);
+    --card-foreground: oklch(0.22 0.008 90);
+    --popover: oklch(0.993 0.002 95);
+    --popover-foreground: oklch(0.22 0.008 90);
+    /* Primary actions are near-black pills (Create, selected day, active chip). */
+    --primary: oklch(0.24 0.012 90);
+    --primary-foreground: oklch(0.985 0.002 95);
+    --secondary: oklch(0.936 0.004 95);
+    --secondary-foreground: oklch(0.26 0.008 90);
+    --muted: oklch(0.945 0.004 95);
+    --muted-foreground: oklch(0.43 0.012 90);
+    --accent: oklch(0.938 0.035 155);
+    --accent-foreground: oklch(0.31 0.045 155);
+    --destructive: oklch(0.55 0.18 27);
+    --destructive-foreground: oklch(0.99 0.003 95);
+    --success: oklch(0.58 0.11 160);
+    --success-foreground: oklch(0.99 0.003 95);
+    --warning: oklch(0.66 0.14 65);
+    --warning-foreground: oklch(0.99 0.003 95);
+    --border: oklch(0.907 0.004 95);
+    --input: oklch(0.885 0.005 95);
+    --ring: oklch(0.24 0.012 90);
+    --chart-1: oklch(0.62 0.12 292);
+    --chart-2: oklch(0.66 0.11 235);
+    --chart-3: oklch(0.68 0.1 160);
+    --chart-4: oklch(0.72 0.11 60);
+    --chart-5: oklch(0.65 0.12 350);
+    --radius: 0.625rem;
+    --sidebar-background: oklch(0.977 0.003 95);
+    --sidebar-foreground: oklch(0.27 0.01 90);
+    --sidebar-primary: oklch(0.24 0.012 90);
+    --sidebar-primary-foreground: oklch(0.985 0.002 95);
+    --sidebar-accent: oklch(0.999 0.001 95);
+    --sidebar-accent-foreground: oklch(0.22 0.008 90);
+    --sidebar-border: oklch(0.912 0.004 95);
+    --sidebar-ring: oklch(0.24 0.012 90);
+    --sidebar: oklch(0.977 0.003 95);
 }
 
 .dark {
@@ -162,14 +224,14 @@
     --card-foreground: hsl(0 0% 98%);
     --popover: #141413;
     --popover-foreground: hsl(0 0% 98%);
-    --primary: oklch(0.9 0.19 104);
-    --primary-foreground: oklch(0.2 0.02 80);
+    --primary: oklch(0.96 0.003 95);
+    --primary-foreground: oklch(0.21 0.01 90);
     --secondary: #30302e;
     --secondary-foreground: hsl(0 0% 98%);
     --muted: #30302e;
     --muted-foreground: hsl(0 0% 66%);
-    --accent: oklch(0.9 0.19 104);
-    --accent-foreground: oklch(0.2 0.02 80);
+    --accent: oklch(0.34 0.03 155);
+    --accent-foreground: oklch(0.9 0.04 155);
     --destructive: hsl(0 84% 60%);
     --destructive-foreground: hsl(0 0% 98%);
     --success: hsl(160 70% 42%);
@@ -178,20 +240,20 @@
     --warning-foreground: oklch(0.2 0.02 80);
     --border: hsl(60 2% 22%);
     --input: hsl(60 2% 24%);
-    --ring: oklch(0.9 0.19 104);
-    --chart-1: oklch(0.9 0.19 104);
-    --chart-2: oklch(0.68 0.15 235);
-    --chart-3: oklch(0.72 0.15 78);
-    --chart-4: oklch(0.65 0.24 350);
-    --chart-5: oklch(0.5 0.2 305);
+    --ring: oklch(0.96 0.003 95);
+    --chart-1: oklch(0.72 0.11 292);
+    --chart-2: oklch(0.7 0.11 235);
+    --chart-3: oklch(0.74 0.1 160);
+    --chart-4: oklch(0.78 0.1 60);
+    --chart-5: oklch(0.72 0.11 350);
     --sidebar-background: #141413;
     --sidebar-foreground: hsl(0 0% 95.9%);
-    --sidebar-primary: oklch(0.9 0.19 104);
-    --sidebar-primary-foreground: oklch(0.2 0.02 80);
+    --sidebar-primary: oklch(0.96 0.003 95);
+    --sidebar-primary-foreground: oklch(0.21 0.01 90);
     --sidebar-accent: #30302e;
     --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
     --sidebar-border: hsl(60 2% 18%);
-    --sidebar-ring: oklch(0.9 0.19 104);
+    --sidebar-ring: oklch(0.96 0.003 95);
     --sidebar: #262624;
 }
 

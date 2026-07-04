@@ -16,7 +16,7 @@ class CalendarSeeder extends Seeder
             [
                 'name' => 'FDCP Events',
                 'description' => 'Organization-wide events, festivals and activities.',
-                'color' => '#EEE621',
+                'color' => '#EFD95F',
                 'icon' => 'clapperboard',
                 'is_default' => true,
                 'sort_order' => 0,
@@ -24,7 +24,7 @@ class CalendarSeeder extends Seeder
             [
                 'name' => 'Trainings & Workshops',
                 'description' => 'Capacity building, film education and workshops.',
-                'color' => '#0096E2',
+                'color' => '#86C6F5',
                 'icon' => 'graduation-cap',
                 'is_default' => true,
                 'sort_order' => 1,

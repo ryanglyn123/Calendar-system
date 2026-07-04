@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('name')->unique();
             $table->string('acronym', 20)->nullable();
             $table->text('description')->nullable();
-            $table->char('color', 7)->default('#580076');
+            $table->char('color', 7)->default('#BFA8F5');
             $table->boolean('is_active')->default(true)->index();
             $table->unsignedSmallInteger('sort_order')->default(0);
             $table->timestamps();

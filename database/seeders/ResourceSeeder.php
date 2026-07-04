@@ -47,12 +47,12 @@ class ResourceSeeder extends Seeder
         );
 
         $seed = [
-            [$boardRooms, 'Cinema Boardroom', 'Main conference room, 4F FDCP Building', 14, '#580076'],
-            [$boardRooms, 'Screening Room A', '2F, with projector and 5.1 audio', 30, '#0096E2'],
-            [$boardRooms, 'Huddle Room', '3F, quick syncs', 6, '#10B981'],
-            [$vehicles, 'Toyota Hiace (SKB 1234)', 'Motor pool', 12, '#E200A9'],
-            [$vehicles, 'Toyota Innova (NEd 5678)', 'Motor pool', 6, '#EEE621'],
-            [$vehicles, 'Mitsubishi L300 (UAM 9012)', 'Motor pool', 2, '#6B7280'],
+            [$boardRooms, 'Cinema Boardroom', 'Main conference room, 4F FDCP Building', 14, '#BFA8F5'],
+            [$boardRooms, 'Screening Room A', '2F, with projector and 5.1 audio', 30, '#86C6F5'],
+            [$boardRooms, 'Huddle Room', '3F, quick syncs', 6, '#86DBAE'],
+            [$vehicles, 'Toyota Hiace (SKB 1234)', 'Motor pool', 12, '#F5A6D8'],
+            [$vehicles, 'Toyota Innova (NEd 5678)', 'Motor pool', 6, '#EFD95F'],
+            [$vehicles, 'Mitsubishi L300 (UAM 9012)', 'Motor pool', 2, '#BFC6CE'],
         ];
 
         foreach ($seed as [$type, $name, $location, $capacity, $color]) {
