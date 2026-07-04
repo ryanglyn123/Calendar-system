@@ -28,6 +28,32 @@ test('the section page inlines only that type\'s calendars, visible by default',
         ->and(collect($props['resources'])->pluck('id'))->toContain($room->id);
 });
 
+test('the section page inlines the user\'s bookings for that type', function () {
+    $user = User::factory()->create();
+    $roomType = ResourceType::factory()->create();
+    $room = Resource::factory()->create(['resource_type_id' => $roomType->id]);
+    $vanType = ResourceType::factory()->create();
+    $van = Resource::factory()->create(['resource_type_id' => $vanType->id]);
+
+    $roomBooking = Booking::factory()->create([
+        'resource_id' => $room->id,
+        'requested_by' => $user->id,
+    ]);
+    $vanBooking = Booking::factory()->create([
+        'resource_id' => $van->id,
+        'requested_by' => $user->id,
+    ]);
+
+    $props = $this->actingAs($user)
+        ->get(route('resources.section', $roomType->slug))
+        ->inertiaProps();
+
+    $bookings = collect($props['initialBookings']);
+
+    expect($bookings->pluck('id'))->toContain($roomBooking->id)
+        ->and($bookings->pluck('id'))->not->toContain($vanBooking->id);
+});
+
 test('inactive resource types have no section page', function () {
     $user = User::factory()->create();
     $type = ResourceType::factory()->create(['is_active' => false]);

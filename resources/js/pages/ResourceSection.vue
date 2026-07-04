@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import { CalendarPlus, ClipboardList } from '@lucide/vue';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import BookingDialog from '@/components/booking/BookingDialog.vue';
 import CalendarShell from '@/components/calendar/CalendarShell.vue';
@@ -69,6 +69,7 @@ const props = defineProps<{
     weekStartsOn: 0 | 1;
     initialCalendars: CalendarItem[];
     initialEvents: EventOccurrence[];
+    initialBookings: MyBooking[];
 }>();
 
 const grid = useCalendarGridStore();
@@ -82,9 +83,10 @@ const panelGroups = computed<CalendarPanelGroup[]>(() => [
     { key: 'resource', label: props.resourceType.name },
 ]);
 
-/* My bookings, scoped to this resource type. */
-const mine = ref<MyBooking[]>([]);
-const loadingMine = ref(true);
+/* My bookings, scoped to this resource type. Inlined with the page so the
+   section paints in one request; refetched only after mutations. */
+const mine = ref<MyBooking[]>(props.initialBookings);
+const loadingMine = ref(false);
 
 const loadMine = async () => {
     loadingMine.value = true;
@@ -102,13 +104,13 @@ const loadMine = async () => {
     }
 };
 
-onMounted(loadMine);
-
 // Inertia reuses this component when hopping between sections
-// (Boardroom -> Carpool), so reload on type change too.
+// (Boardroom -> Carpool); each visit brings fresh inlined bookings.
 watch(
-    () => props.resourceType.id,
-    () => void loadMine(),
+    () => props.initialBookings,
+    (next) => {
+        mine.value = next;
+    },
 );
 
 const booking = ref(false);
@@ -123,6 +125,21 @@ const openNewBooking = () => {
 const openBookingOn = (date: Date) => {
     bookingDate.value = format(date, 'yyyy-MM-dd');
     booking.value = true;
+};
+
+const bookingsSection = ref<HTMLElement | null>(null);
+
+const pendingCount = computed(
+    () => mine.value.filter((item) => item.status === 'pending').length,
+);
+
+const scrollToBookings = () => {
+    bookingsSection.value?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'auto'
+            : 'smooth',
+        block: 'start',
+    });
 };
 
 const onBooked = (startsAt: string) => {
@@ -171,9 +188,10 @@ const when = (target: MyBooking) =>
     <Head :title="resourceType.name" />
 
     <div class="flex h-full min-h-0 flex-1 flex-col overflow-y-auto">
-        <!-- Section header -->
+        <!-- Section header. Sticky so the booking actions and the shortcut to
+             the bookings table below stay reachable while the calendar scrolls. -->
         <div
-            class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6"
+            class="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 sm:px-6"
         >
             <div class="flex min-w-0 items-center gap-3">
                 <span
@@ -198,10 +216,27 @@ const when = (target: MyBooking) =>
                 </div>
             </div>
 
-            <Button data-test="new-booking" @click="openNewBooking">
-                <CalendarPlus aria-hidden="true" />
-                New booking
-            </Button>
+            <div class="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    class="gap-2"
+                    @click="scrollToBookings"
+                >
+                    <ClipboardList aria-hidden="true" />
+                    My bookings
+                    <Badge
+                        v-if="mine.length > 0"
+                        :variant="pendingCount > 0 ? 'secondary' : 'outline'"
+                        class="ml-0.5"
+                    >
+                        {{ mine.length }}
+                    </Badge>
+                </Button>
+                <Button data-test="new-booking" @click="openNewBooking">
+                    <CalendarPlus aria-hidden="true" />
+                    New booking
+                </Button>
+            </div>
         </div>
 
         <!-- Availability calendar: one sub-calendar per room/vehicle.
@@ -223,9 +258,20 @@ const when = (target: MyBooking) =>
         </div>
 
         <!-- My bookings in this section -->
-        <section class="flex flex-col gap-3 p-4 sm:p-6">
-            <h2 class="text-sm font-medium text-muted-foreground">
+        <section
+            ref="bookingsSection"
+            class="flex scroll-mt-20 flex-col gap-3 p-4 sm:p-6"
+        >
+            <h2
+                class="flex items-center gap-2 text-sm font-medium text-muted-foreground"
+            >
                 My bookings
+                <span v-if="mine.length > 0" class="text-foreground">
+                    {{ mine.length }}
+                </span>
+                <span v-if="pendingCount > 0" class="font-normal">
+                    · {{ pendingCount }} pending
+                </span>
             </h2>
             <div class="rounded-xl border">
                 <Table>

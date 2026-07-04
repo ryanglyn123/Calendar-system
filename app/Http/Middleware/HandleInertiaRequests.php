@@ -38,12 +38,14 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
-        $roles = $user?->getRoleNames()->all() ?? [];
 
+        // Everything query-backed is wrapped in closures: Inertia resolves
+        // them only when rendering a page, so plain /api/v1 JSON requests
+        // skip the role/permission/announcement/resource-type queries.
         return [
             ...parent::share($request),
             'name' => config('app.name'),
-            'auth' => [
+            'auth' => fn () => [
                 'user' => $user === null ? null : [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -57,12 +59,12 @@ class HandleInertiaRequests extends Middleware
                         'acronym' => $user->division->acronym,
                         'color' => $user->division->color,
                     ],
-                    'roles' => $roles,
+                    'roles' => $roles = $user->getRoleNames()->all(),
                     'permissions' => $user->getAllPermissions()->pluck('name')->all(),
                     'is_super_admin' => in_array('super_admin', $roles, true),
                 ],
             ],
-            'announcements' => $user === null || ! $user->isActive()
+            'announcements' => fn () => $user === null || ! $user->isActive()
                 ? []
                 : Announcement::query()
                     ->visibleTo($user)
@@ -72,7 +74,7 @@ class HandleInertiaRequests extends Middleware
                     ->toArray(),
             // Each active resource type gets its own sidebar section
             // (Boardroom, Carpool, ...) with a calendar + booking page.
-            'resourceTypes' => $user === null || ! $user->isActive()
+            'resourceTypes' => fn () => $user === null || ! $user->isActive()
                 ? []
                 : ResourceType::query()
                     ->active()

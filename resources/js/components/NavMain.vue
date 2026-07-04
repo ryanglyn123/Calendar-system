@@ -31,7 +31,9 @@ const { isCurrentUrl } = useCurrentUrl();
                     :is-active="isCurrentUrl(item.href)"
                     :tooltip="item.title"
                 >
-                    <Link :href="item.href">
+                    <!-- Hover prefetch: the page request starts before the
+                         click, which hides most of the server round trip. -->
+                    <Link :href="item.href" prefetch cache-for="15s">
                         <component :is="item.icon" />
                         <span>{{ item.title }}</span>
                     </Link>

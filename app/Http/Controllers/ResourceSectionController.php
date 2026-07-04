@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesInitialWindow;
+use App\Models\Booking;
 use App\Models\Resource;
 use App\Models\ResourceType;
+use App\Services\Booking\BookingPresenter;
 use App\Services\Calendar\CalendarListService;
 use App\Services\Event\EventWindowService;
 use App\Settings\GeneralSettings;
@@ -27,6 +29,7 @@ class ResourceSectionController extends Controller
         GeneralSettings $settings,
         CalendarListService $list,
         EventWindowService $window,
+        BookingPresenter $presenter,
     ): Response {
         abort_unless($resourceType->is_active, 404);
 
@@ -68,6 +71,18 @@ class ResourceSectionController extends Controller
                 ...$this->initialSpan($user->timezone, $settings->week_starts_on),
                 resourceTypeId: $resourceType->id,
             ),
+            // The user's bookings ride along too, so the section paints in a
+            // single request instead of a follow-up API call.
+            'initialBookings' => fn () => Booking::query()
+                ->where('requested_by', $user->id)
+                ->whereHas('resource', fn ($q) => $q->where('resource_type_id', $resourceType->id))
+                ->with(['resource.type', 'editRequests'])
+                ->orderByDesc('starts_at')
+                ->limit(100)
+                ->get()
+                ->map(fn (Booking $booking): array => $presenter->toArray($booking))
+                ->values()
+                ->all(),
         ]);
     }
 }

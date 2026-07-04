@@ -266,9 +266,10 @@ Tested layout: one EC2 instance (Ubuntu 24.04 LTS, t3.small or larger) running n
 
 ## Performance
 
-Local development on Windows has two structural bottlenecks worth knowing about:
+Local development on Windows has three structural bottlenecks worth knowing about:
 
-- `php artisan serve` (what `composer dev` runs) handles **one request at a time on Windows**; PHP's built-in server cannot fork workers there. The app minimizes concurrent requests (the dashboard inlines its initial data, and month windows fetch as one spanning request), but for a much faster dev loop use [Laravel Herd](https://herd.laravel.com/windows) (nginx + PHP-FPM + OPcache) and point it at this folder instead of `artisan serve`.
+- **Enable OPcache in your php.ini** (`zend_extension=opcache`, `opcache.enable=1`, and for dev `opcache.revalidate_freq=0` so code edits apply immediately). Without it every request recompiles the entire framework; measured here it cuts per-request time about 3x under `artisan serve`. Restart `composer dev` after changing php.ini.
+- `php artisan serve` (what `composer dev` runs) handles **one request at a time on Windows**; PHP's built-in server cannot fork workers there. The app minimizes concurrent requests (calendar pages inline their initial data, and month windows fetch as one spanning request), but for a much faster dev loop use [Laravel Herd](https://herd.laravel.com/windows) (nginx + PHP-FPM + OPcache) and point it at this folder instead of `artisan serve`.
 - Keeping the repository inside a OneDrive-synced folder slows every request: PHP stats thousands of files per request, and OneDrive plus Windows Defender intercept each one. Move the project outside OneDrive if you can, or at least add an exclusion for the folder in Windows Security and pause OneDrive sync while developing.
 
 In production, `composer install --optimize-autoloader`, `php artisan optimize`, and OPcache (steps above) are what make it fast. Settings are cached (`SETTINGS_CACHE_ENABLED=true`) and each user's accessible-calendar set is cached for five minutes; both invalidate automatically on change.

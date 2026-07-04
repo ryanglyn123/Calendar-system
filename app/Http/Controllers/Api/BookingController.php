@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\EditRequestStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Resource;
+use App\Services\Booking\BookingPresenter;
 use App\Services\Booking\BookingService;
 use App\Services\Booking\EditRequestService;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +17,7 @@ class BookingController extends Controller
     public function __construct(
         private readonly BookingService $bookings,
         private readonly EditRequestService $editRequests,
+        private readonly BookingPresenter $presenter,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -111,26 +112,6 @@ class BookingController extends Controller
      */
     private function serialize(Booking $booking): array
     {
-        $booking->loadMissing(['resource.type', 'editRequests']);
-
-        return [
-            'id' => $booking->id,
-            'resource' => [
-                'id' => $booking->resource->id,
-                'name' => $booking->resource->name,
-                'type' => $booking->resource->type->name,
-            ],
-            'status' => $booking->status->value,
-            'status_color' => $booking->status->color(),
-            'starts_at' => $booking->starts_at->toIso8601String(),
-            'ends_at' => $booking->ends_at->toIso8601String(),
-            'purpose' => $booking->purpose,
-            'attendee_count' => $booking->attendee_count,
-            'rejection_reason' => $booking->rejection_reason,
-            'has_pending_edit' => $booking->editRequests
-                ->contains(fn ($er) => $er->status === EditRequestStatus::Pending),
-            'can_cancel' => in_array($booking->status->value, ['pending', 'approved'], true),
-            'can_request_edit' => $booking->status->value === 'approved',
-        ];
+        return $this->presenter->toArray($booking);
     }
 }
