@@ -10,7 +10,7 @@ import EventQuickView from '@/components/calendar/EventQuickView.vue';
 import MiniMonth from '@/components/calendar/MiniMonth.vue';
 import MonthView from '@/components/calendar/MonthView.vue';
 import RecurrenceScopeDialog from '@/components/calendar/RecurrenceScopeDialog.vue';
-import type {RecurrenceScope} from '@/components/calendar/RecurrenceScopeDialog.vue';
+import type { RecurrenceScope } from '@/components/calendar/RecurrenceScopeDialog.vue';
 import TimeGridView from '@/components/calendar/TimeGridView.vue';
 import { Separator } from '@/components/ui/separator';
 import { useConfirm } from '@/composables/useConfirm';
@@ -35,6 +35,14 @@ const props = defineProps<{
     scope?: CalendarScope;
     /** Which calendar groups the side panel renders, with their labels. */
     panelGroups?: CalendarPanelGroup[];
+}>();
+
+const emit = defineEmits<{
+    /**
+     * A date cell was picked in a scope the shell can't create events in
+     * (resource sections). The page turns this into a resource booking.
+     */
+    createBooking: [date: Date];
 }>();
 
 const grid = useCalendarGridStore();
@@ -88,6 +96,12 @@ const openQuickView = (occurrence: EventOccurrence) => {
 
 const openCreate = (start?: Date, end?: Date) => {
     if (!canCreate.value) {
+        // Resource sections can't create events directly; a picked date
+        // becomes a booking request handled by the page.
+        if (props.scope?.resourceTypeId != null && start) {
+            emit('createBooking', start);
+        }
+
         return;
     }
 
@@ -116,7 +130,9 @@ const scopeResolver = ref<((scope: RecurrenceScope | null) => void) | null>(
     null,
 );
 
-const askScope = (action: 'edit' | 'delete'): Promise<RecurrenceScope | null> => {
+const askScope = (
+    action: 'edit' | 'delete',
+): Promise<RecurrenceScope | null> => {
     scopeAction.value = action;
 
     return new Promise((resolve) => {

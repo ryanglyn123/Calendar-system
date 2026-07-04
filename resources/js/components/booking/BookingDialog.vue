@@ -32,6 +32,8 @@ const props = defineProps<{
         location: string | null;
         capacity: number | null;
     }[];
+    /** Prefill the date (yyyy-MM-dd) when opened from a calendar cell. */
+    initialDate?: string | null;
 }>();
 
 const open = defineModel<boolean>('open', { required: true });
@@ -66,7 +68,9 @@ watch(open, (isOpen) => {
         resource_id:
             props.resources.length === 1 ? props.resources[0].id : null,
         title: '',
-        date: format(new Date(Date.now() + 86_400_000), 'yyyy-MM-dd'),
+        date:
+            props.initialDate ??
+            format(new Date(Date.now() + 86_400_000), 'yyyy-MM-dd'),
         startTime: '09:00',
         endTime: '10:00',
         purpose: '',
@@ -192,10 +196,7 @@ const submit = async () => {
                                     v-if="resource.location"
                                     class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"
                                 >
-                                    <MapPin
-                                        class="size-3"
-                                        aria-hidden="true"
-                                    />
+                                    <MapPin class="size-3" aria-hidden="true" />
                                     {{ resource.location }}
                                 </span>
                             </span>
@@ -293,9 +294,7 @@ const submit = async () => {
                             >
                                 {{
                                     format(new Date(slot.starts_at), 'HH:mm')
-                                }}-{{
-                                    format(new Date(slot.ends_at), 'HH:mm')
-                                }}
+                                }}-{{ format(new Date(slot.ends_at), 'HH:mm') }}
                             </span>
                         </span>
                     </template>

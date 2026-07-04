@@ -112,6 +112,18 @@ watch(
 );
 
 const booking = ref(false);
+/** Prefilled date (yyyy-MM-dd) when the dialog is opened from a calendar cell. */
+const bookingDate = ref<string | null>(null);
+
+const openNewBooking = () => {
+    bookingDate.value = null;
+    booking.value = true;
+};
+
+const openBookingOn = (date: Date) => {
+    bookingDate.value = format(date, 'yyyy-MM-dd');
+    booking.value = true;
+};
 
 const onBooked = (startsAt: string) => {
     void loadMine();
@@ -186,7 +198,7 @@ const when = (target: MyBooking) =>
                 </div>
             </div>
 
-            <Button data-test="new-booking" @click="booking = true">
+            <Button data-test="new-booking" @click="openNewBooking">
                 <CalendarPlus aria-hidden="true" />
                 New booking
             </Button>
@@ -194,8 +206,10 @@ const when = (target: MyBooking) =>
 
         <!-- Availability calendar: one sub-calendar per room/vehicle.
              Keyed so hopping between sections remounts the shell and its
-             scope instead of reusing the previous section's. -->
-        <div class="h-[70vh] min-h-[480px] shrink-0 border-b">
+             scope instead of reusing the previous section's. min-height fits
+             a full six-week month so the grid never bleeds into the bookings
+             table below; overflow-hidden guards the boundary. -->
+        <div class="h-[70vh] min-h-[800px] shrink-0 overflow-hidden border-b">
             <CalendarShell
                 :key="resourceType.id"
                 :event-types="[]"
@@ -204,6 +218,7 @@ const when = (target: MyBooking) =>
                 :initial-events="initialEvents"
                 :scope="scope"
                 :panel-groups="panelGroups"
+                @create-booking="openBookingOn"
             />
         </div>
 
@@ -293,6 +308,7 @@ const when = (target: MyBooking) =>
             v-model:open="booking"
             :type="resourceType"
             :resources="resources"
+            :initial-date="bookingDate"
             @created="onBooked"
         />
     </div>
