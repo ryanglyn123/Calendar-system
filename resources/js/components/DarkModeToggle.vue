@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import { Moon, Sun } from '@lucide/vue';
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useAppearance } from '@/composables/useAppearance';
 
 const { resolvedAppearance, updateAppearance } = useAppearance();
 
-const isDark = computed(() => resolvedAppearance.value === 'dark');
+// The resolved appearance depends on matchMedia and localStorage, which the
+// server cannot know. Until mounted, render the same light state the server
+// rendered; a mismatched first render corrupts hydration of the icon subtree
+// (the icon mounts into a detached node and stays invisible).
+const mounted = ref(false);
+
+onMounted(() => {
+    mounted.value = true;
+});
+
+const isDark = computed(
+    () => mounted.value && resolvedAppearance.value === 'dark',
+);
 
 const squashing = ref(false);
 let squashTimer: ReturnType<typeof setTimeout> | undefined;
