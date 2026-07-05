@@ -7,7 +7,7 @@ use App\Http\Resources\ChatMessageResource;
 use App\Models\ChatMessage;
 use App\Models\ChatPoll;
 use App\Models\ChatRead;
-use App\Models\Division;
+use App\Models\Conversation;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -16,12 +16,12 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
- * All division-chat writes plus the unread count. Broadcasts always fire
- * AFTER the transaction commits so no pre-commit state ever leaves the box.
+ * All chat writes plus unread counts, keyed on the conversation. Broadcasts
+ * fire AFTER the transaction commits so no pre-commit state ever leaves.
  *
- * Membership is a plain division_id comparison everywhere on purpose:
- * Gate::before lets super admins pass every permission check, and chat
- * rooms must not leak across divisions even to them.
+ * Membership never uses policies/can(): division rooms compare division ids
+ * and custom rooms check the participant list, because Gate::before lets
+ * super admins pass every permission check and must not leak into any room.
  */
 class ChatService
 {
@@ -34,15 +34,15 @@ class ChatService
     ];
 
     /**
-     * Latest messages for the division, newest first, before the given id.
+     * Latest messages for the conversation, newest first, before the given id.
      *
      * @return array{messages: list<array<string, mixed>>, has_more: bool}
      */
-    public function page(Request $request, int $divisionId, ?int $beforeId = null): array
+    public function page(Request $request, Conversation $conversation, ?int $beforeId = null): array
     {
         $messages = ChatMessage::query()
             ->withTrashed()
-            ->where('division_id', $divisionId)
+            ->where('conversation_id', $conversation->id)
             ->when($beforeId !== null, fn ($query) => $query->where('id', '<', $beforeId))
             ->with(self::MESSAGE_LOADS)
             ->orderByDesc('id')
@@ -64,11 +64,11 @@ class ChatService
      * @param  array{body?: string|null, reply_to_id?: int|null, event_card?: array<string, mixed>|null, photos?: list<UploadedFile>, poll?: array{question: string, options: list<string>, allows_multiple?: bool}|null}  $input
      * @return array<string, mixed> the serialized message
      */
-    public function send(Request $request, User $user, array $input): array
+    public function send(Request $request, User $user, Conversation $conversation, array $input): array
     {
-        $message = DB::transaction(function () use ($user, $input) {
+        $message = DB::transaction(function () use ($user, $conversation, $input) {
             $message = ChatMessage::create([
-                'division_id' => $user->chatDivision()?->id,
+                'conversation_id' => $conversation->id,
                 'user_id' => $user->id,
                 'body' => $input['body'] ?? null,
                 'reply_to_id' => $input['reply_to_id'] ?? null,
@@ -77,7 +77,7 @@ class ChatService
 
             foreach ($input['photos'] ?? [] as $photo) {
                 $path = $photo->storeAs(
-                    "chat/{$user->division_id}",
+                    "chat/{$conversation->id}",
                     Str::uuid().'.'.$photo->extension(),
                     'local',
                 );
@@ -112,7 +112,7 @@ class ChatService
             $message->load(self::MESSAGE_LOADS),
         )->resolve($request);
 
-        broadcast(new ChatBroadcast($message->division_id, 'message.sent', $payload))->toOthers();
+        broadcast(new ChatBroadcast($conversation->id, 'message.sent', $payload))->toOthers();
 
         return $payload;
     }
@@ -132,7 +132,7 @@ class ChatService
             $message->delete();
         });
 
-        broadcast(new ChatBroadcast($message->division_id, 'message.deleted', [
+        broadcast(new ChatBroadcast($message->conversation_id, 'message.deleted', [
             'id' => $message->id,
         ]))->toOthers();
     }
@@ -155,7 +155,7 @@ class ChatService
 
         $reactions = $message->load('reactions')->reactionSummary();
 
-        broadcast(new ChatBroadcast($message->division_id, 'reaction.updated', [
+        broadcast(new ChatBroadcast($message->conversation_id, 'reaction.updated', [
             'message_id' => $message->id,
             'reactions' => $reactions,
         ]))->toOthers();
@@ -172,7 +172,7 @@ class ChatService
             'pinned_by' => $pinned ? $user->id : null,
         ]);
 
-        broadcast(new ChatBroadcast($message->division_id, 'message.pinned', [
+        broadcast(new ChatBroadcast($message->conversation_id, 'message.pinned', [
             'message_id' => $message->id,
             'is_pinned' => $pinned,
         ]))->toOthers();
@@ -204,7 +204,7 @@ class ChatService
 
         $payload = ChatMessageResource::make($message)->resolve($request);
 
-        broadcast(new ChatBroadcast($message->division_id, 'poll.updated', [
+        broadcast(new ChatBroadcast($message->conversation_id, 'poll.updated', [
             'message_id' => $message->id,
             'poll' => $payload['poll'],
         ]))->toOthers();
@@ -216,12 +216,10 @@ class ChatService
      * Monotonic: an out-of-order request can never move the marker back.
      * Read receipts are always on by design — there is no preference.
      */
-    public function markRead(User $user, int $lastReadMessageId): void
+    public function markRead(User $user, Conversation $conversation, int $lastReadMessageId): void
     {
-        $chatDivisionId = $user->chatDivision()?->id;
-
         $read = ChatRead::query()->firstOrCreate(
-            ['division_id' => $chatDivisionId, 'user_id' => $user->id],
+            ['conversation_id' => $conversation->id, 'user_id' => $user->id],
         );
 
         if (($read->last_read_message_id ?? 0) >= $lastReadMessageId) {
@@ -230,48 +228,40 @@ class ChatService
 
         $read->update(['last_read_message_id' => $lastReadMessageId]);
 
-        broadcast(new ChatBroadcast((int) $chatDivisionId, 'read.updated', [
+        broadcast(new ChatBroadcast($conversation->id, 'read.updated', [
             'user_id' => $user->id,
             'last_read_message_id' => $lastReadMessageId,
         ]))->toOthers();
     }
 
-    public function unreadCount(User $user): int
+    public function unreadCount(User $user, Conversation $conversation): int
     {
-        $chatDivisionId = $user->chatDivision()?->id;
-
-        if ($chatDivisionId === null) {
-            return 0;
-        }
-
         $lastRead = ChatRead::query()
-            ->where('division_id', $chatDivisionId)
+            ->where('conversation_id', $conversation->id)
             ->where('user_id', $user->id)
             ->value('last_read_message_id') ?? 0;
 
         return ChatMessage::query()
-            ->where('division_id', $chatDivisionId)
+            ->where('conversation_id', $conversation->id)
             ->where('id', '>', $lastRead)
             ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', '!=', $user->id))
             ->count();
     }
 
     /**
-     * Division members with their read positions — the read-receipt bootstrap.
+     * Conversation members with their read positions — the read-receipt
+     * bootstrap.
      *
      * @return list<array<string, mixed>>
      */
-    public function members(Division $division): array
+    public function members(Conversation $conversation): array
     {
         $reads = ChatRead::query()
-            ->where('division_id', $division->id)
+            ->where('conversation_id', $conversation->id)
             ->pluck('last_read_message_id', 'user_id');
 
-        // Unit members share the parent room, so they are members too.
-        $divisionIds = [$division->id, ...$division->children()->pluck('id')->all()];
-
         return array_values(User::query()
-            ->whereIn('division_id', $divisionIds)
+            ->whereIn('id', $conversation->memberUserIds())
             ->orderBy('name')
             ->get(['id', 'name', 'avatar_path'])
             ->map(fn (User $member): array => [
@@ -284,27 +274,27 @@ class ChatService
     }
 
     /**
-     * Replace the division's group photo; any member may do this
-     * (messenger semantics).
+     * Replace a conversation's photo; any member may do this (messenger
+     * semantics).
      */
-    public function updatePhoto(User $user, Division $division, UploadedFile $photo): void
+    public function updatePhoto(User $user, Conversation $conversation, UploadedFile $photo): void
     {
-        $old = $division->chat_photo_path;
+        $old = $conversation->photo_path;
 
         $path = $photo->storeAs(
-            "chat/{$division->id}",
+            "chat/{$conversation->id}",
             'photo-'.Str::uuid().'.'.$photo->extension(),
             'local',
         );
 
-        $division->update(['chat_photo_path' => $path]);
+        $conversation->update(['photo_path' => $path]);
 
         if ($old !== null) {
             Storage::disk('local')->delete($old);
         }
 
-        broadcast(new ChatBroadcast($division->id, 'settings.updated', [
-            'photo_url' => route('api.chat.photo.show', absolute: false).'?v='.now()->timestamp,
+        broadcast(new ChatBroadcast($conversation->id, 'settings.updated', [
+            'photo_url' => route('api.chat.photo.show', $conversation, absolute: false).'?v='.now()->timestamp,
             'updated_by' => $user->name,
         ]));
     }

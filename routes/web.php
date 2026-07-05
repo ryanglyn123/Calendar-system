@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CalendarListController;
 use App\Http\Controllers\Api\CalendarPreferenceController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\EventCommentController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventOccurrenceController;
@@ -113,11 +114,32 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
 
         Route::post('announcements/{announcement}/dismiss', [AnnouncementDismissalController::class, 'store'])->name('announcements.dismiss');
 
-        // Division group chat. Reads share the group throttle; writes get
-        // their own limiters, media streaming a generous one.
-        Route::get('chat/messages', [ChatController::class, 'index'])->name('chat.messages.index');
-        Route::post('chat/messages', [ChatController::class, 'store'])
+        // Chat conversations: division rooms + custom group chats. The
+        // conversation list, plus custom-chat creation and management.
+        Route::get('conversations', [ConversationController::class, 'index'])->name('conversations.index');
+        Route::get('conversations/candidates', [ConversationController::class, 'participantCandidates'])->name('conversations.candidates');
+        Route::post('conversations', [ConversationController::class, 'store'])
+            ->middleware('throttle:chat-send')->name('conversations.store');
+        Route::patch('conversations/{conversation}', [ConversationController::class, 'update'])
+            ->middleware('throttle:chat-send')->name('conversations.update');
+        Route::post('conversations/{conversation}/leave', [ConversationController::class, 'leave'])
+            ->middleware('throttle:chat-send')->name('conversations.leave');
+
+        // Per-conversation reads/writes. Reads share the group throttle;
+        // writes get their own limiters, media streaming a generous one.
+        Route::get('conversations/{conversation}/messages', [ChatController::class, 'index'])->name('chat.messages.index');
+        Route::post('conversations/{conversation}/messages', [ChatController::class, 'store'])
             ->middleware('throttle:chat-send')->name('chat.messages.store');
+        Route::get('conversations/{conversation}/members', [ChatController::class, 'members'])->name('chat.members');
+        Route::get('conversations/{conversation}/pinned', [ChatController::class, 'pinned'])->name('chat.pinned');
+        Route::post('conversations/{conversation}/read', [ChatController::class, 'markRead'])
+            ->middleware('throttle:chat-react')->name('chat.read');
+        Route::post('conversations/{conversation}/photo', [ChatController::class, 'updatePhoto'])
+            ->middleware('throttle:chat-send')->name('chat.photo.update');
+        Route::get('conversations/{conversation}/photo', [ChatController::class, 'showPhoto'])
+            ->middleware('throttle:chat-media')->name('chat.photo.show');
+
+        // Message-level actions, bound directly to the message/poll/attachment.
         Route::delete('chat/messages/{message}', [ChatController::class, 'destroy'])
             ->middleware('throttle:chat-send')->name('chat.messages.destroy');
         Route::post('chat/messages/{message}/reactions', [ChatController::class, 'toggleReaction'])
@@ -126,14 +148,6 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->middleware('throttle:chat-react')->name('chat.pin.toggle');
         Route::put('chat/polls/{poll}/votes', [ChatController::class, 'vote'])
             ->middleware('throttle:chat-react')->name('chat.polls.votes');
-        Route::post('chat/read', [ChatController::class, 'markRead'])
-            ->middleware('throttle:chat-react')->name('chat.read');
-        Route::get('chat/members', [ChatController::class, 'members'])->name('chat.members');
-        Route::get('chat/pinned', [ChatController::class, 'pinned'])->name('chat.pinned');
-        Route::post('chat/photo', [ChatController::class, 'updatePhoto'])
-            ->middleware('throttle:chat-send')->name('chat.photo.update');
-        Route::get('chat/photo', [ChatController::class, 'showPhoto'])
-            ->middleware('throttle:chat-media')->name('chat.photo.show');
         Route::get('chat/attachments/{attachment}', [ChatController::class, 'showAttachment'])
             ->middleware('throttle:chat-media')->name('chat.attachments.show');
     });

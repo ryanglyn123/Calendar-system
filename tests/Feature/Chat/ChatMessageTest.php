@@ -6,6 +6,7 @@ use App\Models\User;
 
 beforeEach(function () {
     $this->division = Division::factory()->create();
+    $this->room = $this->division->conversation;
     $this->member = User::factory()->create(['division_id' => $this->division->id]);
     $this->teammate = User::factory()->create(['division_id' => $this->division->id]);
     $this->outsider = User::factory()->create(['division_id' => Division::factory()->create()->id]);
@@ -13,13 +14,13 @@ beforeEach(function () {
 
 test('members can send and list messages', function () {
     $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), ['body' => 'Hello team, see https://fdcp.gov.ph'])
+        ->postJson(route('api.chat.messages.store', $this->room), ['body' => 'Hello team, see https://fdcp.gov.ph'])
         ->assertCreated()
         ->assertJsonPath('data.body', 'Hello team, see https://fdcp.gov.ph')
         ->assertJsonPath('data.user.id', $this->member->id);
 
     $this->actingAs($this->teammate)
-        ->getJson(route('api.chat.messages.index'))
+        ->getJson(route('api.chat.messages.index', $this->room))
         ->assertOk()
         ->assertJsonPath('messages.0.body', 'Hello team, see https://fdcp.gov.ph')
         ->assertJsonPath('has_more', false);
@@ -27,16 +28,16 @@ test('members can send and list messages', function () {
 
 test('a message needs a body, photos, or a poll', function () {
     $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [])
+        ->postJson(route('api.chat.messages.store', $this->room), [])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('body');
 });
 
-test('replies must target a message in the same division', function () {
+test('replies must target a message in the same conversation', function () {
     $foreign = ChatMessage::factory()->create();
 
     $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [
+        ->postJson(route('api.chat.messages.store', $this->room), [
             'body' => 'replying',
             'reply_to_id' => $foreign->id,
         ])
@@ -44,12 +45,12 @@ test('replies must target a message in the same division', function () {
         ->assertJsonValidationErrors('reply_to_id');
 
     $own = ChatMessage::factory()->create([
-        'division_id' => $this->division->id,
+        'conversation_id' => $this->room->id,
         'user_id' => $this->teammate->id,
     ]);
 
     $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [
+        ->postJson(route('api.chat.messages.store', $this->room), [
             'body' => 'replying',
             'reply_to_id' => $own->id,
         ])
@@ -59,13 +60,13 @@ test('replies must target a message in the same division', function () {
 
 test('pagination pages backwards with before_id', function () {
     $messages = collect(range(1, 35))->map(fn (int $i) => ChatMessage::factory()->create([
-        'division_id' => $this->division->id,
+        'conversation_id' => $this->room->id,
         'user_id' => $this->member->id,
         'body' => "Message {$i}",
     ]));
 
     $first = $this->actingAs($this->member)
-        ->getJson(route('api.chat.messages.index'))
+        ->getJson(route('api.chat.messages.index', $this->room))
         ->assertOk()
         ->assertJsonPath('has_more', true)
         ->json();
@@ -76,7 +77,7 @@ test('pagination pages backwards with before_id', function () {
     $oldestSeen = collect($first['messages'])->min('id');
 
     $second = $this->actingAs($this->member)
-        ->getJson(route('api.chat.messages.index', ['before_id' => $oldestSeen]))
+        ->getJson(route('api.chat.messages.index', [$this->room, 'before_id' => $oldestSeen]))
         ->assertOk()
         ->assertJsonPath('has_more', false)
         ->json();
@@ -86,7 +87,7 @@ test('pagination pages backwards with before_id', function () {
 
 test('deleting your own message leaves a tombstone without content', function () {
     $message = ChatMessage::factory()->create([
-        'division_id' => $this->division->id,
+        'conversation_id' => $this->room->id,
         'user_id' => $this->member->id,
         'body' => 'Delete me',
     ]);
@@ -96,7 +97,7 @@ test('deleting your own message leaves a tombstone without content', function ()
         ->assertOk();
 
     $listed = collect($this->actingAs($this->teammate)
-        ->getJson(route('api.chat.messages.index'))
+        ->getJson(route('api.chat.messages.index', $this->room))
         ->json('messages'))
         ->firstWhere('id', $message->id);
 
@@ -107,7 +108,7 @@ test('deleting your own message leaves a tombstone without content', function ()
 
 test('you cannot delete someone else\'s message', function () {
     $message = ChatMessage::factory()->create([
-        'division_id' => $this->division->id,
+        'conversation_id' => $this->room->id,
         'user_id' => $this->teammate->id,
     ]);
 
@@ -117,18 +118,13 @@ test('you cannot delete someone else\'s message', function () {
 });
 
 test('other divisions cannot read or write this room', function () {
-    ChatMessage::factory()->create([
-        'division_id' => $this->division->id,
-        'user_id' => $this->member->id,
-        'body' => 'secret',
-    ]);
+    $this->actingAs($this->outsider)
+        ->getJson(route('api.chat.messages.index', $this->room))
+        ->assertForbidden();
 
-    $foreign = $this->actingAs($this->outsider)
-        ->getJson(route('api.chat.messages.index'))
-        ->assertOk()
-        ->json('messages');
-
-    expect(collect($foreign)->pluck('body'))->not->toContain('secret');
+    $this->actingAs($this->outsider)
+        ->postJson(route('api.chat.messages.store', $this->room), ['body' => 'intrusion'])
+        ->assertForbidden();
 });
 
 test('super admins from another division get no special access', function () {
@@ -136,33 +132,28 @@ test('super admins from another division get no special access', function () {
     $superAdmin->assignRole('super_admin');
 
     $message = ChatMessage::factory()->create([
-        'division_id' => $this->division->id,
+        'conversation_id' => $this->room->id,
         'user_id' => $this->member->id,
         'body' => 'division only',
     ]);
 
-    // Their list is their own division's (empty), not this one.
-    $listed = $this->actingAs($superAdmin)
-        ->getJson(route('api.chat.messages.index'))
-        ->assertOk()
-        ->json('messages');
+    $this->actingAs($superAdmin)
+        ->getJson(route('api.chat.messages.index', $this->room))
+        ->assertForbidden();
 
-    expect(collect($listed)->pluck('id'))->not->toContain($message->id);
-
-    // And direct object access is refused outright.
     $this->actingAs($superAdmin)
         ->postJson(route('api.chat.reactions.toggle', $message), ['emoji' => '👍'])
         ->assertForbidden();
 });
 
-test('users without a division cannot use chat', function () {
+test('users without a division cannot access a division room', function () {
     $nobody = User::factory()->create(['division_id' => null]);
 
     $this->actingAs($nobody)
-        ->getJson(route('api.chat.messages.index'))
+        ->getJson(route('api.chat.messages.index', $this->room))
         ->assertForbidden();
 
     $this->actingAs($nobody)
-        ->postJson(route('api.chat.messages.store'), ['body' => 'hi'])
+        ->postJson(route('api.chat.messages.store', $this->room), ['body' => 'hi'])
         ->assertForbidden();
 });

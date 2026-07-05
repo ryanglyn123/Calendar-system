@@ -83,6 +83,28 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     }
 
     /**
+     * Divisions whose chat rooms this user belongs to: their own division,
+     * plus the parent division when they are a unit member (units also see
+     * the parent room; the parent does not see unit rooms).
+     *
+     * @return list<int>
+     */
+    public function chatDivisionIds(): array
+    {
+        if ($this->division_id === null) {
+            return [];
+        }
+
+        $ids = [(int) $this->division_id];
+
+        if ($this->division?->parent_id !== null) {
+            $ids[] = (int) $this->division->parent_id;
+        }
+
+        return $ids;
+    }
+
+    /**
      * The user's division plus its parent and units — the set whose division
      * calendars this user may view (writes stay own-division only).
      *

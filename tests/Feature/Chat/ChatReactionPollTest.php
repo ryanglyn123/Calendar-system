@@ -7,11 +7,12 @@ use App\Models\User;
 
 beforeEach(function () {
     $this->division = Division::factory()->create();
+    $this->room = $this->division->conversation;
     $this->member = User::factory()->create(['division_id' => $this->division->id]);
     $this->teammate = User::factory()->create(['division_id' => $this->division->id]);
 
     $this->message = ChatMessage::factory()->create([
-        'division_id' => $this->division->id,
+        'conversation_id' => $this->room->id,
         'user_id' => $this->member->id,
     ]);
 });
@@ -38,7 +39,7 @@ test('only the curated reaction set is accepted', function () {
 
 test('polls are created with a message and voted on', function () {
     $response = $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [
+        ->postJson(route('api.chat.messages.store', $this->room), [
             'poll' => [
                 'question' => 'Team lunch where?',
                 'options' => ['Jollibee', 'Mang Inasal', 'Sushi'],
@@ -52,7 +53,6 @@ test('polls are created with a message and voted on', function () {
 
     expect($optionIds)->toHaveCount(3);
 
-    // Single-choice: a new vote replaces the previous one.
     $this->actingAs($this->teammate)
         ->putJson(route('api.chat.polls.votes', $pollId), ['option_ids' => [$optionIds[0]]])
         ->assertOk();
@@ -65,7 +65,6 @@ test('polls are created with a message and voted on', function () {
     expect(collect($poll['options'][0]['voters']))->toHaveCount(0)
         ->and(collect($poll['options'][1]['voters'])->pluck('id'))->toContain($this->teammate->id);
 
-    // Unvote via empty array.
     $poll = $this->actingAs($this->teammate)
         ->putJson(route('api.chat.polls.votes', $pollId), ['option_ids' => []])
         ->assertOk()
@@ -76,7 +75,7 @@ test('polls are created with a message and voted on', function () {
 
 test('single-choice polls refuse multiple selections', function () {
     $response = $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [
+        ->postJson(route('api.chat.messages.store', $this->room), [
             'poll' => ['question' => 'Pick one', 'options' => ['A', 'B']],
         ])->assertCreated();
 
@@ -91,7 +90,7 @@ test('single-choice polls refuse multiple selections', function () {
 
 test('multiple-choice polls accept several selections', function () {
     $response = $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [
+        ->postJson(route('api.chat.messages.store', $this->room), [
             'poll' => [
                 'question' => 'Which days work?',
                 'options' => ['Mon', 'Tue', 'Wed'],
@@ -114,12 +113,12 @@ test('multiple-choice polls accept several selections', function () {
 
 test('poll options from another poll are rejected', function () {
     $mine = $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [
+        ->postJson(route('api.chat.messages.store', $this->room), [
             'poll' => ['question' => 'Mine', 'options' => ['A', 'B']],
         ])->assertCreated();
 
     $other = $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [
+        ->postJson(route('api.chat.messages.store', $this->room), [
             'poll' => ['question' => 'Other', 'options' => ['C', 'D']],
         ])->assertCreated();
 
@@ -132,7 +131,7 @@ test('poll options from another poll are rejected', function () {
 
 test('polls cannot be combined with photos and need two options', function () {
     $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [
+        ->postJson(route('api.chat.messages.store', $this->room), [
             'poll' => ['question' => 'One option only', 'options' => ['A']],
         ])
         ->assertUnprocessable()
@@ -143,7 +142,7 @@ test('votes from another division are refused', function () {
     $outsider = User::factory()->create(['division_id' => Division::factory()->create()->id]);
 
     $response = $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), [
+        ->postJson(route('api.chat.messages.store', $this->room), [
             'poll' => ['question' => 'Private poll', 'options' => ['A', 'B']],
         ])->assertCreated();
 

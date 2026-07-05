@@ -14,7 +14,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property int $id
- * @property int $division_id
+ * @property int $conversation_id
+ * @property int|null $division_id
  * @property int|null $user_id
  * @property string|null $body
  * @property int|null $reply_to_id
@@ -23,7 +24,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int|null $pinned_by
  * @property CarbonInterface $created_at
  */
-#[Fillable(['division_id', 'user_id', 'body', 'reply_to_id', 'event_card', 'pinned_at', 'pinned_by'])]
+#[Fillable(['conversation_id', 'division_id', 'user_id', 'body', 'reply_to_id', 'event_card', 'pinned_at', 'pinned_by'])]
 class ChatMessage extends Model
 {
     /** @use HasFactory<ChatMessageFactory> */
@@ -35,6 +36,12 @@ class ChatMessage extends Model
             'event_card' => 'array',
             'pinned_at' => 'datetime',
         ];
+    }
+
+    /** @return BelongsTo<Conversation, $this> */
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class);
     }
 
     /** @return BelongsTo<Division, $this> */

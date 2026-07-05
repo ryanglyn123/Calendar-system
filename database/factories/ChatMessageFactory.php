@@ -15,7 +15,8 @@ class ChatMessageFactory extends Factory
     public function definition(): array
     {
         return [
-            'division_id' => Division::factory(),
+            // A fresh division's room by default (the observer creates it).
+            'conversation_id' => fn () => Division::factory()->create()->conversation->id,
             'user_id' => User::factory(),
             'body' => fake()->sentence(),
         ];

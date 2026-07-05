@@ -70,6 +70,32 @@ export type ChatDivisionInfo = {
     photo_url: string | null;
 };
 
+export type ChatEventRef = {
+    event_id: number;
+    title: string;
+    url: string;
+};
+
+/** A row in the conversation list: division room or custom group chat. */
+export type ChatConversationSummary = {
+    id: number;
+    type: 'division' | 'custom';
+    name: string;
+    photo_url: string | null;
+    is_division: boolean;
+    created_by: number | null;
+    event: ChatEventRef | null;
+    unread: number;
+    last_preview: string | null;
+    last_activity: string;
+};
+
+export type ChatCandidate = {
+    id: number;
+    name: string;
+    avatar_path: string | null;
+};
+
 export type ChatPage = {
     messages: ChatMessageItem[];
     has_more: boolean;

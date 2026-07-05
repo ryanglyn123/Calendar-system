@@ -290,17 +290,18 @@ const destroy = () => {
                         <select
                             id="division-parent"
                             v-model="form.parent_id"
-                            class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                            <option :value="null">
+                            <option class="bg-background text-foreground" :value="null">
                                 None — top-level division
                             </option>
                             <option
                                 v-for="parent in parentOptions"
                                 :key="parent.id"
                                 :value="parent.id"
+                                class="bg-background text-foreground"
                             >
-                                Unit of {{ parent.name }}
+                                {{ parent.name }}
                             </option>
                         </select>
                         <p

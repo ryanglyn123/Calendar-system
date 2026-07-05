@@ -7,6 +7,7 @@ use App\Models\User;
 
 beforeEach(function () {
     $this->division = Division::factory()->create();
+    $this->room = $this->division->conversation;
     $this->member = User::factory()->create(['division_id' => $this->division->id]);
 });
 
@@ -19,7 +20,7 @@ test('sharing an event posts a server-built card that deep-links to it', functio
     ]);
 
     $response = $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), ['event_id' => $event->id])
+        ->postJson(route('api.chat.messages.store', $this->room), ['event_id' => $event->id])
         ->assertCreated();
 
     $card = $response->json('data.event_card');
@@ -36,7 +37,7 @@ test('sharing an event the user cannot view is rejected', function () {
     $event = Event::factory()->create(['calendar_id' => $personal->id]);
 
     $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), ['event_id' => $event->id])
+        ->postJson(route('api.chat.messages.store', $this->room), ['event_id' => $event->id])
         ->assertForbidden();
 });
 
@@ -45,11 +46,11 @@ test('the card survives the message page payload', function () {
     $event = Event::factory()->create(['calendar_id' => $calendar->id]);
 
     $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), ['event_id' => $event->id])
+        ->postJson(route('api.chat.messages.store', $this->room), ['event_id' => $event->id])
         ->assertCreated();
 
     $this->actingAs($this->member)
-        ->getJson(route('api.chat.messages.index'))
+        ->getJson(route('api.chat.messages.index', $this->room))
         ->assertOk()
         ->assertJsonPath('messages.0.event_card.event_id', $event->id);
 });

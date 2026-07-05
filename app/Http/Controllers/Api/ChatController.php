@@ -2,20 +2,18 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\CalendarType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Chat\StoreChatMessageRequest;
 use App\Http\Resources\ChatMessageResource;
-use App\Models\Calendar;
 use App\Models\ChatAttachment;
 use App\Models\ChatMessage;
 use App\Models\ChatPoll;
 use App\Models\ChatReaction;
-use App\Models\Division;
+use App\Models\Conversation;
 use App\Models\Event;
-use App\Models\Resource;
 use App\Services\Calendar\CalendarAccessService;
 use App\Services\Chat\ChatService;
+use App\Support\EventLink;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -24,9 +22,9 @@ use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Division chat endpoints. Membership is always an explicit division_id
- * comparison — never a permission check — because Gate::before would let
- * super admins into every division's room.
+ * Chat endpoints, scoped to a conversation. Membership is always an explicit
+ * check (division ids or the participant list) — never a permission check —
+ * because Gate::before would let super admins into every private room.
  */
 class ChatController extends Controller
 {
@@ -34,9 +32,9 @@ class ChatController extends Controller
         private readonly ChatService $chat,
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, Conversation $conversation): JsonResponse
     {
-        $divisionId = $this->divisionIdOrAbort($request);
+        $this->assertMember($request, $conversation);
 
         $validated = $request->validate([
             'before_id' => ['sometimes', 'integer'],
@@ -44,13 +42,15 @@ class ChatController extends Controller
 
         return response()->json($this->chat->page(
             $request,
-            $divisionId,
+            $conversation,
             isset($validated['before_id']) ? (int) $validated['before_id'] : null,
         ));
     }
 
-    public function store(StoreChatMessageRequest $request, CalendarAccessService $access): JsonResponse
+    public function store(StoreChatMessageRequest $request, Conversation $conversation, CalendarAccessService $access): JsonResponse
     {
+        $this->assertMember($request, $conversation);
+
         /** @var array{body?: string|null, reply_to_id?: int|null, event_id?: int|null, photos?: list<UploadedFile>, poll?: array{question: string, options: list<string>, allows_multiple?: bool}|null} $validated */
         $validated = $request->validated();
 
@@ -67,53 +67,14 @@ class ChatController extends Controller
         unset($validated['event_id']);
 
         return response()->json(
-            ['data' => $this->chat->send($request, $request->user(), $validated)],
+            ['data' => $this->chat->send($request, $request->user(), $conversation, $validated)],
             201,
         );
     }
 
-    /**
-     * The snapshot a shared event renders as in chat — deliberately not the
-     * full event, just enough to recognize it plus a deep link.
-     *
-     * @return array{event_id: int, title: string, starts_at: string, ends_at: string, all_day: bool, location: string|null, url: string}
-     */
-    private function eventCard(Event $event): array
-    {
-        $path = match ($event->calendar->type) {
-            CalendarType::Organization => route('calendar.public', absolute: false),
-            CalendarType::Division => route('calendar.division', absolute: false),
-            CalendarType::Resource => $this->resourceSectionPath($event->calendar),
-            CalendarType::Personal => route('dashboard', absolute: false),
-        };
-
-        return [
-            'event_id' => $event->id,
-            'title' => $event->title,
-            'starts_at' => $event->starts_at->toIso8601String(),
-            'ends_at' => $event->ends_at->toIso8601String(),
-            'all_day' => $event->all_day,
-            'location' => $event->location,
-            'url' => $path.'?event='.$event->id
-                .'&date='.$event->starts_at->timezone($event->timezone)->toDateString(),
-        ];
-    }
-
-    private function resourceSectionPath(Calendar $calendar): string
-    {
-        $resource = Resource::query()
-            ->with('type')
-            ->where('calendar_id', $calendar->id)
-            ->first();
-
-        return $resource?->type !== null
-            ? route('resources.section', $resource->type, absolute: false)
-            : route('dashboard', absolute: false);
-    }
-
     public function destroy(Request $request, ChatMessage $message): JsonResponse
     {
-        $this->assertSameDivision($request, $message->division_id);
+        $this->assertMessageMember($request, $message);
         abort_unless($message->user_id === $request->user()->id, 403, 'You can only remove your own messages.');
 
         $this->chat->delete($message);
@@ -123,7 +84,7 @@ class ChatController extends Controller
 
     public function toggleReaction(Request $request, ChatMessage $message): JsonResponse
     {
-        $this->assertSameDivision($request, $message->division_id);
+        $this->assertMessageMember($request, $message);
 
         $validated = $request->validate([
             'emoji' => ['required', 'string', Rule::in(ChatReaction::EMOJIS)],
@@ -136,7 +97,7 @@ class ChatController extends Controller
 
     public function togglePin(Request $request, ChatMessage $message): JsonResponse
     {
-        $this->assertSameDivision($request, $message->division_id);
+        $this->assertMessageMember($request, $message);
 
         return response()->json([
             'data' => ['is_pinned' => $this->chat->togglePin($request->user(), $message)],
@@ -146,7 +107,7 @@ class ChatController extends Controller
     public function vote(Request $request, ChatPoll $poll): JsonResponse
     {
         $message = $poll->message()->withTrashed()->firstOrFail();
-        $this->assertSameDivision($request, $message->division_id);
+        $this->assertMessageMember($request, $message);
 
         $optionIds = $poll->options()->pluck('id')->all();
 
@@ -165,34 +126,32 @@ class ChatController extends Controller
         ]);
     }
 
-    public function markRead(Request $request): JsonResponse
+    public function markRead(Request $request, Conversation $conversation): JsonResponse
     {
-        $this->divisionIdOrAbort($request);
+        $this->assertMember($request, $conversation);
 
         $validated = $request->validate([
             'last_read_message_id' => ['required', 'integer', 'min:1'],
         ]);
 
-        $this->chat->markRead($request->user(), (int) $validated['last_read_message_id']);
+        $this->chat->markRead($request->user(), $conversation, (int) $validated['last_read_message_id']);
 
         return response()->json(['data' => ['unread' => 0]]);
     }
 
-    public function members(Request $request): JsonResponse
+    public function members(Request $request, Conversation $conversation): JsonResponse
     {
-        $divisionId = $this->divisionIdOrAbort($request);
+        $this->assertMember($request, $conversation);
 
-        return response()->json([
-            'data' => $this->chat->members(Division::query()->findOrFail($divisionId)),
-        ]);
+        return response()->json(['data' => $this->chat->members($conversation)]);
     }
 
-    public function pinned(Request $request): JsonResponse
+    public function pinned(Request $request, Conversation $conversation): JsonResponse
     {
-        $divisionId = $this->divisionIdOrAbort($request);
+        $this->assertMember($request, $conversation);
 
         $messages = ChatMessage::query()
-            ->where('division_id', $divisionId)
+            ->where('conversation_id', $conversation->id)
             ->whereNotNull('pinned_at')
             ->with(ChatService::MESSAGE_LOADS)
             ->orderByDesc('pinned_at')
@@ -207,32 +166,26 @@ class ChatController extends Controller
         ]);
     }
 
-    public function updatePhoto(Request $request): JsonResponse
+    public function updatePhoto(Request $request, Conversation $conversation): JsonResponse
     {
-        $divisionId = $this->divisionIdOrAbort($request);
+        $this->assertMember($request, $conversation);
 
         $request->validate([
             'photo' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
         ]);
 
-        $this->chat->updatePhoto(
-            $request->user(),
-            Division::query()->findOrFail($divisionId),
-            $request->file('photo'),
-        );
+        $this->chat->updatePhoto($request->user(), $conversation, $request->file('photo'));
 
         return response()->json(['data' => ['ok' => true]], 201);
     }
 
-    public function showPhoto(Request $request): StreamedResponse
+    public function showPhoto(Request $request, Conversation $conversation): StreamedResponse
     {
-        $divisionId = $this->divisionIdOrAbort($request);
+        $this->assertMember($request, $conversation);
 
-        $path = Division::query()->findOrFail($divisionId)->chat_photo_path;
+        abort_if($conversation->photo_path === null, 404);
 
-        abort_if($path === null, 404);
-
-        return Storage::disk('local')->response($path, null, [
+        return Storage::disk('local')->response($conversation->photo_path, null, [
             'Cache-Control' => 'private, max-age=86400',
         ]);
     }
@@ -240,32 +193,45 @@ class ChatController extends Controller
     public function showAttachment(Request $request, ChatAttachment $attachment): StreamedResponse
     {
         $message = $attachment->message()->withTrashed()->firstOrFail();
-        $this->assertSameDivision($request, $message->division_id);
+        $this->assertMessageMember($request, $message);
 
         return Storage::disk('local')->response($attachment->path, $attachment->original_name, [
             'Cache-Control' => 'private, max-age=31536000, immutable',
         ]);
     }
 
-    /**
-     * The chat room's division id: unit members resolve to their parent
-     * division, so the whole hierarchy shares one room.
-     */
-    private function divisionIdOrAbort(Request $request): int
-    {
-        $division = $request->user()->chatDivision();
-
-        abort_if($division === null, 403, 'You are not assigned to a division.');
-
-        return $division->id;
-    }
-
-    private function assertSameDivision(Request $request, int $divisionId): void
+    private function assertMember(Request $request, Conversation $conversation): void
     {
         abort_unless(
-            $request->user()->chatDivision()?->id === $divisionId,
+            $conversation->isAccessibleTo($request->user()),
             403,
-            'This chat belongs to another division.',
+            'You are not a member of this conversation.',
         );
+    }
+
+    private function assertMessageMember(Request $request, ChatMessage $message): void
+    {
+        $conversation = Conversation::query()->findOrFail($message->conversation_id);
+
+        $this->assertMember($request, $conversation);
+    }
+
+    /**
+     * The snapshot a shared event renders as in chat — deliberately not the
+     * full event, just enough to recognize it plus a deep link.
+     *
+     * @return array{event_id: int, title: string, starts_at: string, ends_at: string, all_day: bool, location: string|null, url: string}
+     */
+    private function eventCard(Event $event): array
+    {
+        return [
+            'event_id' => $event->id,
+            'title' => $event->title,
+            'starts_at' => $event->starts_at->toIso8601String(),
+            'ends_at' => $event->ends_at->toIso8601String(),
+            'all_day' => $event->all_day,
+            'location' => $event->location,
+            'url' => EventLink::url($event),
+        ];
     }
 }

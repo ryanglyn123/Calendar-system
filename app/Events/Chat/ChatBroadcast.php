@@ -8,7 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
- * The one broadcast shape for the whole division chat. Sent NOW (not
+ * The one broadcast shape for every chat conversation. Sent NOW (not
  * queued): the database queue worker would add seconds of latency, while a
  * Reverb publish is a local call.
  *
@@ -23,14 +23,14 @@ class ChatBroadcast implements ShouldBroadcastNow
      * @param  array<string, mixed>  $payload
      */
     public function __construct(
-        public readonly int $divisionId,
+        public readonly int $conversationId,
         public readonly string $name,
         public readonly array $payload,
     ) {}
 
     public function broadcastOn(): PrivateChannel
     {
-        return new PrivateChannel("division.{$this->divisionId}.chat");
+        return new PrivateChannel("conversation.{$this->conversationId}.chat");
     }
 
     public function broadcastAs(): string

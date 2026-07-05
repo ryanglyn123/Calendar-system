@@ -8,21 +8,22 @@ use Illuminate\Support\Facades\Event;
 
 beforeEach(function () {
     $this->division = Division::factory()->create();
+    $this->room = $this->division->conversation;
     $this->member = User::factory()->create(['division_id' => $this->division->id]);
     $this->teammate = User::factory()->create(['division_id' => $this->division->id]);
 });
 
-test('sending a message broadcasts message.sent on the division channel', function () {
+test('sending a message broadcasts message.sent on the conversation channel', function () {
     Event::fake([ChatBroadcast::class]);
 
     $this->actingAs($this->member)
-        ->postJson(route('api.chat.messages.store'), ['body' => 'live'])
+        ->postJson(route('api.chat.messages.store', $this->room), ['body' => 'live'])
         ->assertCreated();
 
     Event::assertDispatched(ChatBroadcast::class, function (ChatBroadcast $event) {
         return $event->name === 'message.sent'
-            && $event->divisionId === $this->division->id
-            && $event->broadcastOn()->name === "private-division.{$this->division->id}.chat"
+            && $event->conversationId === $this->room->id
+            && $event->broadcastOn()->name === "private-conversation.{$this->room->id}.chat"
             && $event->payload['body'] === 'live';
     });
 });
@@ -31,7 +32,7 @@ test('reactions, reads, and pins broadcast their updates', function () {
     Event::fake([ChatBroadcast::class]);
 
     $message = ChatMessage::factory()->create([
-        'division_id' => $this->division->id,
+        'conversation_id' => $this->room->id,
         'user_id' => $this->member->id,
     ]);
 
@@ -40,7 +41,7 @@ test('reactions, reads, and pins broadcast their updates', function () {
         ->assertOk();
 
     $this->actingAs($this->teammate)
-        ->postJson(route('api.chat.read'), ['last_read_message_id' => $message->id])
+        ->postJson(route('api.chat.read', $this->room), ['last_read_message_id' => $message->id])
         ->assertOk();
 
     $this->actingAs($this->teammate)
@@ -71,14 +72,14 @@ test('the channel authorizes members and rejects outsiders', function () {
 
     $this->actingAs($this->member)
         ->post('/broadcasting/auth', [
-            'channel_name' => "private-division.{$this->division->id}.chat",
+            'channel_name' => "private-conversation.{$this->room->id}.chat",
             'socket_id' => '123.456',
         ])
         ->assertOk();
 
     $this->actingAs($outsider)
         ->post('/broadcasting/auth', [
-            'channel_name' => "private-division.{$this->division->id}.chat",
+            'channel_name' => "private-conversation.{$this->room->id}.chat",
             'socket_id' => '123.456',
         ])
         ->assertForbidden();

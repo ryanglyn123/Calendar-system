@@ -5,8 +5,13 @@ import { api } from '@/lib/api';
 import chatApi from '@/routes/api/chat';
 import chatMessages from '@/routes/api/chat/messages';
 import chatPhoto from '@/routes/api/chat/photo';
+import chatPin from '@/routes/api/chat/pin';
+import chatPolls from '@/routes/api/chat/polls';
+import chatReactions from '@/routes/api/chat/reactions';
+import conversationsApi from '@/routes/api/conversations';
 import type {
-    ChatDivisionInfo,
+    ChatCandidate,
+    ChatConversationSummary,
     ChatMemberItem,
     ChatMessageItem,
     ChatPage,
@@ -15,19 +20,24 @@ import type {
 } from '@/types/chat';
 
 /**
- * One store, one Echo subscription: the sidebar badge, the floating dock,
- * and the full chat page all read and write here.
+ * One store, one Echo connection: the sidebar badge, the floating dock, and
+ * the full chat page share the conversation list and the open thread. Every
+ * conversation the user belongs to gets its own private channel so unread
+ * counts stay live even when its thread is not open.
  */
 export const useChatStore = defineStore('chat', () => {
-    const division = ref<ChatDivisionInfo | null>(null);
+    const conversations = ref<ChatConversationSummary[]>([]);
+    const activeId = ref<number | null>(null);
+    const myId = ref<number | null>(null);
+
+    // Active thread working set (reloaded when the active conversation changes).
     const messages = ref<ChatMessageItem[]>([]);
+    const members = ref<ChatMemberItem[]>([]);
+    const pinned = ref<ChatMessageItem[]>([]);
     const hasMore = ref(false);
     const loaded = ref(false);
     const loadingOlder = ref(false);
-    const members = ref<ChatMemberItem[]>([]);
-    const unread = ref(0);
     const lastReadMessageId = ref<number | null>(null);
-    const myId = ref<number | null>(null);
 
     /** 'hidden' = dismissed; 'head' = floating circle; 'mini' = small box. */
     const dock = ref<'hidden' | 'head' | 'mini'>('hidden');
@@ -36,17 +46,36 @@ export const useChatStore = defineStore('chat', () => {
     const active = ref(false);
 
     const typing = ref(new Map<number, { name: string; until: number }>());
-
-    /** Pinned messages, newest pin first; feeds the banner and settings. */
-    const pinned = ref<ChatMessageItem[]>([]);
-    let pinnedLoaded = false;
-
-    /** Set by jumpTo(); the panel scrolls that message into view. */
     const jumpRequestId = ref<number | null>(null);
 
-    let subscribed = false;
+    /** Draft for the "new group chat" dialog (may be seeded from an event). */
+    const newGroup = ref<{
+        open: boolean;
+        eventId: number | null;
+        eventTitle: string | null;
+        seed: ChatCandidate[];
+    }>({ open: false, eventId: null, eventTitle: null, seed: [] });
+
+    const subscribed = new Set<number>();
+    let bootstrapped = false;
     let lastTypingWhisper = 0;
     let readTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const sortedConversations = computed(() =>
+        [...conversations.value].sort(
+            (a, b) =>
+                new Date(b.last_activity).getTime() -
+                new Date(a.last_activity).getTime(),
+        ),
+    );
+
+    const activeConversation = computed(
+        () => conversations.value.find((c) => c.id === activeId.value) ?? null,
+    );
+
+    const totalUnread = computed(() =>
+        conversations.value.reduce((sum, c) => sum + c.unread, 0),
+    );
 
     const typingNames = computed(() => {
         const now = Date.now();
@@ -76,56 +105,85 @@ export const useChatStore = defineStore('chat', () => {
         return map;
     });
 
-    function channelName(): string {
-        return `division.${division.value?.id}.chat`;
+    function previewOf(message: ChatMessageItem): string {
+        if (message.is_deleted) {
+            return 'Message removed';
+        }
+
+        if (message.body) {
+            return message.body;
+        }
+
+        if (message.poll) {
+            return 'Poll';
+        }
+
+        if (message.attachments.length > 0) {
+            return 'Photo';
+        }
+
+        return message.event_card ? 'Shared an event' : '';
     }
 
     /**
-     * Called once per page load (from the dock) with the shared props.
-     * Idempotent; keeps the live unread count across SPA navigations.
+     * Called once per page load (from the dock) with the shared conversation
+     * list. Idempotent; keeps live state across SPA navigations.
      */
-    function bootstrap(
-        info: ChatDivisionInfo | null,
-        unreadCount: number,
-        userId: number,
-    ): void {
+    function bootstrap(list: ChatConversationSummary[], userId: number): void {
         myId.value = userId;
 
-        if (info === null) {
-            division.value = null;
+        // Merge server list without clobbering live unread we already bumped.
+        const known = new Map(conversations.value.map((c) => [c.id, c]));
+        conversations.value = list.map((incoming) => {
+            const existing = known.get(incoming.id);
 
-            return;
-        }
+            return existing && bootstrapped
+                ? { ...incoming, unread: existing.unread }
+                : incoming;
+        });
 
-        if (division.value?.id !== info.id) {
-            division.value = info;
-            unread.value = unreadCount;
+        if (!bootstrapped) {
             const saved = localStorage.getItem('chat-dock');
             dock.value = saved === 'head' || saved === 'mini' ? saved : 'hidden';
+            bootstrapped = true;
         }
 
-        subscribe();
+        subscribeAll();
     }
 
-    function subscribe(): void {
+    function subscribeAll(): void {
         const echo = getEcho();
 
-        if (echo === null || subscribed || division.value === null) {
+        if (echo === null) {
             return;
         }
 
-        subscribed = true;
+        for (const conversation of conversations.value) {
+            subscribeTo(conversation.id);
+        }
+    }
 
-        echo.private(channelName())
+    function subscribeTo(id: number): void {
+        const echo = getEcho();
+
+        if (echo === null || subscribed.has(id)) {
+            return;
+        }
+
+        subscribed.add(id);
+
+        echo.private(`conversation.${id}.chat`)
             .listen('.message.sent', (payload: ChatMessageItem) => {
-                onIncoming(payload);
+                onIncoming(id, payload);
             })
             .listen('.message.deleted', (payload: { id: number }) => {
-                patchMessage(payload.id, {
-                    is_deleted: true,
-                    body: null,
-                    attachments: [],
-                });
+                if (id === activeId.value) {
+                    patchMessage(payload.id, {
+                        is_deleted: true,
+                        body: null,
+                        attachments: [],
+                    });
+                }
             })
             .listen(
                 '.reaction.updated',
@@ -133,25 +191,28 @@ export const useChatStore = defineStore('chat', () => {
                     message_id: number;
                     reactions: ChatReactionGroup[];
                 }) => {
-                    patchMessage(payload.message_id, {
-                        reactions: payload.reactions,
-                    });
+                    if (id === activeId.value) {
+                        patchMessage(payload.message_id, {
+                            reactions: payload.reactions,
+                        });
+                    }
                 },
             )
             .listen(
                 '.poll.updated',
                 (payload: { message_id: number; poll: ChatPollData }) => {
-                    patchMessage(payload.message_id, { poll: payload.poll });
+                    if (id === activeId.value) {
+                        patchMessage(payload.message_id, { poll: payload.poll });
+                    }
                 },
             )
             .listen(
                 '.message.pinned',
                 (payload: { message_id: number; is_pinned: boolean }) => {
-                    patchMessage(payload.message_id, {
-                        is_pinned: payload.is_pinned,
-                    });
-
-                    if (pinnedLoaded) {
+                    if (id === activeId.value) {
+                        patchMessage(payload.message_id, {
+                            is_pinned: payload.is_pinned,
+                        });
                         void loadPinned();
                     }
                 },
@@ -162,6 +223,10 @@ export const useChatStore = defineStore('chat', () => {
                     user_id: number;
                     last_read_message_id: number;
                 }) => {
+                    if (id !== activeId.value) {
+                        return;
+                    }
+
                     const member = members.value.find(
                         (m) => m.id === payload.user_id,
                     );
@@ -173,14 +238,23 @@ export const useChatStore = defineStore('chat', () => {
                 },
             )
             .listen('.settings.updated', (payload: { photo_url: string }) => {
-                if (division.value) {
-                    division.value.photo_url = payload.photo_url;
+                const summary = conversations.value.find((c) => c.id === id);
+
+                if (summary) {
+                    summary.photo_url = payload.photo_url;
                 }
             })
             .listenForWhisper(
                 'typing',
-                (payload: { id: number; name: string }) => {
-                    if (payload.id === myId.value) {
+                (payload: {
+                    conversation_id: number;
+                    id: number;
+                    name: string;
+                }) => {
+                    if (
+                        payload.conversation_id !== activeId.value ||
+                        payload.id === myId.value
+                    ) {
                         return;
                     }
 
@@ -197,25 +271,37 @@ export const useChatStore = defineStore('chat', () => {
             );
     }
 
-    function onIncoming(message: ChatMessageItem): void {
-        if (messages.value.some((m) => m.id === message.id)) {
+    function onIncoming(conversationId: number, message: ChatMessageItem): void {
+        const summary = conversations.value.find((c) => c.id === conversationId);
+
+        if (summary) {
+            summary.last_preview = previewOf(message);
+            summary.last_activity = message.created_at;
+        }
+
+        if (conversationId === activeId.value) {
+            if (messages.value.some((m) => m.id === message.id)) {
+                return;
+            }
+
+            messages.value.push(message);
+            typing.value.delete(message.user?.id ?? -1);
+
+            if (active.value) {
+                queueMarkRead();
+            } else if (summary) {
+                summary.unread++;
+            }
+
             return;
         }
 
-        messages.value.push(message);
-        typing.value.delete(message.user?.id ?? -1);
-
-        if (active.value) {
-            queueMarkRead();
-        } else {
-            unread.value++;
+        if (summary && message.user?.id !== myId.value) {
+            summary.unread++;
         }
     }
 
-    function patchMessage(
-        id: number,
-        patch: Partial<ChatMessageItem>,
-    ): void {
+    function patchMessage(id: number, patch: Partial<ChatMessageItem>): void {
         const index = messages.value.findIndex((m) => m.id === id);
 
         if (index !== -1) {
@@ -226,45 +312,65 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
-    /** Hydrate from the full page's inlined props. */
-    function hydrate(
-        page: ChatPage,
-        memberList: ChatMemberItem[],
-        lastRead: number | null,
-        userId: number,
-    ): void {
-        // Seed myId now (not in onMounted's bootstrap): isMine drives message
-        // alignment, so a late id flips own messages left→right on refresh.
-        myId.value = userId;
-        messages.value = [...page.messages].reverse();
-        hasMore.value = page.has_more;
-        members.value = memberList;
-        lastReadMessageId.value = lastRead;
-        loaded.value = true;
-    }
-
-    /** First open of the mini box on a page with no inlined chat data. */
-    async function ensureLoaded(): Promise<void> {
-        if (loaded.value || division.value === null) {
+    /** Load (or switch to) a conversation's thread. */
+    async function openConversation(id: number): Promise<void> {
+        if (activeId.value === id && loaded.value) {
             return;
         }
 
+        activeId.value = id;
+        loaded.value = false;
+        messages.value = [];
+        members.value = [];
+        pinned.value = [];
+        hasMore.value = false;
+        lastReadMessageId.value = null;
+
         const [page, memberList] = await Promise.all([
-            api.get<ChatPage>(chatMessages.index().url),
-            api.get<{ data: ChatMemberItem[] }>(chatApi.members().url),
+            api.get<ChatPage>(chatMessages.index(id).url),
+            api.get<{ data: ChatMemberItem[] }>(chatApi.members(id).url),
         ]);
+
+        // A late switch may have happened while awaiting; ignore stale loads.
+        if (activeId.value !== id) {
+            return;
+        }
 
         messages.value = [...page.messages].reverse();
         hasMore.value = page.has_more;
         members.value = memberList.data;
         loaded.value = true;
+
+        void loadPinned();
+
+        if (active.value) {
+            queueMarkRead();
+        }
+    }
+
+    /** Ensure some conversation is open (first in the list by default). */
+    async function ensureLoaded(): Promise<void> {
+        if (activeId.value !== null) {
+            if (!loaded.value) {
+                await openConversation(activeId.value);
+            }
+
+            return;
+        }
+
+        const first = sortedConversations.value[0];
+
+        if (first) {
+            await openConversation(first.id);
+        }
     }
 
     async function loadOlder(): Promise<void> {
         if (
             loadingOlder.value ||
             !hasMore.value ||
-            messages.value.length === 0
+            messages.value.length === 0 ||
+            activeId.value === null
         ) {
             return;
         }
@@ -273,7 +379,7 @@ export const useChatStore = defineStore('chat', () => {
 
         try {
             const page = await api.get<ChatPage>(
-                chatMessages.index({
+                chatMessages.index(activeId.value, {
                     query: { before_id: messages.value[0].id },
                 }).url,
             );
@@ -291,7 +397,6 @@ export const useChatStore = defineStore('chat', () => {
     async function send(input: {
         body?: string;
         replyToId?: number | null;
-        /** Share an event: the server snapshots it into an event card. */
         eventId?: number;
         photos?: File[];
         poll?: {
@@ -300,6 +405,10 @@ export const useChatStore = defineStore('chat', () => {
             allows_multiple: boolean;
         };
     }): Promise<void> {
+        if (activeId.value === null) {
+            return;
+        }
+
         const form = new FormData();
 
         if (input.body) {
@@ -330,11 +439,11 @@ export const useChatStore = defineStore('chat', () => {
         }
 
         const response = await api.postForm<{ data: ChatMessageItem }>(
-            chatMessages.store().url,
+            chatMessages.store(activeId.value).url,
             form,
         );
 
-        onIncoming(response.data);
+        onIncoming(activeId.value, response.data);
         queueMarkRead();
     }
 
@@ -345,7 +454,7 @@ export const useChatStore = defineStore('chat', () => {
 
     async function toggleReaction(id: number, emoji: string): Promise<void> {
         const response = await api.post<{ data: ChatReactionGroup[] }>(
-            chatApi.reactions.toggle(id).url,
+            chatReactions.toggle(id).url,
             { emoji },
         );
 
@@ -354,36 +463,55 @@ export const useChatStore = defineStore('chat', () => {
 
     async function togglePin(id: number): Promise<void> {
         const response = await api.post<{ data: { is_pinned: boolean } }>(
-            chatApi.pin.toggle(id).url,
+            chatPin.toggle(id).url,
             {},
         );
 
         patchMessage(id, { is_pinned: response.data.is_pinned });
+        await loadPinned();
+    }
 
-        if (pinnedLoaded) {
-            await loadPinned();
+    async function vote(
+        messageId: number,
+        pollId: number,
+        optionIds: number[],
+    ): Promise<void> {
+        const response = await api.put<{ data: ChatPollData }>(
+            chatPolls.votes(pollId).url,
+            { option_ids: optionIds },
+        );
+
+        patchMessage(messageId, { poll: response.data });
+    }
+
+    async function reloadMembers(): Promise<void> {
+        if (activeId.value === null) {
+            return;
         }
+
+        const response = await api.get<{ data: ChatMemberItem[] }>(
+            chatApi.members(activeId.value).url,
+        );
+
+        members.value = response.data;
     }
 
     async function loadPinned(): Promise<void> {
-        if (division.value === null) {
+        if (activeId.value === null) {
             return;
         }
 
         const response = await api.get<{ data: ChatMessageItem[] }>(
-            chatApi.pinned().url,
+            chatApi.pinned(activeId.value).url,
         );
 
         pinned.value = response.data;
-        pinnedLoaded = true;
     }
 
-    /** Scroll a message into view in the open panel (banner, pinned list). */
     function jumpTo(id: number): void {
         jumpRequestId.value = id;
     }
 
-    /** Page older history until the target message id is in the list. */
     async function ensureMessageLoaded(id: number): Promise<void> {
         // ponytail: capped linear paging; fine for 30-per-page history.
         for (let i = 0; i < 30; i++) {
@@ -397,24 +525,14 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
-    async function vote(
-        messageId: number,
-        pollId: number,
-        optionIds: number[],
-    ): Promise<void> {
-        const response = await api.put<{ data: ChatPollData }>(
-            chatApi.polls.votes(pollId).url,
-            { option_ids: optionIds },
-        );
-
-        patchMessage(messageId, { poll: response.data });
-    }
-
     /** Debounced: read receipts are always on, but one POST per second. */
     function queueMarkRead(): void {
+        const id = activeId.value;
         const latest = messages.value.at(-1);
+        const summary = activeConversation.value;
 
         if (
+            id === null ||
             !active.value ||
             latest === undefined ||
             (lastReadMessageId.value ?? 0) >= latest.id
@@ -422,13 +540,15 @@ export const useChatStore = defineStore('chat', () => {
             return;
         }
 
-        unread.value = 0;
+        if (summary) {
+            summary.unread = 0;
+        }
 
         clearTimeout(readTimer);
         readTimer = setTimeout(() => {
             const target = messages.value.at(-1);
 
-            if (target === undefined) {
+            if (target === undefined || activeId.value !== id) {
                 return;
             }
 
@@ -440,7 +560,7 @@ export const useChatStore = defineStore('chat', () => {
                 me.last_read_message_id = target.id;
             }
 
-            void api.post(chatApi.read().url, {
+            void api.post(chatApi.read(id).url, {
                 last_read_message_id: target.id,
             });
         }, 400);
@@ -450,7 +570,10 @@ export const useChatStore = defineStore('chat', () => {
         active.value = next;
 
         if (next) {
-            unread.value = 0;
+            if (activeConversation.value) {
+                activeConversation.value.unread = 0;
+            }
+
             queueMarkRead();
         }
     }
@@ -458,20 +581,85 @@ export const useChatStore = defineStore('chat', () => {
     function whisperTyping(name: string): void {
         const now = Date.now();
 
-        if (now - lastTypingWhisper < 2000 || division.value === null) {
+        if (now - lastTypingWhisper < 2000 || activeId.value === null) {
             return;
         }
 
         lastTypingWhisper = now;
 
         getEcho()
-            ?.private(channelName())
-            .whisper('typing', { id: myId.value, name });
+            ?.private(`conversation.${activeId.value}.chat`)
+            .whisper('typing', {
+                conversation_id: activeId.value,
+                id: myId.value,
+                name,
+            });
     }
+
+    // --- Conversation management -------------------------------------------
+
+    async function createConversation(input: {
+        name: string;
+        memberIds: number[];
+        eventId?: number;
+    }): Promise<number> {
+        const response = await api.post<{ data: ChatConversationSummary }>(
+            conversationsApi.store().url,
+            {
+                name: input.name,
+                member_ids: input.memberIds,
+                event_id: input.eventId,
+            },
+        );
+
+        conversations.value.push(response.data);
+        subscribeTo(response.data.id);
+
+        return response.data.id;
+    }
+
+    async function updateConversation(
+        id: number,
+        input: { name?: string; memberIds?: number[] },
+    ): Promise<void> {
+        const response = await api.patch<{ data: ChatConversationSummary }>(
+            conversationsApi.update(id).url,
+            { name: input.name, member_ids: input.memberIds },
+        );
+
+        const index = conversations.value.findIndex((c) => c.id === id);
+
+        if (index !== -1) {
+            conversations.value.splice(index, 1, response.data);
+        }
+    }
+
+    async function leaveConversation(id: number): Promise<void> {
+        await api.post(conversationsApi.leave(id).url, {});
+
+        conversations.value = conversations.value.filter((c) => c.id !== id);
+
+        if (activeId.value === id) {
+            activeId.value = null;
+            loaded.value = false;
+            messages.value = [];
+        }
+    }
+
+    async function searchCandidates(term: string): Promise<ChatCandidate[]> {
+        const response = await api.get<{ data: ChatCandidate[] }>(
+            conversationsApi.candidates({ query: { q: term } }).url,
+        );
+
+        return response.data;
+    }
+
+    // --- Dock controls ------------------------------------------------------
 
     function openMini(): void {
         dock.value = 'mini';
         localStorage.setItem('chat-dock', 'mini');
+        setActive(true);
         void ensureLoaded();
     }
 
@@ -481,55 +669,98 @@ export const useChatStore = defineStore('chat', () => {
         setActive(false);
     }
 
-    /** Full page's minimize button: leave a floating head behind. */
     function minimizeToHead(): void {
         dock.value = 'head';
         localStorage.setItem('chat-dock', 'head');
     }
 
-    /** Dismiss entirely; only minimizing the full page brings it back. */
     function dismiss(): void {
         dock.value = 'hidden';
         localStorage.setItem('chat-dock', 'hidden');
         setActive(false);
     }
 
+    function backToList(): void {
+        activeId.value = null;
+        loaded.value = false;
+        messages.value = [];
+    }
+
+    /** Open the new-group dialog, optionally seeded from an event. */
+    function openNewGroup(opts?: {
+        eventId?: number;
+        eventTitle?: string;
+        seed?: ChatCandidate[];
+    }): void {
+        newGroup.value = {
+            open: true,
+            eventId: opts?.eventId ?? null,
+            eventTitle: opts?.eventTitle ?? null,
+            seed: opts?.seed ?? [],
+        };
+
+        // Surface the dock so the created chat has somewhere to land.
+        if (dock.value === 'hidden') {
+            dock.value = 'head';
+            localStorage.setItem('chat-dock', 'head');
+        }
+    }
+
+    function closeNewGroup(): void {
+        newGroup.value = { ...newGroup.value, open: false };
+    }
+
     return {
-        division,
+        conversations,
+        sortedConversations,
+        activeId,
+        activeConversation,
+        totalUnread,
+        myId,
         messages,
+        members,
+        pinned,
         hasMore,
         loaded,
         loadingOlder,
-        members,
-        unread,
         lastReadMessageId,
-        myId,
         dock,
         active,
         typingNames,
         readsByMessage,
+        jumpRequestId,
+        newGroup,
+        openNewGroup,
+        closeNewGroup,
         bootstrap,
-        subscribe,
-        hydrate,
+        openConversation,
         ensureLoaded,
         loadOlder,
         send,
         deleteMessage,
         toggleReaction,
         togglePin,
-        pinned,
+        vote,
         loadPinned,
-        jumpRequestId,
+        reloadMembers,
         jumpTo,
         ensureMessageLoaded,
-        vote,
         queueMarkRead,
         setActive,
         whisperTyping,
+        createConversation,
+        updateConversation,
+        leaveConversation,
+        searchCandidates,
         openMini,
         closeMini,
         minimizeToHead,
         dismiss,
-        photoUploadUrl: computed(() => chatPhoto.update().url),
+        backToList,
+        photoUploadUrl: computed(() =>
+            activeId.value === null
+                ? ''
+                : chatPhoto.update(activeId.value).url,
+        ),
     };
 });

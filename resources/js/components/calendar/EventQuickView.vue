@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { usePage } from '@inertiajs/vue3';
 import {
     AlignLeft,
     Ban,
@@ -13,10 +12,10 @@ import {
     Lock,
     MapPin,
     MessageSquareText,
+    MessagesSquare,
     Pencil,
     Repeat,
     Send,
-    Share2,
     ShieldCheck,
     Trash2,
     UserCheck,
@@ -214,13 +213,11 @@ type CommentItem = {
     created_at: string;
 };
 
-const page = usePage();
 const { user: authUser } = useAuth();
 
 const canDiscuss = computed(
     () => props.occurrence !== null && !props.occurrence.is_masked,
 );
-const hasDivisionChat = computed(() => page.props.chatDivision != null);
 
 const comments = ref<CommentItem[]>([]);
 const commentBody = ref('');
@@ -289,20 +286,32 @@ const removeComment = async (comment: CommentItem) => {
 
 const chat = useChatStore();
 
-const shareToChat = async () => {
+// Open the new-group dialog seeded with this event and its people, so the
+// creator lands on an event-linked chat with attendees pre-added.
+const discussInGroup = () => {
     if (!props.occurrence) {
         return;
     }
 
-    try {
-        // Server snapshots the event into a card that deep-links back to it.
-        await chat.send({ eventId: props.occurrence.event_id });
-        toast.success('Shared to your division chat.');
-    } catch (error) {
-        toast.error(
-            error instanceof ApiError ? error.message : 'Could not share.',
-        );
-    }
+    const seed = [
+        props.occurrence.organizer,
+        ...props.occurrence.attendees,
+    ]
+        .filter(
+            (person): person is NonNullable<typeof person> =>
+                person != null && person.user_id != null,
+        )
+        .map((person) => ({
+            id: person.user_id as number,
+            name: person.name,
+            avatar_path: person.avatar_path,
+        }));
+
+    chat.openNewGroup({
+        eventId: props.occurrence.event_id,
+        eventTitle: props.occurrence.title,
+        seed,
+    });
 };
 
 const commentTime = (iso: string) => format(parseISO(iso), 'MMM d, HH:mm');
@@ -786,14 +795,16 @@ const commentTime = (iso: string) => format(parseISO(iso), 'MMM d, HH:mm');
                             </span>
                         </h3>
                         <Button
-                            v-if="hasDivisionChat"
                             variant="ghost"
                             size="sm"
                             class="h-7 text-xs text-muted-foreground"
-                            @click="shareToChat"
+                            @click="discussInGroup"
                         >
-                            <Share2 class="size-3.5" aria-hidden="true" />
-                            Share to division chat
+                            <MessagesSquare
+                                class="size-3.5"
+                                aria-hidden="true"
+                            />
+                            Group chat
                         </Button>
                     </div>
 

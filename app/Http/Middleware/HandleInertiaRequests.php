@@ -4,7 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Announcement;
 use App\Models\ResourceType;
-use App\Services\Chat\ChatService;
+use App\Services\Chat\ConversationService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -83,23 +83,11 @@ class HandleInertiaRequests extends Middleware
                     ->orderBy('name')
                     ->get(['id', 'name', 'slug', 'icon'])
                     ->toArray(),
-            // Division chat bootstrap for the sidebar badge and chat dock.
-            // Null when the user has no division (no room to show).
-            'chatDivision' => function () use ($user) {
-                // Unit members resolve to their parent division's room.
-                $room = $user !== null && $user->isActive() ? $user->chatDivision() : null;
-
-                return $room === null ? null : [
-                    'id' => $room->id,
-                    'name' => $room->name,
-                    'photo_url' => $room->chat_photo_path === null
-                        ? null
-                        : route('api.chat.photo.show', absolute: false),
-                ];
-            },
-            'chatUnread' => fn () => $user === null || ! $user->isActive() || $user->division_id === null
-                ? 0
-                : app(ChatService::class)->unreadCount($user),
+            // Chat conversation list for the sidebar badge and the dock:
+            // division rooms + custom group chats the user belongs to.
+            'chatConversations' => fn () => $user === null || ! $user->isActive()
+                ? []
+                : app(ConversationService::class)->summaries($user),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             // Lets the theme toggle render its real state on first paint
             // (explicit light/dark); 'system' still resolves client-side.

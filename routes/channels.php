@@ -1,14 +1,20 @@
 <?php
 
+use App\Models\Conversation;
 use App\Models\User;
 use Illuminate\Support\Facades\Broadcast;
 
 /*
- * Division chat. A plain division comparison on purpose - no permission
- * checks here, because Gate::before would let super admins into every
- * division's private room.
+ * Chat conversations. Access is a plain membership check (division ids for
+ * division rooms, participant list for custom rooms) - never a permission
+ * check, because Gate::before would let super admins into every private room.
  */
-Broadcast::channel('division.{divisionId}.chat', function (User $user, int $divisionId) {
-    // Unit members resolve to their parent division's room.
-    return $user->isActive() && $user->chatDivision()?->id === $divisionId;
+Broadcast::channel('conversation.{conversationId}.chat', function (User $user, int $conversationId) {
+    if (! $user->isActive()) {
+        return false;
+    }
+
+    $conversation = Conversation::query()->find($conversationId);
+
+    return $conversation !== null && $conversation->isAccessibleTo($user);
 });

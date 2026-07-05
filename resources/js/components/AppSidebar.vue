@@ -71,14 +71,14 @@ const mainNavItems = computed<NavItem[]>(() => [
                   href: calendarPage.division(),
                   icon: Building2,
               } satisfies NavItem,
-              {
-                  title: 'Division Chat',
-                  href: chatPage.index(),
-                  icon: MessagesSquare,
-                  badge: chat.unread,
-              } satisfies NavItem,
           ]
         : []),
+    {
+        title: 'Chats',
+        href: chatPage.index(),
+        icon: MessagesSquare,
+        badge: chat.totalUnread,
+    },
     ...resourceTypes.value.map(
         (type): NavItem => ({
             title: type.name,

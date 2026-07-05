@@ -2,45 +2,38 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ChatRead;
-use App\Models\Division;
-use App\Services\Chat\ChatService;
-use Illuminate\Http\RedirectResponse;
+use App\Models\Conversation;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The full-page division group chat. The floating chat dock reuses the same
- * store and components; this page is the "maximized" surface.
+ * The full-page chat: a conversation list plus the open thread. The floating
+ * dock reuses the same store and components; this page is the "maximized"
+ * surface. Conversations themselves come from the shared props.
  */
 class DivisionChatController extends Controller
 {
-    public function __invoke(Request $request, ChatService $chat): Response|RedirectResponse
+    public function __invoke(Request $request): Response
     {
         $user = $request->user();
 
-        // Unit members land in their parent division's room.
-        $division = $user->chatDivision();
+        // Optional deep link (?conversation=ID); the page falls back to the
+        // first conversation in the shared list when this is null.
+        $requested = (int) $request->query('conversation', 0);
 
-        if ($division === null) {
-            return redirect()->route('dashboard');
+        $activeId = null;
+
+        if ($requested > 0) {
+            $conversation = Conversation::query()->find($requested);
+
+            if ($conversation !== null && $conversation->isAccessibleTo($user)) {
+                $activeId = $conversation->id;
+            }
         }
 
         return Inertia::render('DivisionChat', [
-            'division' => [
-                'id' => $division->id,
-                'name' => $division->name,
-                'photo_url' => $division->chat_photo_path === null
-                    ? null
-                    : route('api.chat.photo.show', absolute: false),
-            ],
-            'initialPage' => fn () => $chat->page($request, $division->id),
-            'members' => fn () => $chat->members($division),
-            'lastReadMessageId' => fn () => ChatRead::query()
-                ->where('division_id', $division->id)
-                ->where('user_id', $user->id)
-                ->value('last_read_message_id'),
+            'initialConversationId' => $activeId,
         ]);
     }
 }
