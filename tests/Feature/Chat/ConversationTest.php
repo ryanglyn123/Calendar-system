@@ -132,4 +132,12 @@ test('participant candidate search finds active users', function () {
         ->json('data'));
 
     expect($results->pluck('id'))->toContain($target->id);
+
+    // An empty term lists people right away (live search before typing).
+    $initial = collect($this->actingAs($this->creator)
+        ->getJson(route('api.conversations.candidates'))
+        ->assertOk()
+        ->json('data'));
+
+    expect($initial)->not->toBeEmpty();
 });

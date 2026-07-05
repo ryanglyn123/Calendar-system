@@ -133,11 +133,14 @@ const removeMember = async (userId: number) => {
 const term = ref('');
 const results = ref<ChatCandidate[]>([]);
 
+// Empty term lists people once the box is focused; typing narrows it live.
 const runSearch = useDebounceFn(async () => {
-    results.value =
-        term.value.trim() === ''
-            ? []
-            : await chat.searchCandidates(term.value.trim());
+    const query = term.value.trim();
+    const found = await chat.searchCandidates(query);
+
+    if (query === term.value.trim()) {
+        results.value = found;
+    }
 }, 250);
 
 watch(term, runSearch);
@@ -279,6 +282,7 @@ const viewPinned = (message: ChatMessageItem) => {
                             class="pl-8"
                             placeholder="Add people…"
                             aria-label="Search people to add"
+                            @focus="runSearch"
                         />
                     </div>
                     <ul

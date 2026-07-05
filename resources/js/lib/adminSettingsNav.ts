@@ -7,11 +7,14 @@ import {
     CalendarOff,
     CalendarRange,
     CarFront,
+    MailPlus,
     Presentation,
     ScrollText,
     Settings2,
     ShieldCheck,
     Tags,
+    UserCheck,
+    Users,
 } from '@lucide/vue';
 import adminAudit from '@/routes/admin/audit';
 import adminCalendars from '@/routes/admin/calendars';
@@ -19,10 +22,13 @@ import adminDivisions from '@/routes/admin/divisions';
 import adminEventTypes from '@/routes/admin/event-types';
 import adminHealth from '@/routes/admin/health';
 import adminHolidays from '@/routes/admin/holidays';
+import adminInvitations from '@/routes/admin/invitations';
+import adminPending from '@/routes/admin/pending-registrations';
 import adminResourceTypes from '@/routes/admin/resource-types';
 import adminResources from '@/routes/admin/resources';
 import adminRoles from '@/routes/admin/roles';
 import adminSettings from '@/routes/admin/settings';
+import adminUsers from '@/routes/admin/users';
 import adminWorkingHours from '@/routes/admin/working-hours';
 
 export type AdminSettingsLink = {
@@ -40,6 +46,32 @@ export type AdminSettingsSection = {
 
 /** One source for the settings hub cards AND the settings sidebar. */
 export const ADMIN_SETTINGS_SECTIONS: AdminSettingsSection[] = [
+    {
+        title: 'User Management',
+        links: [
+            {
+                title: 'Users',
+                description: 'Accounts, roles, and divisions.',
+                href: adminUsers.index(),
+                icon: Users,
+                permission: 'users.manage',
+            },
+            {
+                title: 'Pending Registrations',
+                description: 'Sign-ups waiting for approval.',
+                href: adminPending.index(),
+                icon: UserCheck,
+                permission: 'users.approve',
+            },
+            {
+                title: 'Invitations',
+                description: 'Invite staff by email.',
+                href: adminInvitations.index(),
+                icon: MailPlus,
+                permission: 'users.manage',
+            },
+        ],
+    },
     {
         title: 'Scheduling',
         links: [

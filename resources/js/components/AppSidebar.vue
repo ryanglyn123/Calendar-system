@@ -6,13 +6,10 @@ import {
     FileDiff,
     Globe,
     LayoutGrid,
-    MailPlus,
     Megaphone,
     MessagesSquare,
     Presentation,
     Settings2,
-    UserCheck,
-    Users,
 } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -33,10 +30,7 @@ import admin from '@/routes/admin';
 import adminAnnouncements from '@/routes/admin/announcements';
 import adminBookings from '@/routes/admin/bookings';
 import adminEditRequests from '@/routes/admin/edit-requests';
-import adminInvitations from '@/routes/admin/invitations';
-import adminPending from '@/routes/admin/pending-registrations';
 import adminSettings from '@/routes/admin/settings';
-import adminUsers from '@/routes/admin/users';
 import calendarPage from '@/routes/calendar';
 import chatPage from '@/routes/chat';
 import resourcesPage from '@/routes/resources';
@@ -101,29 +95,6 @@ const adminNavItems = computed<NavItem[]>(() => {
         },
     ];
 
-    if (hasAnyPermission('users.manage', 'users.approve')) {
-        items.push(
-            {
-                title: 'Users',
-                href: adminUsers.index(),
-                icon: Users,
-            },
-            {
-                title: 'Pending Registrations',
-                href: adminPending.index(),
-                icon: UserCheck,
-            },
-        );
-    }
-
-    if (hasPermission('users.manage')) {
-        items.push({
-            title: 'Invitations',
-            href: adminInvitations.index(),
-            icon: MailPlus,
-        });
-    }
-
     if (hasPermission('bookings.approve')) {
         items.push(
             {
@@ -149,6 +120,8 @@ const adminNavItems = computed<NavItem[]>(() => {
 
     if (
         hasAnyPermission(
+            'users.manage',
+            'users.approve',
             'divisions.manage',
             'calendars.manage',
             'event-types.manage',

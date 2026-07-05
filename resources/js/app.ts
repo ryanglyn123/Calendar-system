@@ -15,7 +15,7 @@ const appName = import.meta.env.VITE_APP_NAME || 'FDCP Calendar';
 // Admin settings area: every configuration section shares one persistent
 // sidebar so switching sections never goes through the hub page.
 const adminSettingsArea =
-    /^admin\/(settings|calendars|event-types|holidays|working-hours|resource-types|resources|divisions|roles|health|audit)\//;
+    /^admin\/(settings|calendars|event-types|holidays|working-hours|resource-types|resources|divisions|roles|health|audit|users|invitations)\//;
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

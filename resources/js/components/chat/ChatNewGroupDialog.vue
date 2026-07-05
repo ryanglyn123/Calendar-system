@@ -53,17 +53,18 @@ watch(
         name.value = chat.newGroup.eventTitle ?? '';
         term.value = '';
         results.value = [];
+        void runSearch();
     },
 );
 
+// Empty term lists people right away; typing narrows it live.
 const runSearch = useDebounceFn(async () => {
-    if (term.value.trim() === '') {
-        results.value = [];
+    const query = term.value.trim();
+    const found = await chat.searchCandidates(query);
 
-        return;
+    if (query === term.value.trim()) {
+        results.value = found;
     }
-
-    results.value = await chat.searchCandidates(term.value.trim());
 }, 250);
 
 watch(term, runSearch);

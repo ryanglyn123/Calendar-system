@@ -83,7 +83,7 @@ class ConversationController extends Controller
     /** Members may search teammates to add — any active user, any division. */
     public function participantCandidates(Request $request): JsonResponse
     {
-        $term = trim((string) $request->query('q', ''));
+        $term = mb_substr(trim((string) $request->query('q', '')), 0, 100);
 
         $users = User::query()
             ->where('status', 'active')
