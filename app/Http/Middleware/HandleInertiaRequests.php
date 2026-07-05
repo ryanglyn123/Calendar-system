@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Announcement;
 use App\Models\ResourceType;
+use App\Services\Chat\ChatService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -82,7 +83,24 @@ class HandleInertiaRequests extends Middleware
                     ->orderBy('name')
                     ->get(['id', 'name', 'slug', 'icon'])
                     ->toArray(),
+            // Division chat bootstrap for the sidebar badge and chat dock.
+            // Null when the user has no division (no room to show).
+            'chatDivision' => fn () => $user === null || ! $user->isActive() || $user->division === null
+                ? null
+                : [
+                    'id' => $user->division->id,
+                    'name' => $user->division->name,
+                    'photo_url' => $user->division->chat_photo_path === null
+                        ? null
+                        : route('api.chat.photo.show', absolute: false),
+                ],
+            'chatUnread' => fn () => $user === null || ! $user->isActive() || $user->division_id === null
+                ? 0
+                : app(ChatService::class)->unreadCount($user),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            // Lets the theme toggle render its real state on first paint
+            // (explicit light/dark); 'system' still resolves client-side.
+            'appearance' => $request->cookie('appearance') ?? 'system',
         ];
     }
 }

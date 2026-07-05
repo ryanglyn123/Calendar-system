@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Plus } from '@lucide/vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import AttendeePicker from '@/components/calendar/AttendeePicker.vue';
@@ -12,6 +13,7 @@ import {
     Select,
     SelectContent,
     SelectItem,
+    SelectSeparator,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
@@ -26,8 +28,10 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/composables/useAuth';
 import { api, ApiError } from '@/lib/api';
 import { format, parseISO } from '@/lib/calendarMath';
+import eventTypesApi from '@/routes/api/event-types';
 import {
     store as eventsStore,
     update as eventsUpdate,
@@ -54,6 +58,52 @@ const emit = defineEmits<{
 
 const grid = useCalendarGridStore();
 const list = useCalendarListStore();
+const { hasPermission } = useAuth();
+
+// Types created inline live here until the page reloads and props catch up.
+const canManageTypes = hasPermission('event-types.manage');
+const localTypes = ref<EventTypeItem[]>([]);
+const allTypes = computed(() => [...props.eventTypes, ...localTypes.value]);
+
+const addingType = ref(false);
+const creatingType = ref(false);
+
+// '__new__' is the bottom dropdown row; picking it opens the inline creator
+// instead of setting a type.
+const onTypeSelect = (v: string) => {
+    if (v === '__new__') {
+        addingType.value = true;
+        return;
+    }
+    form.event_type_id = v === 'none' ? null : Number(v);
+};
+const newType = reactive({ name: '', color: '#86C6F5' });
+const newTypeError = ref('');
+
+const createType = async () => {
+    if (!newType.name.trim() || creatingType.value) {
+        return;
+    }
+    creatingType.value = true;
+    newTypeError.value = '';
+    try {
+        const { data } = await api.post<{ data: EventTypeItem }>(
+            eventTypesApi.store().url,
+            { name: newType.name.trim(), color: newType.color, is_active: true },
+        );
+        localTypes.value.push(data);
+        form.event_type_id = data.id;
+        addingType.value = false;
+        newType.name = '';
+    } catch (error) {
+        newTypeError.value =
+            error instanceof ApiError
+                ? (error.errors.name?.[0] ?? error.message)
+                : 'Could not create type.';
+    } finally {
+        creatingType.value = false;
+    }
+};
 
 const swatches = [
     '#EFD95F',
@@ -387,7 +437,7 @@ const submit = async (action: () => Promise<unknown>) => {
                     All day
                 </Label>
 
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-2 items-start gap-3">
                     <div class="grid gap-2">
                         <Label for="event-start-date">Starts</Label>
                         <Input
@@ -439,11 +489,7 @@ const submit = async (action: () => Promise<unknown>) => {
                                 ? 'none'
                                 : String(form.event_type_id)
                         "
-                        @update:model-value="
-                            (v) =>
-                                (form.event_type_id =
-                                    v === 'none' ? null : Number(v))
-                        "
+                        @update:model-value="(v) => onTypeSelect(v as string)"
                     >
                         <SelectTrigger id="event-type">
                             <SelectValue placeholder="None" />
@@ -451,7 +497,7 @@ const submit = async (action: () => Promise<unknown>) => {
                         <SelectContent>
                             <SelectItem value="none">None</SelectItem>
                             <SelectItem
-                                v-for="type in eventTypes"
+                                v-for="type in allTypes"
                                 :key="type.id"
                                 :value="String(type.id)"
                             >
@@ -465,8 +511,58 @@ const submit = async (action: () => Promise<unknown>) => {
                                     {{ type.name }}
                                 </span>
                             </SelectItem>
+                            <template v-if="canManageTypes">
+                                <SelectSeparator />
+                                <SelectItem value="__new__">
+                                    <span class="flex items-center gap-2 text-primary">
+                                        <Plus class="size-3.5" />
+                                        New type
+                                    </span>
+                                </SelectItem>
+                            </template>
                         </SelectContent>
                     </Select>
+
+                    <div
+                        v-if="canManageTypes && addingType"
+                        class="flex items-start gap-2"
+                    >
+                        <input
+                            v-model="newType.color"
+                            type="color"
+                            aria-label="Type color"
+                            class="size-9 shrink-0 cursor-pointer rounded-md border border-input bg-transparent p-1"
+                        />
+                        <div class="grid flex-1 gap-1">
+                            <Input
+                                v-model="newType.name"
+                                placeholder="Type name"
+                                @keydown.enter.prevent="createType"
+                            />
+                            <p
+                                v-if="newTypeError"
+                                class="text-sm text-destructive"
+                            >
+                                {{ newTypeError }}
+                            </p>
+                        </div>
+                        <Button
+                            type="button"
+                            size="sm"
+                            :disabled="creatingType || !newType.name.trim()"
+                            @click="createType"
+                        >
+                            Add
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            @click="addingType = false"
+                        >
+                            Cancel
+                        </Button>
+                    </div>
                 </div>
 
                 <RecurrenceEditor

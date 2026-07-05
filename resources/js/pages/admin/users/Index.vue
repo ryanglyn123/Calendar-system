@@ -299,7 +299,7 @@ const paginationLabel = (label: string) =>
             v-if="users.meta.last_page > 1"
             class="flex items-center justify-center gap-1"
         >
-            <template v-for="(link, i) in users.links" :key="i">
+            <template v-for="(link, i) in users.meta.links" :key="i">
                 <Link
                     v-if="link.url"
                     :href="link.url"

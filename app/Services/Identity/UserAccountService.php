@@ -5,17 +5,22 @@ namespace App\Services\Identity;
 use App\Enums\UserStatus;
 use App\Models\User;
 use App\Notifications\UserApprovedNotification;
+use App\Services\Calendar\CalendarAccessService;
 use Illuminate\Support\Facades\DB;
 
 class UserAccountService
 {
+    public function __construct(
+        private readonly CalendarAccessService $access,
+    ) {}
+
     /**
      * Approve a pending registration, assigning the division and role the
      * reviewing admin selected.
      */
     public function approve(User $user, int $divisionId, string $role, User $approvedBy): User
     {
-        return DB::transaction(function () use ($user, $divisionId, $role, $approvedBy) {
+        $user = DB::transaction(function () use ($user, $divisionId, $role, $approvedBy) {
             $user->forceFill([
                 'status' => UserStatus::Active,
                 'division_id' => $divisionId,
@@ -35,6 +40,12 @@ class UserAccountService
 
             return $user;
         });
+
+        // After commit: the division just changed, so any cached
+        // accessible-calendar set must not outlive it.
+        $this->access->forgetFor($user);
+
+        return $user;
     }
 
     /**

@@ -79,13 +79,14 @@ export type PaginationLink = {
     active: boolean;
 };
 
+/** Resource-collection paginator: the page links live under meta.links. */
 export type Paginated<T> = {
     data: T[];
-    links: PaginationLink[];
     meta: {
         current_page: number;
         from: number | null;
         last_page: number;
+        links: PaginationLink[];
         per_page: number;
         to: number | null;
         total: number;

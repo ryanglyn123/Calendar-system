@@ -22,6 +22,7 @@ class NotificationPreferenceController extends Controller
         'Events' => [
             'event.invited' => 'Someone invites you to an event',
             'event.rsvp-changed' => 'An attendee responds to your invitation',
+            'event.commented' => 'Someone comments on an event you organize or attend',
             'event.reminder' => 'Event reminders you set',
         ],
         'Bookings' => [

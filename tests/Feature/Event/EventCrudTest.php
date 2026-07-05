@@ -89,6 +89,24 @@ test('all-day events are stored end-exclusive at the creator\'s local day bounda
         ->and($event->ends_at->timezone('Asia/Manila')->format('Y-m-d H:i'))->toBe('2026-08-06 00:00');
 });
 
+test('all-day events may span a single day', function () {
+    $user = User::factory()->create(['timezone' => 'Asia/Manila']);
+    $calendar = Calendar::factory()->ownedBy($user)->create();
+
+    $this->actingAs($user)->postJson(route('api.events.store'), [
+        'calendar_id' => $calendar->id,
+        'title' => 'Training',
+        'all_day' => true,
+        'starts_at' => '2026-07-01T00:00:00',
+        'ends_at' => '2026-07-01T00:00:00',
+    ])->assertCreated();
+
+    $event = Event::query()->latest('id')->firstOrFail();
+
+    expect($event->starts_at->timezone('Asia/Manila')->format('Y-m-d H:i'))->toBe('2026-07-01 00:00')
+        ->and($event->ends_at->timezone('Asia/Manila')->format('Y-m-d H:i'))->toBe('2026-07-02 00:00');
+});
+
 test('timed events with an offset are stored normalized to UTC', function () {
     $user = User::factory()->create(['timezone' => 'Asia/Manila']);
     $calendar = Calendar::factory()->ownedBy($user)->create();

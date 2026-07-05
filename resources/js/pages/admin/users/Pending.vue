@@ -56,6 +56,8 @@ const approveForm = useForm({
 const openApprove = (user: AdminUser) => {
     approving.value = user;
     approveForm.reset();
+    // Pre-select the division the applicant chose at signup.
+    approveForm.division_id = user.division?.id ?? null;
 };
 
 const submitApprove = () => {

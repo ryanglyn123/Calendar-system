@@ -18,7 +18,7 @@ import {
 import { format } from '@/lib/calendarMath';
 import admin from '@/routes/admin';
 import adminAudit from '@/routes/admin/audit';
-import type { PaginationLink } from '@/types';
+import type { Paginated } from '@/types';
 
 defineOptions({
     layout: {
@@ -41,10 +41,7 @@ type ActivityRow = {
 };
 
 const props = defineProps<{
-    activities: {
-        data: ActivityRow[];
-        links: PaginationLink[];
-    };
+    activities: Paginated<ActivityRow>;
     filters: { search?: string };
 }>();
 
@@ -147,8 +144,11 @@ const paginationLabel = (label: string) =>
             </Table>
         </div>
 
-        <div class="flex items-center justify-center gap-1">
-            <template v-for="(link, i) in activities.links" :key="i">
+        <div
+            v-if="activities.meta.last_page > 1"
+            class="flex items-center justify-center gap-1"
+        >
+            <template v-for="(link, i) in activities.meta.links" :key="i">
                 <Link
                     v-if="link.url"
                     :href="link.url"

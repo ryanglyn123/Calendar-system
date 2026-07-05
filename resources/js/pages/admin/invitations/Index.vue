@@ -180,7 +180,7 @@ const paginationLabel = (label: string) =>
             v-if="invitations.meta.last_page > 1"
             class="flex items-center justify-center gap-1"
         >
-            <template v-for="(link, i) in invitations.links" :key="i">
+            <template v-for="(link, i) in invitations.meta.links" :key="i">
                 <Link
                     v-if="link.url"
                     :href="link.url"

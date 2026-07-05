@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdateEventTypeRequest;
 use App\Http\Resources\EventTypeResource;
 use App\Models\EventType;
 use App\Support\Toast;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,9 +26,14 @@ class EventTypeController extends Controller
         ]);
     }
 
-    public function store(StoreEventTypeRequest $request): RedirectResponse
+    public function store(StoreEventTypeRequest $request): RedirectResponse|JsonResponse
     {
-        EventType::query()->create($request->validated());
+        $eventType = EventType::query()->create($request->validated());
+
+        // Inline creation from the event editor expects the new type back as JSON.
+        if ($request->wantsJson()) {
+            return EventTypeResource::make($eventType)->response()->setStatusCode(201);
+        }
 
         Toast::success('Event type created.');
 

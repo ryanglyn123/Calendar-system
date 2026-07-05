@@ -68,10 +68,44 @@ if (props.initialEvents) {
     grid.primeAround(new Date(), props.initialEvents);
 }
 
-onMounted(() => {
+onMounted(async () => {
     void list.load();
-    void grid.ensureWindowsAround(grid.focusDate);
+    await grid.ensureWindowsAround(grid.focusDate);
+    await openSharedEvent();
 });
+
+/**
+ * Deep link from a shared chat card: ?event=ID&date=YYYY-MM-DD focuses the
+ * event's date and pops its quick view once the window is loaded.
+ */
+const openSharedEvent = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const eventId = Number(params.get('event'));
+
+    if (!eventId) {
+        return;
+    }
+
+    const date = params.get('date');
+
+    if (date) {
+        grid.setFocusDate(new Date(`${date}T00:00:00`));
+        await grid.ensureWindowsAround(grid.focusDate);
+    }
+
+    const from = new Date(grid.focusDate);
+    from.setDate(from.getDate() - 42);
+    const to = new Date(grid.focusDate);
+    to.setDate(to.getDate() + 42);
+
+    const match = grid
+        .occurrencesBetween(from, to)
+        .find((occurrence) => occurrence.event_id === eventId);
+
+    if (match) {
+        quickViewTarget.value = match;
+    }
+};
 
 /**
  * Whether the user can create events anywhere in this scope. Resource

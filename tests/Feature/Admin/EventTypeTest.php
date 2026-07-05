@@ -20,6 +20,29 @@ test('admins can create event types', function () {
     expect(EventType::query()->where('name', 'Premiere')->exists())->toBeTrue();
 });
 
+test('inline creation returns the new type as json', function () {
+    $this->actingAs($this->admin)
+        ->postJson(route('api.event-types.store'), [
+            'name' => 'Workshop',
+            'color' => '#123456',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.name', 'Workshop')
+        ->assertJsonPath('data.color', '#123456');
+});
+
+test('staff cannot inline-create event types', function () {
+    $staff = User::factory()->create();
+    $staff->assignRole('staff');
+
+    $this->actingAs($staff)
+        ->postJson(route('api.event-types.store'), [
+            'name' => 'Nope',
+            'color' => '#000000',
+        ])
+        ->assertForbidden();
+});
+
 test('event type names must be unique', function () {
     EventType::factory()->create(['name' => 'Meeting']);
 

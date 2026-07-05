@@ -29,7 +29,8 @@ class StoreEventRequest extends FormRequest
             'location' => ['nullable', 'string', 'max:255'],
             'meeting_url' => ['nullable', 'url', 'max:255'],
             'starts_at' => ['required', 'date'],
-            'ends_at' => ['required', 'date', 'after:starts_at'],
+            // All-day events may span a single day (end == start); timed events must be strictly after.
+            'ends_at' => ['required', 'date', $this->boolean('all_day') ? 'after_or_equal:starts_at' : 'after:starts_at'],
             'all_day' => ['boolean'],
             'color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'visibility' => ['sometimes', Rule::in(['default', 'private'])],

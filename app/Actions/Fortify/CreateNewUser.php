@@ -10,6 +10,7 @@ use App\Notifications\UserRegisteredNotification;
 use App\Settings\RegistrationSettings;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
@@ -33,6 +34,13 @@ class CreateNewUser implements CreatesNewUsers
         Validator::make($input, [
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
+            // The signup choice is a default the approving admin confirms
+            // or overrides.
+            'division_id' => [
+                'required',
+                'integer',
+                Rule::exists('divisions', 'id')->where('is_active', true),
+            ],
         ])->validate();
 
         if (! $this->settings->emailDomainAllowed($input['email'])) {
@@ -45,6 +53,7 @@ class CreateNewUser implements CreatesNewUsers
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => $input['password'],
+            'division_id' => (int) $input['division_id'],
             'status' => $this->settings->require_approval ? UserStatus::Pending : UserStatus::Active,
         ]);
 

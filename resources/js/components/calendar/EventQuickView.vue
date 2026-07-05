@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import {
     AlignLeft,
     Ban,
@@ -11,8 +12,11 @@ import {
     FileText,
     Lock,
     MapPin,
+    MessageSquareText,
     Pencil,
     Repeat,
+    Send,
+    Share2,
     ShieldCheck,
     Trash2,
     UserCheck,
@@ -20,7 +24,7 @@ import {
     Video,
     X,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +35,8 @@ import {
     DialogScrollContent,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/composables/useAuth';
 import { getInitials } from '@/composables/useInitials';
 import { api, ApiError } from '@/lib/api';
 import { format, isSameDay, parseISO } from '@/lib/calendarMath';
@@ -42,7 +48,9 @@ import {
     formatTimezone,
 } from '@/lib/eventDisplay';
 import { rsvp as eventsRsvp } from '@/routes/api/events';
+import eventComments from '@/routes/api/events/comments';
 import { useCalendarListStore } from '@/stores/calendarList';
+import { useChatStore } from '@/stores/chat';
 import type { EventOccurrence, RsvpStatus } from '@/types/calendar';
 
 const props = defineProps<{
@@ -196,6 +204,108 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
     { status: 'tentative', label: 'Maybe', icon: CircleHelp },
     { status: 'declined', label: 'No', icon: X },
 ];
+
+// --- Discussion: comment thread shared by everyone who can see the event ---
+
+type CommentItem = {
+    id: number;
+    user: { id: number; name: string; avatar_path: string | null } | null;
+    body: string;
+    created_at: string;
+};
+
+const page = usePage();
+const { user: authUser } = useAuth();
+
+const canDiscuss = computed(
+    () => props.occurrence !== null && !props.occurrence.is_masked,
+);
+const hasDivisionChat = computed(() => page.props.chatDivision != null);
+
+const comments = ref<CommentItem[]>([]);
+const commentBody = ref('');
+const posting = ref(false);
+
+watch(
+    () => props.occurrence?.event_id,
+    async (eventId) => {
+        comments.value = [];
+
+        if (!eventId || props.occurrence?.is_masked) {
+            return;
+        }
+
+        try {
+            const { data } = await api.get<{ data: CommentItem[] }>(
+                eventComments.index(eventId).url,
+            );
+            comments.value = data;
+        } catch {
+            // Thread stays empty; posting surfaces any real error.
+        }
+    },
+    { immediate: true },
+);
+
+const postComment = async () => {
+    const body = commentBody.value.trim();
+
+    if (!body || !props.occurrence || posting.value) {
+        return;
+    }
+
+    posting.value = true;
+
+    try {
+        const { data } = await api.post<{ data: CommentItem }>(
+            eventComments.store(props.occurrence.event_id).url,
+            { body },
+        );
+        comments.value.push(data);
+        commentBody.value = '';
+    } catch (error) {
+        toast.error(
+            error instanceof ApiError
+                ? error.message
+                : 'Could not post comment.',
+        );
+    } finally {
+        posting.value = false;
+    }
+};
+
+const removeComment = async (comment: CommentItem) => {
+    try {
+        await api.delete(eventComments.destroy(comment.id).url);
+        comments.value = comments.value.filter((c) => c.id !== comment.id);
+    } catch (error) {
+        toast.error(
+            error instanceof ApiError
+                ? error.message
+                : 'Could not delete comment.',
+        );
+    }
+};
+
+const chat = useChatStore();
+
+const shareToChat = async () => {
+    if (!props.occurrence) {
+        return;
+    }
+
+    try {
+        // Server snapshots the event into a card that deep-links back to it.
+        await chat.send({ eventId: props.occurrence.event_id });
+        toast.success('Shared to your division chat.');
+    } catch (error) {
+        toast.error(
+            error instanceof ApiError ? error.message : 'Could not share.',
+        );
+    }
+};
+
+const commentTime = (iso: string) => format(parseISO(iso), 'MMM d, HH:mm');
 </script>
 
 <template>
@@ -652,6 +762,106 @@ const rsvpOptions: { status: RsvpStatus; label: string; icon: unknown }[] = [
                         {{ occurrence.description }}
                     </p>
                 </div>
+
+                <!-- Discussion -->
+                <section
+                    v-if="canDiscuss"
+                    class="qv-reveal space-y-3 border-t pt-4"
+                    style="--i: 6"
+                >
+                    <div class="flex items-center justify-between gap-2">
+                        <h3
+                            class="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                        >
+                            <MessageSquareText
+                                class="size-3.5"
+                                aria-hidden="true"
+                            />
+                            Discussion
+                            <span
+                                v-if="comments.length"
+                                class="font-normal normal-case"
+                            >
+                                · {{ comments.length }}
+                            </span>
+                        </h3>
+                        <Button
+                            v-if="hasDivisionChat"
+                            variant="ghost"
+                            size="sm"
+                            class="h-7 text-xs text-muted-foreground"
+                            @click="shareToChat"
+                        >
+                            <Share2 class="size-3.5" aria-hidden="true" />
+                            Share to division chat
+                        </Button>
+                    </div>
+
+                    <ul v-if="comments.length" class="space-y-3">
+                        <li
+                            v-for="comment in comments"
+                            :key="comment.id"
+                            class="group flex items-start gap-2.5"
+                        >
+                            <Avatar class="size-7">
+                                <AvatarImage
+                                    v-if="comment.user?.avatar_path"
+                                    :src="comment.user.avatar_path"
+                                    :alt="comment.user.name"
+                                />
+                                <AvatarFallback class="text-[10px]">
+                                    {{ getInitials(comment.user?.name ?? '?') }}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs text-muted-foreground">
+                                    <span class="font-medium text-foreground">
+                                        {{
+                                            comment.user?.name ?? 'Former user'
+                                        }}
+                                    </span>
+                                    · {{ commentTime(comment.created_at) }}
+                                </p>
+                                <p class="break-words whitespace-pre-line">
+                                    {{ comment.body }}
+                                </p>
+                            </div>
+                            <button
+                                v-if="comment.user?.id === authUser.id"
+                                type="button"
+                                class="mt-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
+                                aria-label="Delete comment"
+                                @click="removeComment(comment)"
+                            >
+                                <Trash2 class="size-3.5" aria-hidden="true" />
+                            </button>
+                        </li>
+                    </ul>
+                    <p v-else class="text-xs text-muted-foreground">
+                        No comments yet.
+                    </p>
+
+                    <form
+                        class="flex items-center gap-2"
+                        @submit.prevent="postComment"
+                    >
+                        <Input
+                            v-model="commentBody"
+                            placeholder="Write a comment..."
+                            maxlength="2000"
+                            class="h-8 text-sm"
+                        />
+                        <Button
+                            type="submit"
+                            size="sm"
+                            class="h-8"
+                            :disabled="posting || !commentBody.trim()"
+                            aria-label="Post comment"
+                        >
+                            <Send class="size-3.5" aria-hidden="true" />
+                        </Button>
+                    </form>
+                </section>
 
                 <!-- Provenance -->
                 <p

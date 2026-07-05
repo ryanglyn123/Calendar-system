@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserStatus;
+use App\Models\Division;
 use App\Models\User;
 use App\Notifications\UserRegisteredNotification;
 use App\Settings\RegistrationSettings;
@@ -10,6 +11,7 @@ test('self-registered users start pending with the staff role', function () {
     $response = $this->post(route('register.store'), [
         'name' => 'Pending Person',
         'email' => 'pending@fdcp.gov.ph',
+        'division_id' => Division::factory()->create()->id,
         'password' => 'password',
         'password_confirmation' => 'password',
     ]);
@@ -61,6 +63,7 @@ test('users with approve permission are notified about new registrations', funct
     $this->post(route('register.store'), [
         'name' => 'New Registrant',
         'email' => 'newbie@fdcp.gov.ph',
+        'division_id' => Division::factory()->create()->id,
         'password' => 'password',
         'password_confirmation' => 'password',
     ]);
@@ -76,6 +79,7 @@ test('registration can be limited to an email domain', function () {
     $this->post(route('register.store'), [
         'name' => 'Outsider',
         'email' => 'outsider@gmail.com',
+        'division_id' => Division::factory()->create()->id,
         'password' => 'password',
         'password_confirmation' => 'password',
     ])->assertSessionHasErrors('email');

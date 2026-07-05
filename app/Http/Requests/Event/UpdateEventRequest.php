@@ -54,8 +54,10 @@ class UpdateEventRequest extends FormRequest
 
                 $starts = $this->date('starts_at') ?? $event->starts_at;
                 $ends = $this->date('ends_at') ?? $event->ends_at;
+                $allDay = $this->has('all_day') ? $this->boolean('all_day') : $event->all_day;
 
-                if ($ends <= $starts) {
+                // All-day events may span a single day (end == start); timed events must be strictly after.
+                if ($allDay ? $ends < $starts : $ends <= $starts) {
                     $validator->errors()->add('ends_at', 'The end must be after the start.');
                 }
 

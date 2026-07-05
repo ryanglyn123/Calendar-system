@@ -20,10 +20,11 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string|null $acronym
  * @property string|null $description
  * @property string $color
+ * @property string|null $chat_photo_path
  * @property bool $is_active
  * @property int $sort_order
  */
-#[Fillable(['name', 'acronym', 'description', 'color', 'is_active', 'sort_order'])]
+#[Fillable(['name', 'acronym', 'description', 'color', 'chat_photo_path', 'is_active', 'sort_order'])]
 #[ObservedBy(DivisionObserver::class)]
 class Division extends Model
 {

@@ -10,6 +10,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Division;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Calendar\CalendarAccessService;
 use App\Services\Identity\UserAccountService;
 use App\Support\Toast;
 use Illuminate\Http\RedirectResponse;
@@ -45,12 +46,18 @@ class UserController extends Controller
         ]);
     }
 
-    public function update(UpdateUserRequest $request, User $user): RedirectResponse
+    public function update(UpdateUserRequest $request, User $user, CalendarAccessService $access): RedirectResponse
     {
         $user->update([
             'name' => $request->validated('name'),
             'division_id' => $request->validated('division_id'),
         ]);
+
+        // A division move changes which calendars the user may see; the
+        // accessible set is cached for five minutes otherwise.
+        if ($user->wasChanged('division_id')) {
+            $access->forgetFor($user);
+        }
 
         $user->syncRoles($request->validated('roles'));
 

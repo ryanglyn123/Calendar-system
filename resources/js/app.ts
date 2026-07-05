@@ -6,6 +6,9 @@ import AuthLayout from '@/layouts/AuthLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
 
+// Echo (websockets) is created lazily in @/echo.ts by the chat store —
+// never at module load, which would break SSR hydration.
+
 const appName = import.meta.env.VITE_APP_NAME || 'FDCP Calendar';
 
 createInertiaApp({

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { layoutWeekLanes } from '@/components/calendar/monthLanes';
 import {
@@ -20,8 +20,14 @@ import { useCalendarListStore } from '@/stores/calendarList';
 import type { EventOccurrence } from '@/types/calendar';
 
 const MAX_LANES = 2;
-const MAX_CHIPS = 2;
 const LANE_HEIGHT = 24;
+
+// The chip cap is measured, not fixed: show as many timed chips as the cell's
+// height fits. Heights in px — tuning knobs if chip/label styling changes.
+const CHIP_HEIGHT = 22; // chip (20) + gap-0.5 (2)
+const LABEL_HEIGHT = 32; // day-number block
+const CELL_PAD = 4; // pb-1
+const MIN_ROW_HEIGHT = 112; // min-h-28 floor — the pre-measure seed
 
 const emit = defineEmits<{
     createAt: [date: Date];
@@ -120,13 +126,65 @@ const dayOccurrences = (day: Date): EventOccurrence[] =>
         occurrenceTouchesDay(new Date(o.starts_at), new Date(o.ends_at), day),
     );
 
-const hiddenCount = (week: WeekLayout, day: Date): number => {
-    const key = dayKey(day);
-    const chips = week.chipsByDay.get(key) ?? [];
-    const hiddenLanes = week.hiddenLaneOccurrences.get(key)?.length ?? 0;
+// All six week-rows share one height (auto-rows-fr); measure it once and let
+// each cell fit as many chips as its remaining space allows. Seed with the
+// min-h-28 floor so pre-measure rows never overflow the page (a taller seed
+// would balloon rows, add a scrollbar, then shift the layout when it settles).
+const gridEl = ref<HTMLElement | null>(null);
+const rowHeight = ref(MIN_ROW_HEIGHT);
+let rowObserver: ResizeObserver | undefined;
 
-    return Math.max(0, chips.length - MAX_CHIPS) + hiddenLanes;
+onMounted(() => {
+    if (!gridEl.value) {
+        return;
+    }
+
+    const measure = () => {
+        rowHeight.value = (gridEl.value?.clientHeight ?? 0) / 6;
+    };
+
+    measure(); // sync, before paint — avoids a wrong "+more" on the first frame
+    rowObserver = new ResizeObserver(measure);
+    rowObserver.observe(gridEl.value);
+});
+
+onBeforeUnmount(() => rowObserver?.disconnect());
+
+const maxChips = (laneCount: number): number => {
+    const avail =
+        rowHeight.value - LABEL_HEIGHT - laneCount * LANE_HEIGHT - CELL_PAD;
+
+    return Math.max(1, Math.floor(avail / CHIP_HEIGHT));
 };
+
+type ChipPlan = { shown: EventOccurrence[]; hiddenCount: number };
+
+// Per week: how many chips to render per day and the "+N more" remainder,
+// reserving the last row for the more-link whenever anything overflows.
+const chipPlans = computed<Map<string, ChipPlan>[]>(() =>
+    weekLayouts.value.map((week) => {
+        const budget = maxChips(week.laneCount);
+        const plans = new Map<string, ChipPlan>();
+
+        for (const [key, chips] of week.chipsByDay) {
+            const hiddenLanes =
+                week.hiddenLaneOccurrences.get(key)?.length ?? 0;
+
+            if (chips.length <= budget && hiddenLanes === 0) {
+                plans.set(key, { shown: chips, hiddenCount: 0 });
+                continue;
+            }
+
+            const shown = chips.slice(0, Math.max(0, budget - 1));
+            plans.set(key, {
+                shown,
+                hiddenCount: chips.length - shown.length + hiddenLanes,
+            });
+        }
+
+        return plans;
+    }),
+);
 
 const weekdayHeaders = computed(() =>
     days.value.slice(0, 7).map((d) => format(d, 'EEE')),
@@ -293,7 +351,7 @@ const onChipClick = (occurrence: EventOccurrence): void => {
             </div>
         </div>
 
-        <div class="grid flex-1 auto-rows-fr">
+        <div ref="gridEl" class="grid flex-1 auto-rows-fr">
             <div
                 v-for="(week, w) in weeks"
                 :key="w"
@@ -369,13 +427,11 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                         aria-hidden="true"
                     />
 
-                    <div class="flex flex-col gap-0.5 overflow-hidden">
+                    <div class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
                         <button
-                            v-for="occurrence in (
-                                weekLayouts[w].chipsByDay.get(
-                                    format(day, 'yyyy-MM-dd'),
-                                ) ?? []
-                            ).slice(0, MAX_CHIPS)"
+                            v-for="occurrence in chipPlans[w].get(
+                                format(day, 'yyyy-MM-dd'),
+                            )?.shown ?? []"
                             :key="occurrence.occurrence_id"
                             type="button"
                             data-event
@@ -408,13 +464,20 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                         </button>
 
                         <button
-                            v-if="hiddenCount(weekLayouts[w], day) > 0"
+                            v-if="
+                                (chipPlans[w].get(format(day, 'yyyy-MM-dd'))
+                                    ?.hiddenCount ?? 0) > 0
+                            "
                             type="button"
                             data-event
-                            class="rounded px-1 py-0.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted"
+                            class="shrink-0 rounded px-1 py-0.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted"
                             @click="emit('showDay', day, dayOccurrences(day))"
                         >
-                            +{{ hiddenCount(weekLayouts[w], day) }} more
+                            +{{
+                                chipPlans[w].get(format(day, 'yyyy-MM-dd'))
+                                    ?.hiddenCount
+                            }}
+                            more
                         </button>
                     </div>
                 </div>

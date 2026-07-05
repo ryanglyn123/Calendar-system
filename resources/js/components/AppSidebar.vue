@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import {
+    Building2,
     CalendarDays,
     FileDiff,
     Globe,
     LayoutGrid,
     MailPlus,
     Megaphone,
+    MessagesSquare,
     Presentation,
     Settings2,
     UserCheck,
@@ -22,7 +24,6 @@ import {
     SidebarFooter,
     SidebarHeader,
     SidebarMenu,
-    SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/composables/useAuth';
@@ -37,12 +38,15 @@ import adminPending from '@/routes/admin/pending-registrations';
 import adminSettings from '@/routes/admin/settings';
 import adminUsers from '@/routes/admin/users';
 import calendarPage from '@/routes/calendar';
+import chatPage from '@/routes/chat';
 import resourcesPage from '@/routes/resources';
+import { useChatStore } from '@/stores/chat';
 import type { NavItem, ResourceTypeNav } from '@/types';
 
-const { hasPermission, hasAnyPermission } = useAuth();
+const { user, hasPermission, hasAnyPermission } = useAuth();
 
 const page = usePage();
+const chat = useChatStore();
 
 // One sidebar section per active resource type (Boardroom, Carpool, ...).
 const resourceTypes = computed(
@@ -60,6 +64,21 @@ const mainNavItems = computed<NavItem[]>(() => [
         href: calendarPage.public(),
         icon: Globe,
     },
+    ...(user.value?.division
+        ? [
+              {
+                  title: 'Division Calendar',
+                  href: calendarPage.division(),
+                  icon: Building2,
+              } satisfies NavItem,
+              {
+                  title: 'Division Chat',
+                  href: chatPage.index(),
+                  icon: MessagesSquare,
+                  badge: chat.unread,
+              } satisfies NavItem,
+          ]
+        : []),
     ...resourceTypes.value.map(
         (type): NavItem => ({
             title: type.name,
@@ -158,11 +177,12 @@ const adminNavItems = computed<NavItem[]>(() => {
         <SidebarHeader>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
-                        <Link :href="dashboard()">
-                            <AppLogo />
-                        </Link>
-                    </SidebarMenuButton>
+                    <Link
+                        :href="dashboard()"
+                        class="flex h-12 items-center px-1 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+                    >
+                        <AppLogo />
+                    </Link>
                 </SidebarMenuItem>
             </SidebarMenu>
         </SidebarHeader>

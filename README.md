@@ -8,6 +8,7 @@ Internal calendar and resource booking platform for the Film Development Council
 - Custom calendar UI: month, week, day, and agenda views with drag to create, move, and resize, overlap packing, multi-day spanning bars, keyboard operation, and dark mode.
 - Full recurrence (RFC 5545 RRULE) with this, this-and-following, and all-events edit scopes and per-occurrence overrides.
 - Attendees with RSVP, per-event reminders (in-app and email), and a queued notification center with per-user channel preferences.
+- Division group chat over websockets (Laravel Reverb): one private room per division with messages, replies, photo attachments, polls, emoji reactions, pinned messages, a changeable group photo, typing indicators, and always-on read receipts. Lives as a floating messenger-style chat head that opens a mini chat box or maximizes to a full page.
 - Resource booking for admin-defined resource types (board rooms, vehicles, and anything else) with approval workflows, edit requests, conflict detection, working hours, holiday blocking, and per-type booking rules.
 - Super Admin panel: users, pending registrations, invitations, divisions, roles and permissions, calendars, event types, resource types, resources, booking approvals, change requests, working hours, holidays, announcements, audit log, system health, and typed settings. All configurable without code changes.
 - Sign in with password (Fortify, with 2FA and passkeys) or Google (Socialite). Self-registration and unknown Google accounts land in a pending queue for admin approval.
@@ -69,7 +70,9 @@ Works the same on Windows, macOS, and Linux. On Windows, get PHP + Composer + No
    composer dev
    ```
 
-   This starts the PHP server, queue worker, log tail, and Vite together. Open http://localhost:8000 and sign in as `admin@fdcp.gov.ph` / `password`.
+   This starts the PHP server, queue worker, Reverb websocket server (chat), log tail, and Vite together. Open http://localhost:8000 and sign in as `admin@fdcp.gov.ph` / `password`.
+
+   The chat needs `REVERB_*` and `VITE_REVERB_*` values in `.env` (see `.env.example`); restart `composer dev` after changing them, since Vite reads `VITE_*` at startup.
 
 8. **Optional: local email.** Run [Mailpit](https://mailpit.axllent.org/) and set `MAIL_MAILER=smtp`, `MAIL_PORT=1025` in `.env`; sent mail appears at http://localhost:8025. The default `.env` uses `MAIL_MAILER=log` (mail goes to `storage/logs/laravel.log`).
 
@@ -236,7 +239,53 @@ Tested layout: one EC2 instance (Ubuntu 24.04 LTS, t3.small or larger) running n
    sudo systemctl enable --now calendar-queue
    ```
 
-10. **Scheduler cron** — dispatches due event reminders and prunes expired invitations:
+10. **Reverb websocket server (chat) as a systemd service** — the division group chat is realtime; without Reverb the chat still works over plain requests but nothing arrives live. Create `/etc/systemd/system/calendar-reverb.service`:
+
+    ```ini
+    [Unit]
+    Description=FDCP Calendar Reverb websocket server
+    After=network.target
+
+    [Service]
+    User=www-data
+    Group=www-data
+    Restart=always
+    RestartSec=3
+    ExecStart=/usr/bin/php /var/www/calendar/artisan reverb:start
+
+    [Install]
+    WantedBy=multi-user.target
+    ```
+
+    ```bash
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now calendar-reverb
+    ```
+
+    Add the websocket proxy to the nginx server block (inside `server { }`, next to the other `location` blocks) so clients connect through 443:
+
+    ```nginx
+    location /app {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 300s;
+    }
+    ```
+
+    Then in `.env`: keep the server bound locally (`REVERB_SERVER_HOST=0.0.0.0`, `REVERB_PORT=8080` defaults are fine) while the CLIENT values point at your domain through nginx:
+
+    ```ini
+    REVERB_HOST=calendar.fdcp.gov.ph
+    REVERB_PORT=443
+    REVERB_SCHEME=https
+    ```
+
+    Reload nginx and rebuild assets (`npm run build`) so the `VITE_REVERB_*` values are compiled in.
+
+11. **Scheduler cron** — dispatches due event reminders and prunes expired invitations:
 
     ```bash
     sudo crontab -u www-data -e
@@ -244,13 +293,13 @@ Tested layout: one EC2 instance (Ubuntu 24.04 LTS, t3.small or larger) running n
     * * * * * cd /var/www/calendar && php artisan schedule:run >> /dev/null 2>&1
     ```
 
-11. **Cache for speed**
+12. **Cache for speed**
 
     ```bash
     php artisan optimize        # caches config, routes, views, events
     ```
 
-12. **Updating a running deployment**
+13. **Updating a running deployment**
 
     ```bash
     cd /var/www/calendar
@@ -261,6 +310,7 @@ Tested layout: one EC2 instance (Ubuntu 24.04 LTS, t3.small or larger) running n
     php artisan migrate --force
     php artisan optimize
     sudo systemctl restart calendar-queue    # workers must reload new code
+    php artisan reverb:restart               # so the websocket server does too
     php artisan up
     ```
 

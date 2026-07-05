@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import { Badge } from '@/components/ui/badge';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -36,6 +37,13 @@ const { isCurrentUrl } = useCurrentUrl();
                     <Link :href="item.href" prefetch cache-for="15s">
                         <component :is="item.icon" />
                         <span>{{ item.title }}</span>
+                        <Badge
+                            v-if="item.badge"
+                            variant="destructive"
+                            class="ml-auto h-5 min-w-5 justify-center rounded-full px-1 text-[10px] tabular-nums"
+                        >
+                            {{ item.badge > 99 ? '99+' : item.badge }}
+                        </Badge>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>

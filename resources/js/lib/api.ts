@@ -21,23 +21,35 @@ function xsrfToken(): string {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
-async function request<T>(
-    method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
-    url: string,
-    body?: unknown,
-): Promise<T> {
-    const response = await fetch(url, {
-        method,
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-XSRF-TOKEN': xsrfToken(),
-        },
-        credentials: 'same-origin',
-        body: body === undefined ? undefined : JSON.stringify(body),
-    });
+/**
+ * Echo's socket id, when connected. Sent as X-Socket-ID so the server's
+ * broadcast(...)->toOthers() can skip echoing our own mutations back.
+ */
+function socketId(): string | undefined {
+    const echo = (
+        window as { Echo?: { socketId?: () => string | undefined } }
+    ).Echo;
 
+    return echo?.socketId?.();
+}
+
+function baseHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-XSRF-TOKEN': xsrfToken(),
+    };
+
+    const socket = socketId();
+
+    if (socket) {
+        headers['X-Socket-ID'] = socket;
+    }
+
+    return headers;
+}
+
+async function parse<T>(response: Response): Promise<T> {
     if (response.status === 204) {
         return undefined as T;
     }
@@ -57,9 +69,43 @@ async function request<T>(
     return payload as T;
 }
 
+async function request<T>(
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+    url: string,
+    body?: unknown,
+): Promise<T> {
+    const response = await fetch(url, {
+        method,
+        headers: {
+            ...baseHeaders(),
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    return parse<T>(response);
+}
+
+/**
+ * Multipart POST for file uploads. No Content-Type header on purpose:
+ * the browser sets it with the multipart boundary.
+ */
+async function postForm<T>(url: string, form: FormData): Promise<T> {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: baseHeaders(),
+        credentials: 'same-origin',
+        body: form,
+    });
+
+    return parse<T>(response);
+}
+
 export const api = {
     get: <T>(url: string) => request<T>('GET', url),
     post: <T>(url: string, body?: unknown) => request<T>('POST', url, body),
+    postForm: <T>(url: string, form: FormData) => postForm<T>(url, form),
     patch: <T>(url: string, body?: unknown) => request<T>('PATCH', url, body),
     put: <T>(url: string, body?: unknown) => request<T>('PUT', url, body),
     delete: <T>(url: string) => request<T>('DELETE', url),

@@ -12,6 +12,7 @@ import { store } from '@/routes/register';
 
 defineProps<{
     passwordRules: string;
+    divisions: { id: number; name: string; acronym: string | null }[];
 }>();
 
 defineOptions({
@@ -63,11 +64,35 @@ defineOptions({
             </div>
 
             <div class="grid gap-2">
+                <Label for="division_id">Division</Label>
+                <select
+                    id="division_id"
+                    name="division_id"
+                    required
+                    :tabindex="3"
+                    class="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                >
+                    <option value="" disabled selected>
+                        Select your division
+                    </option>
+                    <option
+                        v-for="division in divisions"
+                        :key="division.id"
+                        :value="division.id"
+                    >
+                        {{ division.name
+                        }}{{ division.acronym ? ` (${division.acronym})` : '' }}
+                    </option>
+                </select>
+                <InputError :message="errors.division_id" />
+            </div>
+
+            <div class="grid gap-2">
                 <Label for="password">Password</Label>
                 <PasswordInput
                     id="password"
                     required
-                    :tabindex="3"
+                    :tabindex="4"
                     autocomplete="new-password"
                     name="password"
                     :passwordrules="passwordRules"
@@ -80,7 +105,7 @@ defineOptions({
                 <PasswordInput
                     id="password_confirmation"
                     required
-                    :tabindex="4"
+                    :tabindex="5"
                     autocomplete="new-password"
                     name="password_confirmation"
                     :passwordrules="passwordRules"
@@ -91,7 +116,7 @@ defineOptions({
             <Button
                 type="submit"
                 class="mt-2 w-full"
-                tabindex="5"
+                tabindex="6"
                 :disabled="processing"
                 data-test="register-user-button"
             >
@@ -105,7 +130,7 @@ defineOptions({
             <TextLink
                 :href="login()"
                 class="underline underline-offset-4"
-                :tabindex="6"
+                :tabindex="7"
                 >Log in</TextLink
             >
         </div>

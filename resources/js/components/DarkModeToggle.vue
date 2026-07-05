@@ -1,9 +1,16 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import { Moon, Sun } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useAppearance } from '@/composables/useAppearance';
 
 const { resolvedAppearance, updateAppearance } = useAppearance();
+const page = usePage();
+
+// The server shares the appearance cookie, so for an explicit light/dark choice
+// the very first render (SSR + the matching client render) is already correct —
+// no snap on refresh. 'system' is unknown server-side and resolves on mount.
+const initialDark = (page.props.appearance as string | undefined) === 'dark';
 
 // The resolved appearance depends on matchMedia and localStorage, which the
 // server cannot know. Until mounted, render the same light state the server
@@ -11,12 +18,20 @@ const { resolvedAppearance, updateAppearance } = useAppearance();
 // (the icon mounts into a detached node and stays invisible).
 const mounted = ref(false);
 
+// Transitions stay off until a frame after mount: the first render is always
+// light, so enabling them immediately would animate (slide + colour-fade) the
+// correction to the real theme on every refresh. Only user flips animate.
+const animate = ref(false);
+
 onMounted(() => {
     mounted.value = true;
+    requestAnimationFrame(() => {
+        animate.value = true;
+    });
 });
 
-const isDark = computed(
-    () => mounted.value && resolvedAppearance.value === 'dark',
+const isDark = computed(() =>
+    mounted.value ? resolvedAppearance.value === 'dark' : initialDark,
 );
 
 const squashing = ref(false);
@@ -48,17 +63,21 @@ onBeforeUnmount(() => clearTimeout(squashTimer));
         :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
         :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
         data-test="dark-mode-toggle"
-        class="dm-track inline-flex h-8 w-16 shrink-0 items-center overflow-hidden rounded-full border px-1 backdrop-blur-md transition-colors duration-500 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-        :class="
+        class="dm-track inline-flex h-8 w-16 shrink-0 items-center overflow-hidden rounded-full border px-1 backdrop-blur-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+        :class="[
+            animate ? 'transition-colors duration-500' : '',
             isDark
                 ? 'border-white/10 bg-slate-800/50'
-                : 'border-white/40 bg-sky-200/50'
-        "
+                : 'border-white/40 bg-sky-200/50',
+        ]"
         @click="toggle"
     >
         <span
             class="dm-thumb flex size-6 items-center justify-center"
-            :class="isDark ? 'dm-thumb-dark' : 'dm-thumb-light'"
+            :class="[
+                animate ? 'dm-animate' : '',
+                isDark ? 'dm-thumb-dark' : 'dm-thumb-light',
+            ]"
         >
             <span
                 class="dm-inner flex size-full items-center justify-center rounded-full border border-white/60 bg-gradient-to-br from-white to-white/75"
@@ -92,7 +111,9 @@ onBeforeUnmount(() => clearTimeout(squashTimer));
  * the inner right edge). overflow-hidden on the track is the hard guarantee
  * nothing can escape the bounds.
  */
-.dm-thumb {
+/* Motion is opt-in: .dm-animate is added a frame after mount so the initial
+   theme correction (light → dark) snaps instead of sliding on refresh. */
+.dm-animate {
     transition: transform 0.3s cubic-bezier(0.34, 1.15, 0.64, 1);
 }
 
@@ -108,8 +129,11 @@ onBeforeUnmount(() => clearTimeout(squashTimer));
     box-shadow:
         inset 0 1px 1px rgba(255, 255, 255, 0.9),
         0 2px 5px rgba(0, 0, 0, 0.2);
-    transition: box-shadow 0.3s ease;
     transform-origin: center;
+}
+
+.dm-animate .dm-inner {
+    transition: box-shadow 0.3s ease;
 }
 
 /* Colored glass glow that tints the thumb by mode. */

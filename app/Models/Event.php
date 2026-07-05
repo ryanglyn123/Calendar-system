@@ -108,6 +108,12 @@ class Event extends Model
         return $this->hasMany(EventReminder::class);
     }
 
+    /** @return HasMany<EventComment, $this> */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(EventComment::class);
+    }
+
     /** @return HasOne<Booking, $this> */
     public function booking(): HasOne
     {
