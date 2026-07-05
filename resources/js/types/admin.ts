@@ -1,5 +1,7 @@
 export type Division = {
     id: number;
+    parent_id?: number | null;
+    parent?: { id: number; name: string } | null;
     name: string;
     acronym: string | null;
     description: string | null;
@@ -61,6 +63,8 @@ export type CalendarItem = {
     division?: Division | null;
     can_write_events: boolean;
     can_manage: boolean;
+    /** The calendar of a unit the user may manage from the panel. */
+    unit_manageable?: boolean;
 };
 
 export type EventTypeItem = {

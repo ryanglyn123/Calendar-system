@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
@@ -16,6 +17,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property int $id
+ * @property int|null $parent_id
  * @property string $name
  * @property string|null $acronym
  * @property string|null $description
@@ -24,7 +26,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property bool $is_active
  * @property int $sort_order
  */
-#[Fillable(['name', 'acronym', 'description', 'color', 'chat_photo_path', 'is_active', 'sort_order'])]
+#[Fillable(['parent_id', 'name', 'acronym', 'description', 'color', 'chat_photo_path', 'is_active', 'sort_order'])]
 #[ObservedBy(DivisionObserver::class)]
 class Division extends Model
 {
@@ -42,6 +44,27 @@ class Division extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    /** @return BelongsTo<Division, $this> */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    /**
+     * Units under this division (hierarchy is one level deep).
+     *
+     * @return HasMany<Division, $this>
+     */
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
+
+    public function isUnit(): bool
+    {
+        return $this->parent_id !== null;
     }
 
     /**

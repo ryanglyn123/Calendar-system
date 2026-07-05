@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\CalendarType;
 use App\Models\Calendar;
 use App\Models\CalendarUserPreference;
 use App\Models\User;
@@ -55,6 +56,15 @@ class CalendarResource extends JsonResource
             'division' => DivisionResource::make($this->whenLoaded('division')),
             'can_write_events' => $this->canWriteEvents,
             'can_manage' => $this->canManage,
+            // The calendar of a unit under (or being) the user's division:
+            // members may rename/recolor/delete the unit from the panel.
+            'unit_manageable' => $this->type === CalendarType::Division
+                && $this->relationLoaded('division')
+                && $this->division?->parent_id !== null
+                && $this->is_default
+                && ($this->division->parent_id === $user->division_id
+                    || $this->division->id === $user->division_id
+                    || $user->can('divisions.manage')),
         ];
     }
 }

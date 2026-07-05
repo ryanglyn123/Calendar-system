@@ -22,7 +22,8 @@ const props = defineProps<{
 const scope: CalendarScope = { types: ['division'] };
 
 const panelGroups = computed<CalendarPanelGroup[]>(() => [
-    { key: 'division', label: props.divisionName },
+    // manageUnits: members can add/edit/delete unit calendars here.
+    { key: 'division', label: props.divisionName, manageUnits: true },
 ]);
 </script>
 

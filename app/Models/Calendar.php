@@ -89,7 +89,7 @@ class Calendar extends Model
     {
         return match ($this->type) {
             CalendarType::Organization => $this->is_default,
-            CalendarType::Division => $this->division_id === $user->division_id,
+            CalendarType::Division => in_array((int) $this->division_id, $user->relatedDivisionIds(), true),
             CalendarType::Resource => false,
             CalendarType::Personal => true,
         };

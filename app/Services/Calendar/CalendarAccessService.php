@@ -94,7 +94,8 @@ class CalendarAccessService
 
         return match ($calendar->type) {
             CalendarType::Organization, CalendarType::Resource => true,
-            CalendarType::Division => $calendar->division_id === $user->division_id
+            // Units see their parent division's calendar and vice versa.
+            CalendarType::Division => in_array((int) $calendar->division_id, $user->relatedDivisionIds(), true)
                 || $user->can('calendars.manage')
                 || $this->sharePermission($user, $calendar) !== null,
             CalendarType::Personal => $calendar->isOwnedBy($user)
@@ -168,7 +169,7 @@ class CalendarAccessService
                     ->whereIn('type', [CalendarType::Organization->value, CalendarType::Resource->value])
                     ->orWhere(fn (Builder $q) => $q
                         ->where('type', CalendarType::Division->value)
-                        ->where('division_id', $user->division_id))
+                        ->whereIn('division_id', $user->relatedDivisionIds()))
                     ->orWhere(fn (Builder $q) => $q
                         ->where('type', CalendarType::Personal->value)
                         ->where('owner_id', $user->id))

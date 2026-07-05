@@ -132,6 +132,10 @@ const dayOccurrences = (day: Date): EventOccurrence[] =>
 // would balloon rows, add a scrollbar, then shift the layout when it settles).
 const gridEl = ref<HTMLElement | null>(null);
 const rowHeight = ref(MIN_ROW_HEIGHT);
+// The server can't measure the viewport, so it can't know the real chip budget.
+// Until the client measures, we cap chips (to avoid overflow) but never render
+// "+N more" — a guessed one flashes on refresh on days that actually fit.
+const measured = ref(false);
 let rowObserver: ResizeObserver | undefined;
 
 onMounted(() => {
@@ -140,10 +144,18 @@ onMounted(() => {
     }
 
     const measure = () => {
-        rowHeight.value = (gridEl.value?.clientHeight ?? 0) / 6;
+        // Clamp to the min-h-28 floor: a not-yet-laid-out or mid-transition
+        // read can report a tiny height, which would drop the chip budget and
+        // flash "+N more" on days that actually fit. Rows never shrink below
+        // the floor (CSS min-height), so a smaller measurement is never real.
+        rowHeight.value = Math.max(
+            MIN_ROW_HEIGHT,
+            (gridEl.value?.clientHeight ?? 0) / 6,
+        );
     };
 
     measure(); // sync, before paint — avoids a wrong "+more" on the first frame
+    measured.value = true;
     rowObserver = new ResizeObserver(measure);
     rowObserver.observe(gridEl.value);
 });
@@ -169,6 +181,15 @@ const chipPlans = computed<Map<string, ChipPlan>[]>(() =>
         for (const [key, chips] of week.chipsByDay) {
             const hiddenLanes =
                 week.hiddenLaneOccurrences.get(key)?.length ?? 0;
+
+            // Pre-measure: fill up to the (conservative) budget, no "+more".
+            if (!measured.value) {
+                plans.set(key, {
+                    shown: chips.slice(0, budget),
+                    hiddenCount: 0,
+                });
+                continue;
+            }
 
             if (chips.length <= budget && hiddenLanes === 0) {
                 plans.set(key, { shown: chips, hiddenCount: 0 });

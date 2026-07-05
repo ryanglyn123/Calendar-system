@@ -85,15 +85,18 @@ class HandleInertiaRequests extends Middleware
                     ->toArray(),
             // Division chat bootstrap for the sidebar badge and chat dock.
             // Null when the user has no division (no room to show).
-            'chatDivision' => fn () => $user === null || ! $user->isActive() || $user->division === null
-                ? null
-                : [
-                    'id' => $user->division->id,
-                    'name' => $user->division->name,
-                    'photo_url' => $user->division->chat_photo_path === null
+            'chatDivision' => function () use ($user) {
+                // Unit members resolve to their parent division's room.
+                $room = $user !== null && $user->isActive() ? $user->chatDivision() : null;
+
+                return $room === null ? null : [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                    'photo_url' => $room->chat_photo_path === null
                         ? null
                         : route('api.chat.photo.show', absolute: false),
-                ],
+                ];
+            },
             'chatUnread' => fn () => $user === null || ! $user->isActive() || $user->division_id === null
                 ? 0
                 : app(ChatService::class)->unreadCount($user),

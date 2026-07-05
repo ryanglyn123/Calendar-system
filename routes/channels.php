@@ -9,5 +9,6 @@ use Illuminate\Support\Facades\Broadcast;
  * division's private room.
  */
 Broadcast::channel('division.{divisionId}.chat', function (User $user, int $divisionId) {
-    return $user->isActive() && (int) $user->division_id === $divisionId;
+    // Unit members resolve to their parent division's room.
+    return $user->isActive() && $user->chatDivision()?->id === $divisionId;
 });

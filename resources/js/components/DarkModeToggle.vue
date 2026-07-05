@@ -74,10 +74,8 @@ onBeforeUnmount(() => clearTimeout(squashTimer));
     >
         <span
             class="dm-thumb flex size-6 items-center justify-center"
-            :class="[
-                animate ? 'dm-animate' : '',
-                isDark ? 'dm-thumb-dark' : 'dm-thumb-light',
-            ]"
+            :class="animate ? 'dm-animate' : ''"
+            :style="{ transform: isDark ? 'translateX(30px)' : 'translateX(0)' }"
         >
             <span
                 class="dm-inner flex size-full items-center justify-center rounded-full border border-white/60 bg-gradient-to-br from-white to-white/75"
@@ -111,18 +109,11 @@ onBeforeUnmount(() => clearTimeout(squashTimer));
  * the inner right edge). overflow-hidden on the track is the hard guarantee
  * nothing can escape the bounds.
  */
-/* Motion is opt-in: .dm-animate is added a frame after mount so the initial
-   theme correction (light → dark) snaps instead of sliding on refresh. */
+/* The thumb transform is inlined (see :style) so SSR paints the right position
+   with no dependency on scoped-CSS load order. Motion is opt-in: .dm-animate is
+   added a frame after mount, so the initial correction never animates. */
 .dm-animate {
     transition: transform 0.3s cubic-bezier(0.34, 1.15, 0.64, 1);
-}
-
-.dm-thumb-light {
-    transform: translateX(0);
-}
-
-.dm-thumb-dark {
-    transform: translateX(30px);
 }
 
 .dm-inner {

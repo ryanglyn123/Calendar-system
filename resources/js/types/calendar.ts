@@ -15,6 +15,8 @@ export type CalendarScope = {
 export type CalendarPanelGroup = {
     key: 'organization' | 'division' | 'personal' | 'resource';
     label: string;
+    /** Show unit-calendar management (create/edit/delete) for this group. */
+    manageUnits?: boolean;
 };
 
 export type RsvpStatus = 'pending' | 'accepted' | 'declined' | 'tentative';

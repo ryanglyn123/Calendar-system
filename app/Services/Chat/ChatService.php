@@ -68,7 +68,7 @@ class ChatService
     {
         $message = DB::transaction(function () use ($user, $input) {
             $message = ChatMessage::create([
-                'division_id' => $user->division_id,
+                'division_id' => $user->chatDivision()?->id,
                 'user_id' => $user->id,
                 'body' => $input['body'] ?? null,
                 'reply_to_id' => $input['reply_to_id'] ?? null,
@@ -218,8 +218,10 @@ class ChatService
      */
     public function markRead(User $user, int $lastReadMessageId): void
     {
+        $chatDivisionId = $user->chatDivision()?->id;
+
         $read = ChatRead::query()->firstOrCreate(
-            ['division_id' => $user->division_id, 'user_id' => $user->id],
+            ['division_id' => $chatDivisionId, 'user_id' => $user->id],
         );
 
         if (($read->last_read_message_id ?? 0) >= $lastReadMessageId) {
@@ -228,7 +230,7 @@ class ChatService
 
         $read->update(['last_read_message_id' => $lastReadMessageId]);
 
-        broadcast(new ChatBroadcast((int) $user->division_id, 'read.updated', [
+        broadcast(new ChatBroadcast((int) $chatDivisionId, 'read.updated', [
             'user_id' => $user->id,
             'last_read_message_id' => $lastReadMessageId,
         ]))->toOthers();
@@ -236,17 +238,19 @@ class ChatService
 
     public function unreadCount(User $user): int
     {
-        if ($user->division_id === null) {
+        $chatDivisionId = $user->chatDivision()?->id;
+
+        if ($chatDivisionId === null) {
             return 0;
         }
 
         $lastRead = ChatRead::query()
-            ->where('division_id', $user->division_id)
+            ->where('division_id', $chatDivisionId)
             ->where('user_id', $user->id)
             ->value('last_read_message_id') ?? 0;
 
         return ChatMessage::query()
-            ->where('division_id', $user->division_id)
+            ->where('division_id', $chatDivisionId)
             ->where('id', '>', $lastRead)
             ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', '!=', $user->id))
             ->count();
@@ -263,7 +267,11 @@ class ChatService
             ->where('division_id', $division->id)
             ->pluck('last_read_message_id', 'user_id');
 
-        return array_values($division->users()
+        // Unit members share the parent room, so they are members too.
+        $divisionIds = [$division->id, ...$division->children()->pluck('id')->all()];
+
+        return array_values(User::query()
+            ->whereIn('division_id', $divisionIds)
             ->orderBy('name')
             ->get(['id', 'name', 'avatar_path'])
             ->map(fn (User $member): array => [

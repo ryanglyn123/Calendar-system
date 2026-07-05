@@ -33,7 +33,12 @@ const settingsOpen = ref(false);
 
 // Hydrate before mount so the panel paints full in one pass; everything
 // touching window/Echo waits for onMounted (SSR hydration rule).
-chat.hydrate(props.initialPage, props.members, props.lastReadMessageId);
+chat.hydrate(
+    props.initialPage,
+    props.members,
+    props.lastReadMessageId,
+    user.value.id,
+);
 
 const onVisibility = () => {
     chat.setActive(document.visibilityState === 'visible');

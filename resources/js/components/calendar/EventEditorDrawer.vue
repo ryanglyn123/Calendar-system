@@ -73,8 +73,10 @@ const creatingType = ref(false);
 const onTypeSelect = (v: string) => {
     if (v === '__new__') {
         addingType.value = true;
+
         return;
     }
+
     form.event_type_id = v === 'none' ? null : Number(v);
 };
 const newType = reactive({ name: '', color: '#86C6F5' });
@@ -84,8 +86,10 @@ const createType = async () => {
     if (!newType.name.trim() || creatingType.value) {
         return;
     }
+
     creatingType.value = true;
     newTypeError.value = '';
+
     try {
         const { data } = await api.post<{ data: EventTypeItem }>(
             eventTypesApi.store().url,

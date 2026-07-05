@@ -60,7 +60,16 @@ const maximize = () => {
 <template>
     <template v-if="visible">
         <!-- Chat head -->
-        <div v-if="chat.dock === 'head'" class="fixed right-4 bottom-4 z-40">
+        <Transition
+            appear
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0 scale-75"
+            enter-to-class="opacity-100 scale-100"
+        >
+        <div
+            v-if="chat.dock === 'head'"
+            class="fixed right-4 bottom-4 z-40 origin-bottom-right"
+        >
             <button
                 type="button"
                 class="rounded-full shadow-lg transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95"
@@ -96,10 +105,11 @@ const maximize = () => {
                 <X class="size-3" aria-hidden="true" />
             </button>
         </div>
+        </Transition>
 
         <!-- Mini chat box -->
         <div
-            v-else-if="chat.dock === 'mini'"
+            v-if="chat.dock === 'mini'"
             class="fixed right-4 bottom-4 z-40 flex h-[520px] max-h-[80vh] w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl"
             role="dialog"
             :aria-label="`${chat.division!.name} chat`"

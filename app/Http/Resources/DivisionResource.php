@@ -18,6 +18,11 @@ class DivisionResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'parent_id' => $this->parent_id,
+            'parent' => $this->whenLoaded('parent', fn (): array => [
+                'id' => $this->parent->id,
+                'name' => $this->parent->name,
+            ]),
             'name' => $this->name,
             'acronym' => $this->acronym,
             'description' => $this->description,

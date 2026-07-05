@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { Pencil, Plus, Trash2 } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,7 @@ defineOptions({
     },
 });
 
-defineProps<{
+const props = defineProps<{
     divisions: { data: Division[] };
 }>();
 
@@ -51,8 +51,17 @@ const form = useForm({
     acronym: '',
     description: '',
     color: '#580076',
+    parent_id: null as number | null,
     is_active: true,
 });
+
+// Only root divisions can be parents (units are one level deep).
+const parentOptions = computed(() =>
+    props.divisions.data.filter(
+        (division) =>
+            division.parent_id == null && division.id !== editing.value?.id,
+    ),
+);
 
 const openCreate = () => {
     form.reset();
@@ -66,6 +75,7 @@ const openEdit = (division: Division) => {
     form.acronym = division.acronym ?? '';
     form.description = division.description ?? '';
     form.color = division.color;
+    form.parent_id = division.parent_id ?? null;
     form.is_active = division.is_active;
     editing.value = division;
 };
@@ -149,8 +159,17 @@ const destroy = () => {
                                     aria-hidden="true"
                                 />
                                 <div>
-                                    <div class="font-medium">
+                                    <div
+                                        class="flex items-center gap-1.5 font-medium"
+                                    >
                                         {{ division.name }}
+                                        <Badge
+                                            v-if="division.parent"
+                                            variant="outline"
+                                            class="font-normal"
+                                        >
+                                            Unit of {{ division.parent.name }}
+                                        </Badge>
                                     </div>
                                     <div
                                         v-if="division.acronym"
@@ -264,6 +283,32 @@ const destroy = () => {
                                 {{ form.errors.color }}
                             </p>
                         </div>
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="division-parent">Parent division</Label>
+                        <select
+                            id="division-parent"
+                            v-model="form.parent_id"
+                            class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <option :value="null">
+                                None — top-level division
+                            </option>
+                            <option
+                                v-for="parent in parentOptions"
+                                :key="parent.id"
+                                :value="parent.id"
+                            >
+                                Unit of {{ parent.name }}
+                            </option>
+                        </select>
+                        <p
+                            v-if="form.errors.parent_id"
+                            class="text-sm text-destructive"
+                        >
+                            {{ form.errors.parent_id }}
+                        </p>
                     </div>
 
                     <div class="grid gap-2">

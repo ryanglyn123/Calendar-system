@@ -231,7 +231,11 @@ export const useChatStore = defineStore('chat', () => {
         page: ChatPage,
         memberList: ChatMemberItem[],
         lastRead: number | null,
+        userId: number,
     ): void {
+        // Seed myId now (not in onMounted's bootstrap): isMine drives message
+        // alignment, so a late id flips own messages left→right on refresh.
+        myId.value = userId;
         messages.value = [...page.messages].reverse();
         hasMore.value = page.has_more;
         members.value = memberList;

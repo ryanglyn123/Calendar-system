@@ -71,6 +71,42 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->belongsTo(Division::class);
     }
 
+    /**
+     * The division whose chat room this user belongs to: unit members share
+     * their parent division's room instead of getting their own.
+     */
+    public function chatDivision(): ?Division
+    {
+        $division = $this->division;
+
+        return $division === null ? null : ($division->parent ?? $division);
+    }
+
+    /**
+     * The user's division plus its parent and units — the set whose division
+     * calendars this user may view (writes stay own-division only).
+     *
+     * @return list<int>
+     */
+    public function relatedDivisionIds(): array
+    {
+        if ($this->division_id === null) {
+            return [];
+        }
+
+        $ids = [(int) $this->division_id];
+
+        if ($this->division?->parent_id !== null) {
+            $ids[] = (int) $this->division->parent_id;
+        }
+
+        foreach (Division::query()->where('parent_id', $this->division_id)->pluck('id') as $childId) {
+            $ids[] = (int) $childId;
+        }
+
+        return $ids;
+    }
+
     /** @return BelongsTo<User, $this> */
     public function approver(): BelongsTo
     {

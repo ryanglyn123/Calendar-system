@@ -20,6 +20,11 @@ class StoreDivisionRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255', Rule::unique('divisions', 'name')->whereNull('deleted_at')],
+            // Units are one level deep: a parent must itself be a root division.
+            'parent_id' => [
+                'nullable', 'integer',
+                Rule::exists('divisions', 'id')->whereNull('deleted_at')->whereNull('parent_id'),
+            ],
             'acronym' => ['nullable', 'string', 'max:20'],
             'description' => ['nullable', 'string', 'max:1000'],
             'color' => ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],

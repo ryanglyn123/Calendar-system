@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\EventTypeController;
 use App\Http\Controllers\Api\AnnouncementDismissalController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CalendarListController;
@@ -13,10 +14,10 @@ use App\Http\Controllers\Api\EventWindowController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ResourceBrowserController;
 use App\Http\Controllers\Api\UserSearchController;
-use App\Http\Controllers\Admin\EventTypeController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\InvitationAcceptanceController;
 use App\Http\Controllers\Calendar\CalendarShareController;
+use App\Http\Controllers\Calendar\DivisionUnitController;
 use App\Http\Controllers\Calendar\PersonalCalendarController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DivisionCalendarController;
@@ -62,6 +63,11 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::delete('calendars/{calendar}', [PersonalCalendarController::class, 'destroy'])->name('calendars.destroy');
     Route::post('calendars/{calendar}/shares', [CalendarShareController::class, 'store'])->name('calendars.shares.store');
     Route::delete('calendars/{calendar}/shares/{share}', [CalendarShareController::class, 'destroy'])->name('calendars.shares.destroy');
+
+    // Units: member-managed sub-divisions of their own division.
+    Route::post('division-units', [DivisionUnitController::class, 'store'])->name('division-units.store');
+    Route::patch('division-units/{division}', [DivisionUnitController::class, 'update'])->name('division-units.update');
+    Route::delete('division-units/{division}', [DivisionUnitController::class, 'destroy'])->name('division-units.destroy');
 
     // Session JSON endpoints for the calendar UI. Registered inside the web
     // group on purpose: CSRF stays enforced, the fetch client forwards the

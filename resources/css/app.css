@@ -356,6 +356,8 @@
     --sidebar-border: oklch(0.912 0.004 95);
     --sidebar-ring: oklch(0.24 0.012 90);
     --sidebar: oklch(0.977 0.003 95);
+    /* Native controls (select dropdowns, scrollbars) follow the theme. */
+    color-scheme: light;
 }
 
 .dark {
@@ -396,6 +398,7 @@
     --sidebar-border: hsl(60 2% 18%);
     --sidebar-ring: oklch(0.96 0.003 95);
     --sidebar: #262624;
+    color-scheme: dark;
 }
 
 @layer base {

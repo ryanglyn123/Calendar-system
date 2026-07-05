@@ -20,7 +20,7 @@ class DivisionController extends Controller
 
         return Inertia::render('admin/divisions/Index', [
             'divisions' => DivisionResource::collection(
-                Division::query()->withCount('users')->orderBy('sort_order')->orderBy('name')->get(),
+                Division::query()->with('parent')->withCount('users')->orderBy('sort_order')->orderBy('name')->get(),
             ),
         ]);
     }
@@ -48,6 +48,7 @@ class DivisionController extends Controller
         $this->authorize('delete', $division);
 
         abort_if($division->users()->exists(), 403, 'Divisions with members cannot be deleted.');
+        abort_if($division->children()->exists(), 403, 'Divisions with units cannot be deleted. Remove the units first.');
 
         $division->delete();
 

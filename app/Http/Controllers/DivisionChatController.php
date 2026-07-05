@@ -20,12 +20,12 @@ class DivisionChatController extends Controller
     {
         $user = $request->user();
 
-        if ($user->division_id === null) {
+        // Unit members land in their parent division's room.
+        $division = $user->chatDivision();
+
+        if ($division === null) {
             return redirect()->route('dashboard');
         }
-
-        /** @var Division $division */
-        $division = $user->division;
 
         return Inertia::render('DivisionChat', [
             'division' => [

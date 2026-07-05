@@ -81,7 +81,8 @@ class CalendarService
                 'name' => $division->name,
                 'description' => "Shared calendar for {$division->name}.",
                 'color' => $division->color,
-                'is_default' => false,
+                // The division's own calendar; unit calendars are is_default=false.
+                'is_default' => true,
                 'is_active' => $division->is_active,
             ],
         );

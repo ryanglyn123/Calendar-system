@@ -247,19 +247,23 @@ class ChatController extends Controller
         ]);
     }
 
+    /**
+     * The chat room's division id: unit members resolve to their parent
+     * division, so the whole hierarchy shares one room.
+     */
     private function divisionIdOrAbort(Request $request): int
     {
-        $divisionId = $request->user()->division_id;
+        $division = $request->user()->chatDivision();
 
-        abort_if($divisionId === null, 403, 'You are not assigned to a division.');
+        abort_if($division === null, 403, 'You are not assigned to a division.');
 
-        return (int) $divisionId;
+        return $division->id;
     }
 
     private function assertSameDivision(Request $request, int $divisionId): void
     {
         abort_unless(
-            (int) $request->user()->division_id === $divisionId,
+            $request->user()->chatDivision()?->id === $divisionId,
             403,
             'This chat belongs to another division.',
         );
