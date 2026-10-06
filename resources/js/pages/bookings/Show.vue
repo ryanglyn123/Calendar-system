@@ -12,6 +12,8 @@ import {
 import { defaultDocument, defaultWindow, useEventListener } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import type { GoogleCopy } from '@/components/booking/GoogleCopyStatus.vue';
+import GoogleCopyStatus from '@/components/booking/GoogleCopyStatus.vue';
 import PeopleEditor from '@/components/booking/PeopleEditor.vue';
 import PeopleRoster from '@/components/booking/PeopleRoster.vue';
 import { isoDate, pillPrimary, pillQuiet } from '@/components/desk/desk';
@@ -78,6 +80,8 @@ type BookingDetail = {
     } | null;
     is_mine: boolean;
     version: string | null;
+    /** The requester's Google Calendar copy (requester only). */
+    google: GoogleCopy | null;
     can: {
         print: boolean;
         revise: boolean;
@@ -443,6 +447,9 @@ async function withdraw(): Promise<void> {
                 Review it
             </Link>
         </section>
+
+        <!-- The requester's Google Calendar copy -->
+        <GoogleCopyStatus v-if="b.google" :booking-id="b.id" :copy="b.google" />
 
         <!-- A change waiting on an approver -->
         <section

@@ -51,6 +51,7 @@ class BookingPresenter
             'can_cancel' => in_array($booking->status->value, ['pending', 'approved'], true),
             'can_request_edit' => $booking->status->value === 'approved',
             'version' => BookingService::versionOf($booking),
+            'google' => request()->user()?->id === $booking->requested_by ? $this->googleCopy($booking) : null,
         ];
     }
 
@@ -122,6 +123,20 @@ class BookingPresenter
                 'cancel' => $viewer->can('cancel', $booking),
                 'review' => $viewer->can('approve', $booking),
             ],
+            'google' => $isMine ? $this->googleCopy($booking) : null,
         ];
+    }
+
+    /**
+     * Where the requester's Google copy of this booking stands. Only ever
+     * shown to the requester.
+     *
+     * @return array{state: string, html_link: string|null}|null
+     */
+    private function googleCopy(Booking $booking): ?array
+    {
+        $link = $booking->googleEvents()->latest('id')->first();
+
+        return $link === null ? null : ['state' => $link->state, 'html_link' => $link->html_link];
     }
 }

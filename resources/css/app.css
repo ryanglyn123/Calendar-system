@@ -650,6 +650,25 @@
     background: var(--ev);
 }
 
+/* Holidays: a tinted band with a flag, never a solid pill, so a holiday
+   can't pass for an event or a booking. */
+.ev-holiday {
+    background: color-mix(in oklab, var(--ev) 12%, transparent);
+    color: color-mix(in oklab, var(--ev) 78%, var(--foreground));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ev) 32%, transparent);
+}
+
+.dark .ev-holiday {
+    background: color-mix(in oklab, var(--ev) 20%, transparent);
+    color: color-mix(in oklab, var(--ev) 45%, white);
+}
+
+/* Google entries shown as "free" (working location, declined invites):
+   present, but quieter than what actually fills the day. */
+.ev-free {
+    opacity: 0.72;
+}
+
 /* Pills answer the pointer without lifting (the system is flat): pointing
    deepens a pill in its own ink, pressing deepens it further and squeezes it
    3% so the click lands. The tint is currentColor, so it is the hue-matched

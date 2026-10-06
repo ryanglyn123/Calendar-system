@@ -8,6 +8,8 @@ enum CalendarType: string
     case Division = 'division';
     case Resource = 'resource';
     case Personal = 'personal';
+    // A read-only mirror of one of the owner's Google calendars.
+    case Google = 'google';
 
     public function label(): string
     {
@@ -16,6 +18,7 @@ enum CalendarType: string
             self::Division => 'Division',
             self::Resource => 'Resource',
             self::Personal => 'Personal',
+            self::Google => 'Google Calendar',
         };
     }
 }

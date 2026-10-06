@@ -20,7 +20,7 @@ class CalendarListController extends Controller
     {
         $validated = $request->validate([
             'types' => ['sometimes', 'array'],
-            'types.*' => ['string', Rule::in(['organization', 'division', 'personal', 'resource'])],
+            'types.*' => ['string', Rule::in(['organization', 'division', 'personal', 'resource', 'google'])],
             'resource_type_id' => ['sometimes', 'integer'],
         ]);
 

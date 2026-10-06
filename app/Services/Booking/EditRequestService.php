@@ -9,6 +9,7 @@ use App\Models\BookingEditRequest;
 use App\Models\User;
 use App\Notifications\EditRequestDecidedNotification;
 use App\Notifications\EditRequestSubmittedNotification;
+use App\Services\Google\GoogleBookingSync;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -147,6 +148,9 @@ class EditRequestService
                 ->log("Applied change request #{$editRequest->id}");
 
             $editRequest->requester?->notify(new EditRequestDecidedNotification($editRequest));
+
+            // The approved change moves the Google copy too (after commit).
+            GoogleBookingSync::queue($booking);
 
             return $editRequest;
         });

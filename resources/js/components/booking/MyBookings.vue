@@ -3,6 +3,8 @@ import { Link } from '@inertiajs/vue3';
 import { CalendarSearch, CircleAlert, Printer } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import type { GoogleCopy } from '@/components/booking/GoogleCopyStatus.vue';
+import GoogleCopyStatus from '@/components/booking/GoogleCopyStatus.vue';
 import { Button } from '@/components/ui/button';
 import { api, ApiError } from '@/lib/api';
 import { BOOKING_STATE } from '@/lib/bookingDisplay';
@@ -32,6 +34,8 @@ export type MyBooking = {
     has_pending_edit: boolean;
     can_cancel: boolean;
     version: string | null;
+    /** The requester's Google Calendar copy, once one exists. */
+    google?: GoogleCopy | null;
 };
 
 /**
@@ -190,6 +194,12 @@ const swatch = (b: MyBooking) => ({
                                 >
                                     Change requested
                                 </span>
+                                <GoogleCopyStatus
+                                    v-if="b.google"
+                                    :booking-id="b.id"
+                                    :copy="b.google"
+                                    compact
+                                />
                             </p>
                             <p
                                 class="truncate text-[13px] text-muted-foreground"

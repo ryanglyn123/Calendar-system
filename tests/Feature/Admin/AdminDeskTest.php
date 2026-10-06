@@ -66,3 +66,32 @@ test('the schedule date must be a real date', function () {
         ->get(route('admin.dashboard', ['date' => 'next-tuesday']))
         ->assertSessionHasErrors('date');
 });
+
+test('the schedule shows purpose and headcount only for bookings this approver can review', function () {
+    $carType = ResourceType::factory()->create([
+        'approver_role_id' => Role::query()->where('name', 'vehicle_approver')->firstOrFail()->id,
+    ]);
+    $car = Resource::factory()->create(['resource_type_id' => $carType->id]);
+    $at = $this->day->copy()->utc();
+
+    $mine = Booking::factory()->approved()->at($at)
+        ->create(['resource_id' => $this->room->id, 'purpose' => 'Screening committee', 'attendee_count' => 6]);
+    $theirs = Booking::factory()->approved()->at($at)
+        ->create(['resource_id' => $car->id, 'purpose' => 'Confidential site visit', 'attendee_count' => 4]);
+
+    $response = $this->actingAs($this->approver)
+        ->get(route('admin.dashboard', ['date' => $this->day->toDateString()]))
+        ->assertOk();
+
+    $bookings = collect($response->viewData('page')['props']['schedule']['types'])
+        ->flatMap(fn (array $type) => collect($type['resources'])->flatMap(fn (array $resource) => $resource['bookings']))
+        ->keyBy('id');
+
+    expect($bookings[$mine->id])
+        ->purpose->toBe('Screening committee')
+        ->attendee_count->toBe(6)
+        ->and($bookings[$theirs->id])
+        ->purpose->toBeNull()
+        ->attendee_count->toBeNull()
+        ->title->not->toBe('Confidential site visit');
+});

@@ -89,6 +89,10 @@ Route::prefix('admin')
         Route::post('holidays', [HolidayController::class, 'store'])->name('holidays.store');
         Route::patch('holidays/{holiday}', [HolidayController::class, 'update'])->name('holidays.update');
         Route::delete('holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
+        Route::put('holidays/google-sources', [HolidayController::class, 'updateGoogleSources'])->name('holidays.google-sources');
+        Route::post('holidays/google-sync', [HolidayController::class, 'syncFromGoogle'])
+            ->middleware('throttle:6,1')
+            ->name('holidays.google-sync');
 
         Route::get('working-hours', [WorkingHourController::class, 'index'])->name('working-hours.index');
         Route::put('working-hours', [WorkingHourController::class, 'update'])->name('working-hours.update');

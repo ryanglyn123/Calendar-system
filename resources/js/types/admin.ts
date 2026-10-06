@@ -49,7 +49,7 @@ export type Invitation = {
 
 export type CalendarItem = {
     id: number;
-    type: 'organization' | 'division' | 'resource' | 'personal';
+    type: 'organization' | 'division' | 'resource' | 'personal' | 'google';
     name: string;
     description: string | null;
     color: string;
@@ -65,6 +65,15 @@ export type CalendarItem = {
     can_manage: boolean;
     /** The calendar of a unit the user may manage from the panel. */
     unit_manageable?: boolean;
+    /** Sync health of a Google mirror (type google only). */
+    google?: {
+        id: number;
+        access_role: string;
+        is_primary: boolean;
+        is_holiday: boolean;
+        last_synced_at: string | null;
+        error: string | null;
+    } | null;
 };
 
 export type EventTypeItem = {

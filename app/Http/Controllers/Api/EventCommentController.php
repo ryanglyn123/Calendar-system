@@ -25,6 +25,9 @@ class EventCommentController extends Controller
 
     public function index(Request $request, Event $event): JsonResponse
     {
+        // Google events are a private read-only copy; discussion happens in Google.
+        abort_if($event->isGoogleMirror(), 404);
+
         $this->assertCanView($request->user(), $event);
 
         // ponytail: no pagination — event threads are short; page when one isn't.
@@ -39,6 +42,9 @@ class EventCommentController extends Controller
 
     public function store(Request $request, Event $event): JsonResponse
     {
+        // Google events are a private read-only copy; discussion happens in Google.
+        abort_if($event->isGoogleMirror(), 404);
+
         $user = $request->user();
         $this->assertCanView($user, $event);
 

@@ -9,7 +9,8 @@ import {
 } from '@/lib/calendarMath';
 import type { WeekStart } from '@/lib/calendarMath';
 
-export type HolidayKind = 'regular' | 'special_non_working' | 'company';
+export type HolidayKind =
+    'regular' | 'special_non_working' | 'company' | 'observance';
 
 export type HolidayRow = {
     id: number;
@@ -18,6 +19,10 @@ export type HolidayRow = {
     recurs_annually: boolean;
     type: HolidayKind;
     blocks_bookings: boolean;
+    /** manual, or imported from a Google public holiday calendar */
+    source: 'manual' | 'google';
+    /** An imported holiday an admin edited; imports leave it alone. */
+    overridden: boolean;
 };
 
 /** A holiday placed on a day of the selected year (yearly ones projected). */
@@ -43,6 +48,7 @@ const marks: Record<HolidayKind, string> = {
     regular: 'bg-foreground font-semibold text-background',
     special_non_working: 'border-[1.5px] border-foreground font-semibold',
     company: 'bg-muted-foreground/25 font-semibold',
+    observance: 'underline decoration-dotted underline-offset-4',
 };
 
 const today = new Date();

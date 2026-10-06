@@ -138,18 +138,25 @@ class AdminDashboard
                     'location' => $resource->location,
                     'color' => $resource->calendar?->color,
                     'bookings' => ($bookings->get($resource->id) ?? collect())
-                        ->map(fn (Booking $booking) => [
-                            'id' => $booking->id,
-                            'title' => $booking->event->title ?? $booking->purpose ?? 'Booking',
-                            'requester' => $booking->requester?->name,
-                            'starts_at' => $booking->starts_at->toIso8601String(),
-                            'ends_at' => $booking->ends_at->toIso8601String(),
-                            'status' => $booking->status->value,
-                            'purpose' => $booking->purpose,
-                            'attendee_count' => $booking->attendee_count,
-                            'can_approve' => $booking->status === BookingStatus::Pending
-                                && $user->can('approve', $booking),
-                        ])->values(),
+                        ->map(function (Booking $booking) use ($user) {
+                            // Same rule as the calendar (EventOccurrenceResource):
+                            // purpose and headcount only for the requester and
+                            // the booking's own reviewers.
+                            $canReview = $user->can('approve', $booking);
+                            $full = $canReview || $booking->requested_by === $user->id;
+
+                            return [
+                                'id' => $booking->id,
+                                'title' => $booking->event?->title ?? ($full ? $booking->purpose : null) ?? 'Booking',
+                                'requester' => $booking->requester?->name,
+                                'starts_at' => $booking->starts_at->toIso8601String(),
+                                'ends_at' => $booking->ends_at->toIso8601String(),
+                                'status' => $booking->status->value,
+                                'purpose' => $full ? $booking->purpose : null,
+                                'attendee_count' => $full ? $booking->attendee_count : null,
+                                'can_approve' => $booking->status === BookingStatus::Pending && $canReview,
+                            ];
+                        })->values(),
                 ])->values(),
             ])->values(),
         ];

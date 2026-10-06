@@ -57,6 +57,15 @@ export const useCalendarListStore = defineStore('calendarList', () => {
             .filter((c) => c.type === 'personal')
             .sort((a, b) => Number(b.is_default) - Number(a.is_default)),
         resource: calendars.value.filter((c) => c.type === 'resource'),
+        // The user's own Google calendars; primary first, holidays last.
+        google: calendars.value
+            .filter((c) => c.type === 'google')
+            .sort(
+                (a, b) =>
+                    Number(b.google?.is_primary) -
+                        Number(a.google?.is_primary) ||
+                    Number(a.google?.is_holiday) - Number(b.google?.is_holiday),
+            ),
     }));
 
     const writableCalendars = computed(() =>

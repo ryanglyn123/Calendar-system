@@ -6,6 +6,7 @@ use App\Settings\GeneralSettings;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -15,16 +16,23 @@ use Illuminate\Support\Carbon;
  * @property bool $recurs_annually
  * @property string $type
  * @property bool $blocks_bookings
+ * @property string $source manual | google
+ * @property string|null $google_calendar_id
+ * @property string|null $google_event_id
+ * @property bool $overridden an admin edited an imported holiday; syncs leave it alone
  */
-#[Fillable(['name', 'date', 'recurs_annually', 'type', 'blocks_bookings'])]
+#[Fillable(['name', 'date', 'recurs_annually', 'type', 'blocks_bookings', 'source', 'google_calendar_id', 'google_event_id', 'overridden'])]
 class Holiday extends Model
 {
+    use SoftDeletes;
+
     protected function casts(): array
     {
         return [
             'date' => 'date',
             'recurs_annually' => 'boolean',
             'blocks_bookings' => 'boolean',
+            'overridden' => 'boolean',
         ];
     }
 

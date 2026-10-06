@@ -6,6 +6,8 @@ import {
     Check,
     CircleHelp,
     Clock,
+    ExternalLink,
+    Flag,
     Lock,
     MapPin,
     MessageSquareText,
@@ -68,8 +70,25 @@ const emit = defineEmits<{
 const list = useCalendarListStore();
 
 const calendarName = computed(
-    () => list.byId.get(props.occurrence?.calendar_id ?? -1)?.name ?? '',
+    () =>
+        props.occurrence?.google?.calendar ??
+        list.byId.get(props.occurrence?.calendar_id ?? -1)?.name ??
+        '',
 );
+
+const HOLIDAY_LABELS: Record<string, string> = {
+    regular: 'Regular holiday',
+    special_non_working: 'Special non-working day',
+    company: 'Organization holiday',
+    observance: 'Observance',
+};
+
+const GOOGLE_RESPONSES: Record<string, string> = {
+    accepted: 'Going',
+    declined: 'Not going',
+    tentative: 'Maybe',
+    needsAction: 'No response yet',
+};
 
 const when = computed(() => {
     if (!props.occurrence) {
@@ -212,8 +231,12 @@ type CommentItem = {
 
 const { user: authUser } = useAuth();
 
+// Only the app's own events have a discussion; Google and holidays don't.
 const canDiscuss = computed(
-    () => props.occurrence !== null && !props.occurrence.is_masked,
+    () =>
+        props.occurrence !== null &&
+        props.occurrence.source === 'app' &&
+        !props.occurrence.is_masked,
 );
 
 const comments = ref<CommentItem[]>([]);
@@ -225,7 +248,7 @@ watch(
     async (eventId) => {
         comments.value = [];
 
-        if (!eventId || props.occurrence?.is_masked) {
+        if (!eventId || !canDiscuss.value) {
             return;
         }
 
@@ -410,10 +433,50 @@ watch(
                     style="--i: 0"
                 >
                     <CalendarDays
+                        v-if="occurrence.source !== 'holiday'"
                         class="size-4 shrink-0 text-muted-foreground"
                         aria-hidden="true"
                     />
-                    <span>{{ calendarName }}</span>
+                    <template v-if="occurrence.source === 'holiday'">
+                        <Flag
+                            class="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
+                        <span>
+                            {{
+                                HOLIDAY_LABELS[
+                                    occurrence.holiday?.type ?? ''
+                                ] ?? 'Holiday'
+                            }}
+                        </span>
+                        <Badge
+                            v-if="occurrence.holiday?.blocks_bookings"
+                            variant="outline"
+                            class="font-normal"
+                        >
+                            Bookings paused
+                        </Badge>
+                    </template>
+                    <template v-else>
+                        <span>{{ calendarName }}</span>
+                        <Badge
+                            v-if="occurrence.source === 'google'"
+                            variant="outline"
+                            class="font-normal"
+                        >
+                            Google Calendar
+                        </Badge>
+                        <Badge
+                            v-if="occurrence.google?.event_type_label"
+                            variant="secondary"
+                            class="font-normal"
+                        >
+                            {{ occurrence.google.event_type_label }}
+                            <template v-if="occurrence.google.working_location">
+                                · {{ occurrence.google.working_location }}
+                            </template>
+                        </Badge>
+                    </template>
                     <Badge
                         v-if="occurrence.event_type"
                         variant="outline"
@@ -581,6 +644,79 @@ watch(
                     </div>
                 </section>
 
+                <!-- People on a Google event: Google owns the RSVPs. -->
+                <section
+                    v-if="
+                        occurrence.google &&
+                        (occurrence.google.organizer ||
+                            occurrence.google.attendees.length)
+                    "
+                    class="qv-reveal space-y-2"
+                    style="--i: 3"
+                >
+                    <h3
+                        class="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                    >
+                        <Users class="size-3.5" aria-hidden="true" />
+                        People
+                        <span
+                            v-if="occurrence.google.attendees.length"
+                            class="font-normal normal-case"
+                        >
+                            · {{ occurrence.google.attendees.length
+                            }}{{
+                                occurrence.google.attendees_omitted ? '+' : ''
+                            }}
+                        </span>
+                    </h3>
+                    <p
+                        v-if="
+                            occurrence.google.organizer &&
+                            !occurrence.google.attendees.length
+                        "
+                        class="text-sm"
+                    >
+                        Organized by
+                        {{
+                            occurrence.google.organizer.self
+                                ? 'you'
+                                : (occurrence.google.organizer.name ??
+                                  occurrence.google.organizer.email)
+                        }}
+                    </p>
+                    <ul
+                        v-if="occurrence.google.attendees.length"
+                        class="space-y-1"
+                    >
+                        <li
+                            v-for="person in occurrence.google.attendees"
+                            :key="person.email ?? person.name"
+                            class="flex items-center justify-between gap-3 text-sm"
+                        >
+                            <span class="min-w-0 truncate">
+                                {{ person.name ?? person.email
+                                }}{{ person.self ? ' (you)' : '' }}
+                                <span
+                                    v-if="person.organizer"
+                                    class="text-xs text-muted-foreground"
+                                >
+                                    · organizer
+                                </span>
+                            </span>
+                            <span
+                                class="shrink-0 text-xs"
+                                :class="
+                                    person.response === 'declined'
+                                        ? 'text-destructive'
+                                        : 'text-muted-foreground'
+                                "
+                            >
+                                {{ GOOGLE_RESPONSES[person.response] }}
+                            </span>
+                        </li>
+                    </ul>
+                </section>
+
                 <!-- Reminders -->
                 <div
                     v-if="reminders.length"
@@ -710,11 +846,36 @@ watch(
 
                 <!-- Provenance -->
                 <p
-                    v-if="createdLabel"
+                    v-if="createdLabel && occurrence.source === 'app'"
                     class="border-t pt-3 text-xs text-muted-foreground"
                 >
                     {{ createdLabel }}
                 </p>
+            </div>
+
+            <!-- Google events are read-only here: changes happen in Google. -->
+            <div
+                v-if="occurrence.source === 'google'"
+                class="flex items-center justify-between gap-3 border-t px-6 py-4"
+            >
+                <p class="text-xs text-muted-foreground">
+                    Read-only copy. Edit it in Google Calendar.
+                </p>
+                <Button
+                    v-if="occurrence.google?.html_link"
+                    as-child
+                    size="sm"
+                    variant="outline"
+                >
+                    <a
+                        :href="occurrence.google.html_link"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <ExternalLink aria-hidden="true" />
+                        Open in Google Calendar
+                    </a>
+                </Button>
             </div>
 
             <div

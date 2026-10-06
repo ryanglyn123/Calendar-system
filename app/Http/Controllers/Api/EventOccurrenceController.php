@@ -24,6 +24,8 @@ class EventOccurrenceController extends Controller
      */
     public function update(UpdateOccurrenceRequest $request, Event $event): JsonResponse
     {
+        abort_if($event->isGoogleMirror(), 403, 'Events from Google Calendar are read-only here. Change them in Google Calendar.');
+
         abort_if(! $event->isRecurring(), 422, 'Not a recurring event; use the plain event endpoint.');
 
         $validated = $request->validated();
@@ -51,6 +53,8 @@ class EventOccurrenceController extends Controller
      */
     public function destroy(Request $request, Event $event): JsonResponse
     {
+        abort_if($event->isGoogleMirror(), 403, 'Events from Google Calendar are read-only here. Change them in Google Calendar.');
+
         $this->authorize('delete', $event);
 
         abort_if(! $event->isRecurring(), 422, 'Not a recurring event; use the plain event endpoint.');

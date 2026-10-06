@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Models\User;
 use App\Services\Booking\BookingService;
 use App\Services\Event\EventOccurrence;
+use App\Services\Google\GoogleEventMapper;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -42,6 +43,9 @@ class EventOccurrenceResource extends JsonResource
         $isMine = $booking !== null && $booking->requested_by === $user->id;
         $canReview = $booking !== null && $user->can('approve', $booking);
         $fullBooking = $isMine || $canReview;
+
+        // Mirrored from the viewer's own Google Calendar (only its owner can see it).
+        $google = $event->relationLoaded('googleEvent') ? $event->googleEvent : null;
 
         return [
             'occurrence_id' => $this->occurrence->id(),
@@ -113,7 +117,7 @@ class EventOccurrenceResource extends JsonResource
                     'rsvp_status' => $attendee->rsvp_status->value,
                     'is_organizer' => $attendee->is_organizer,
                 ])->values()->all(),
-            'organizer' => $masked || ! $event->relationLoaded('creator') || $event->creator === null
+            'organizer' => $masked || $google !== null || ! $event->relationLoaded('creator') || $event->creator === null
                 ? null
                 : [
                     'user_id' => $event->creator->id,
@@ -138,6 +142,19 @@ class EventOccurrenceResource extends JsonResource
             'created_by' => $event->created_by,
             'timezone' => $event->timezone,
             'created_at' => $event->created_at?->toIso8601String(),
+            'source' => $google !== null ? 'google' : 'app',
+            'google' => $google === null ? null : [
+                'calendar' => $event->relationLoaded('calendar') ? $event->calendar?->name : null,
+                'html_link' => $google->html_link,
+                'event_type' => $google->event_type,
+                'event_type_label' => GoogleEventMapper::TYPE_LABELS[$google->event_type] ?? null,
+                'busy' => $google->busy,
+                'organizer' => $google->details['organizer'] ?? null,
+                'attendees' => $google->details['attendees'] ?? [],
+                'attendees_omitted' => (bool) ($google->details['attendees_omitted'] ?? false),
+                'conference' => $google->details['conference'] ?? null,
+                'working_location' => $google->details['working_location'] ?? null,
+            ],
         ];
     }
 }

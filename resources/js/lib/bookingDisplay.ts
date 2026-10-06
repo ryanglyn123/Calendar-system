@@ -1,5 +1,5 @@
 import type { LucideIcon } from '@lucide/vue';
-import { Ban, CircleCheck, CircleX, Hourglass } from '@lucide/vue';
+import { Ban, CircleCheck, CircleX, Flag, Hourglass } from '@lucide/vue';
 import { format, isSameDay } from '@/lib/calendarMath';
 import type { BookingStatus, EventOccurrence } from '@/types/calendar';
 
@@ -67,6 +67,15 @@ export function bookingTone(occurrence: EventOccurrence): string | null {
 
 /** Fill class for an occurrence's chip; ordinary events keep the wash. */
 export function chipFill(occurrence: EventOccurrence): string {
+    if (occurrence.source === 'holiday') {
+        return 'ev-holiday';
+    }
+
+    // Google entries marked "free" (working location, declined, FYI) recede.
+    if (occurrence.source === 'google' && occurrence.google?.busy === false) {
+        return 'ev-wash ev-free';
+    }
+
     return occurrence.booking
         ? BOOKING_STATE[occurrence.booking.status].fill
         : 'ev-wash';
@@ -74,6 +83,10 @@ export function chipFill(occurrence: EventOccurrence): string {
 
 /** Icon shown ahead of a booking chip's title, when its state needs one. */
 export function chipIcon(occurrence: EventOccurrence): LucideIcon | null {
+    if (occurrence.source === 'holiday') {
+        return Flag;
+    }
+
     const status = occurrence.booking?.status;
 
     return status && status !== 'approved' ? BOOKING_STATE[status].icon : null;
@@ -81,6 +94,16 @@ export function chipIcon(occurrence: EventOccurrence): LucideIcon | null {
 
 /** Spoken prefix for a chip: "Your booking, pending". */
 export function chipState(occurrence: EventOccurrence): string {
+    if (occurrence.source === 'holiday') {
+        return occurrence.holiday?.blocks_bookings
+            ? 'Holiday, bookings paused. '
+            : 'Holiday. ';
+    }
+
+    if (occurrence.source === 'google') {
+        return 'From Google Calendar. ';
+    }
+
     const booking = occurrence.booking;
 
     if (!booking) {
@@ -148,6 +171,11 @@ export function isShown(
     visibleIds: Set<number>,
     listedIds: Set<number>,
 ): boolean {
+    // The organization's holidays show on every calendar.
+    if (occurrence.source === 'holiday') {
+        return true;
+    }
+
     if (visibleIds.has(occurrence.calendar_id)) {
         return true;
     }

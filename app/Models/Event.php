@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CalendarType;
 use App\Enums\EventStatus;
 use Carbon\CarbonInterface;
 use Database\Factories\EventFactory;
@@ -118,6 +119,22 @@ class Event extends Model
     public function booking(): HasOne
     {
         return $this->hasOne(Booking::class);
+    }
+
+    /** Mirrored from Google Calendar: read-only here, whoever asks. */
+    public function isGoogleMirror(): bool
+    {
+        return $this->calendar?->type === CalendarType::Google;
+    }
+
+    /**
+     * Set when this row mirrors a Google Calendar event.
+     *
+     * @return HasOne<GoogleEvent, $this>
+     */
+    public function googleEvent(): HasOne
+    {
+        return $this->hasOne(GoogleEvent::class);
     }
 
     public function isRecurring(): bool

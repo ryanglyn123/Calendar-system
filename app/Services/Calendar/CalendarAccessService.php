@@ -100,6 +100,8 @@ class CalendarAccessService
                 || $this->sharePermission($user, $calendar) !== null,
             CalendarType::Personal => $calendar->isOwnedBy($user)
                 || $this->sharePermission($user, $calendar) !== null,
+            // A Google mirror is the owner's private copy; never shared.
+            CalendarType::Google => $calendar->isOwnedBy($user),
         };
     }
 
@@ -120,7 +122,8 @@ class CalendarAccessService
                 || $user->can('calendars.manage'),
             CalendarType::Personal => $calendar->isOwnedBy($user)
                 || $this->sharePermission($user, $calendar)?->atLeast(SharePermission::Editor) === true,
-            CalendarType::Resource => false,
+            // Bookings and Google own these events; nothing edits them here.
+            CalendarType::Resource, CalendarType::Google => false,
         };
     }
 
@@ -133,6 +136,8 @@ class CalendarAccessService
             CalendarType::Organization, CalendarType::Division, CalendarType::Resource => $user->can('calendars.manage'),
             CalendarType::Personal => $calendar->isOwnedBy($user)
                 || $this->sharePermission($user, $calendar) === SharePermission::Manager,
+            // Managed from the Google Calendar settings page instead.
+            CalendarType::Google => false,
         };
     }
 
@@ -171,7 +176,7 @@ class CalendarAccessService
                         ->where('type', CalendarType::Division->value)
                         ->whereIn('division_id', $user->relatedDivisionIds()))
                     ->orWhere(fn (Builder $q) => $q
-                        ->where('type', CalendarType::Personal->value)
+                        ->whereIn('type', [CalendarType::Personal->value, CalendarType::Google->value])
                         ->where('owner_id', $user->id))
                     ->orWhereHas('shares', fn ($q) => $q->where('user_id', $user->id));
             })

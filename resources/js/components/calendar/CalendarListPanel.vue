@@ -2,6 +2,7 @@
 import { useForm, usePage } from '@inertiajs/vue3';
 import { Pencil, Plus } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import GoogleSyncStatus from '@/components/calendar/GoogleSyncStatus.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -35,6 +36,7 @@ const groups = computed<CalendarPanelGroup[]>(
     () =>
         props.groups ?? [
             { key: 'personal', label: 'My calendars' },
+            { key: 'google', label: 'Google Calendar' },
             { key: 'organization', label: page.props.organization.acronym },
             { key: 'division', label: 'Division' },
         ],
@@ -43,6 +45,11 @@ const groups = computed<CalendarPanelGroup[]>(
 const hasPersonalGroup = computed(() =>
     groups.value.some((group) => group.key === 'personal'),
 );
+
+/* The Google group also shows while empty, for connecting/reconnecting. */
+const showsGroup = (key: CalendarPanelGroup['key']) =>
+    list.grouped[key].length > 0 ||
+    (key === 'google' && page.props.googleCalendar?.configured === true);
 
 // Google's palette, so calendars and events share one set of colors.
 const swatches = EVENT_COLORS.map((c) => c.hex);
@@ -143,7 +150,7 @@ const removeUnit = async () => {
 <template>
     <div class="space-y-4">
         <template v-for="group in groups" :key="group.key">
-            <section v-if="list.grouped[group.key].length > 0">
+            <section v-if="showsGroup(group.key)">
                 <div class="flex items-center justify-between px-1 pb-1">
                     <h3
                         class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
@@ -170,6 +177,14 @@ const removeUnit = async () => {
                     >
                         <Plus class="size-3.5" aria-hidden="true" />
                     </Button>
+                    <GoogleSyncStatus
+                        v-if="
+                            group.key === 'google' &&
+                            page.props.googleCalendar?.connected
+                        "
+                        :calendars="list.grouped.google"
+                        actions-only
+                    />
                 </div>
 
                 <ul class="space-y-0.5">
@@ -193,6 +208,16 @@ const removeUnit = async () => {
                             <span class="truncate" :title="calendar.name">
                                 {{ calendar.name }}
                             </span>
+                            <span
+                                v-if="
+                                    calendar.google?.access_role ===
+                                    'freeBusyReader'
+                                "
+                                class="shrink-0 text-[11px] text-muted-foreground"
+                                title="You can see when this calendar is busy, not what is on it"
+                            >
+                                busy only
+                            </span>
                         </Label>
                         <Button
                             v-if="group.manageUnits && calendar.unit_manageable"
@@ -206,6 +231,11 @@ const removeUnit = async () => {
                         </Button>
                     </li>
                 </ul>
+                <GoogleSyncStatus
+                    v-if="group.key === 'google'"
+                    :calendars="list.grouped.google"
+                    class="mt-1"
+                />
             </section>
         </template>
 

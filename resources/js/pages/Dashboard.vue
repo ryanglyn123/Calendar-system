@@ -18,7 +18,7 @@ defineProps<{
 // Resource calendars live on their own section pages; the merged calendar
 // carries everything else.
 const scope: CalendarScope = {
-    types: ['organization', 'division', 'personal'],
+    types: ['organization', 'division', 'personal', 'google'],
 };
 </script>
 

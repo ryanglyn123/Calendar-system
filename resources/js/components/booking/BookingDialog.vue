@@ -42,6 +42,7 @@ import {
 import { peopleProblems, peopleToSend, rowErrors } from '@/lib/people';
 import { resourceNouns, resourceTypeIcon } from '@/lib/resourceTypeIcon';
 import bookingsApi from '@/routes/api/bookings';
+import { busy as googleBusyApi } from '@/routes/api/google';
 import resourcesApi from '@/routes/api/resources';
 import bookingsPage from '@/routes/bookings';
 
@@ -378,6 +379,71 @@ const busy = computed(() =>
         end: minutesOf(slot.ends_at),
         pending: slot.status === 'pending',
     })),
+);
+
+/* ---- The requester's own Google Calendar: a hint, never a blocker ---- */
+
+const googleBusy = ref<{
+    date: string;
+    slots: { start: number; end: number }[];
+} | null>(null);
+
+async function loadGoogleBusy(): Promise<void> {
+    const state = page.props.googleCalendar;
+    const date = form.value.date;
+
+    if (!state?.connected || state.needs_reconnect || !date) {
+        return;
+    }
+
+    const start = parseISO(`${date}T00:00:00`);
+
+    try {
+        const response = await api.get<{
+            connected: boolean;
+            data: { starts_at: string; ends_at: string }[];
+        }>(
+            googleBusyApi({
+                query: {
+                    start: start.toISOString(),
+                    end: new Date(start.getTime() + DAY * 60_000).toISOString(),
+                },
+            }).url,
+        );
+
+        if (date === form.value.date) {
+            googleBusy.value = {
+                date,
+                slots: response.data.map((slot) => ({
+                    start: minutesOf(slot.starts_at),
+                    end: minutesOf(slot.ends_at),
+                })),
+            };
+        }
+    } catch {
+        // Only a hint: without it the dialog works exactly as before.
+    }
+}
+
+watch(
+    () => [open.value, form.value.date] as const,
+    ([isOpen]) => {
+        if (isOpen) {
+            void loadGoogleBusy();
+        }
+    },
+    { immediate: true },
+);
+
+const googleSlots = computed(() =>
+    googleBusy.value?.date === form.value.date ? googleBusy.value.slots : [],
+);
+
+/** The chosen time overlaps something in the requester's Google Calendar. */
+const googleClash = computed(() =>
+    googleSlots.value.some(
+        (slot) => slot.start < form.value.end && slot.end > form.value.start,
+    ),
 );
 
 /** Minutes of the chosen day already gone: 0 for future days. */
@@ -1505,6 +1571,14 @@ const summary = computed(() => {
                                             :style="span(b.start, b.end)"
                                         />
 
+                                        <!-- Busy in the requester's Google Calendar: a line, not a block -->
+                                        <div
+                                            v-for="(g, i) in googleSlots"
+                                            :key="`g${i}`"
+                                            class="booking-google pointer-events-none absolute bottom-1 h-1 rounded-full"
+                                            :style="span(g.start, g.end)"
+                                        />
+
                                         <!-- Hover preview -->
                                         <div
                                             v-if="
@@ -1691,6 +1765,17 @@ const summary = computed(() => {
                                                 Awaiting approval
                                             </span>
                                         </template>
+                                        <span
+                                            v-if="
+                                                !loading && googleSlots.length
+                                            "
+                                            class="inline-flex items-center gap-1.5"
+                                        >
+                                            <span
+                                                class="booking-google inline-block h-1 w-4 rounded-full"
+                                            />
+                                            You, in Google Calendar
+                                        </span>
                                     </div>
                                     <p class="sr-only" aria-live="polite">
                                         {{ busySummary }}
@@ -1818,6 +1903,17 @@ const summary = computed(() => {
                                     for {{ duration(form.end - form.start) }}
                                 </span>
                             </template>
+                        </p>
+                        <p
+                            v-if="
+                                googleClash &&
+                                !blocked &&
+                                !(whenError || timeIssue)
+                            "
+                            class="-mt-1 text-xs text-muted-foreground"
+                        >
+                            You have something in your Google Calendar then. You
+                            can still book.
                         </p>
                     </section>
 
@@ -1979,6 +2075,13 @@ const summary = computed(() => {
     );
     box-shadow: inset 0 0 0 1px
         color-mix(in oklch, var(--foreground) 18%, transparent);
+}
+
+/* The requester's own Google busy time: a thin line under the strip, so it
+   can never be mistaken for a booking on this room or vehicle. */
+.booking-google {
+    background: var(--color-fdcp-blue);
+    opacity: 0.7;
 }
 
 /* Earlier today: faded, not hatched, so it doesn't read as a booking. */

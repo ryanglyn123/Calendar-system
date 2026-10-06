@@ -6,6 +6,7 @@ use App\Enums\CalendarType;
 use App\Models\Calendar;
 use App\Models\CalendarUserPreference;
 use App\Models\User;
+use App\Services\Google\GoogleAccounts;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -65,6 +66,30 @@ class CalendarResource extends JsonResource
                 && ($this->division->parent_id === $user->division_id
                     || $this->division->id === $user->division_id
                     || $user->can('divisions.manage')),
+            'google' => $this->type === CalendarType::Google ? $this->googleSummary() : null,
+        ];
+    }
+
+    /**
+     * Sync health of a Google mirror, for the panel's status line.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function googleSummary(): ?array
+    {
+        $google = $this->googleCalendar;
+
+        if ($google === null) {
+            return null;
+        }
+
+        return [
+            'id' => $google->id,
+            'access_role' => $google->access_role,
+            'is_primary' => $google->is_primary,
+            'is_holiday' => $google->is_holiday,
+            'last_synced_at' => $google->last_synced_at?->toIso8601String(),
+            'error' => GoogleAccounts::errorMessage($google->sync_error),
         ];
     }
 }

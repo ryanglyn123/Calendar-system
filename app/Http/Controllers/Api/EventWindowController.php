@@ -22,7 +22,7 @@ class EventWindowController extends Controller
             'calendars' => ['sometimes', 'array'],
             'calendars.*' => ['integer'],
             'types' => ['sometimes', 'array'],
-            'types.*' => ['string', Rule::in(['organization', 'division', 'personal', 'resource'])],
+            'types.*' => ['string', Rule::in(['organization', 'division', 'personal', 'resource', 'google'])],
             'resource_type_id' => ['sometimes', 'integer'],
         ]);
 

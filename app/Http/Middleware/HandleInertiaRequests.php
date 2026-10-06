@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Controllers\Settings\GoogleCalendarController;
 use App\Models\Announcement;
 use App\Models\ResourceType;
 use App\Services\Booking\ReviewQueue;
@@ -95,6 +96,12 @@ class HandleInertiaRequests extends Middleware
             'reviewQueue' => fn () => $user === null || ! $user->isActive()
                 ? null
                 : app(ReviewQueue::class)->summary($user),
+            // Whether the calendar panel offers "Connect Google Calendar".
+            'googleCalendar' => fn () => $user === null ? null : [
+                'configured' => GoogleCalendarController::configured(),
+                'connected' => $user->googleAccount !== null,
+                'needs_reconnect' => $user->googleAccount !== null && ! $user->googleAccount->isActive(),
+            ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             // The calendar side panel's dragged width, so the server paints
             // it at the user's size; null (default width) when unset or bad.

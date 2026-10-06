@@ -22,11 +22,13 @@ class EventWindowService
     private const EAGER = [
         'eventType', 'calendar', 'overrides', 'attendees.user', 'reminders',
         'creator', 'booking.resource.type', 'booking.requester', 'booking.reviewer',
+        'googleEvent',
     ];
 
     public function __construct(
         private readonly CalendarAccessService $access,
         private readonly OccurrenceExpander $expander,
+        private readonly HolidayOccurrences $holidays,
     ) {}
 
     /**
@@ -37,6 +39,9 @@ class EventWindowService
      *
      * My Calendar (a scope with personal calendars and no resource ones)
      * also carries the user's own room and vehicle bookings, in every state.
+     *
+     * Every window also carries the organization's holidays, so they show
+     * on every calendar (and on the booking pages, where they matter most).
      *
      * @param  list<int>|null  $requestedCalendarIds
      * @param  list<string>|null  $types
@@ -65,7 +70,7 @@ class EventWindowService
         $withOwnBookings = $types !== null && in_array('personal', $types, true) && ! in_array('resource', $types, true);
 
         if ($calendarIds === [] && ! $withOwnBookings) {
-            return [];
+            return $this->holidays->between($start, $end);
         }
 
         $roots = Event::query()
@@ -95,14 +100,17 @@ class EventWindowService
         $writable = $accessible
             ->map(fn (Calendar $calendar) => $this->access->canWriteEvents($user, $calendar));
 
-        return array_map(
-            fn (EventOccurrence $occurrence) => (new EventOccurrenceResource(
-                $occurrence,
-                $preferences->get($occurrence->event->calendar_id),
-                (bool) $writable->get($occurrence->event->calendar_id, false),
-            ))->toArray($request),
-            $this->expander->expand($roots, $start, $end),
-        );
+        return [
+            ...array_map(
+                fn (EventOccurrence $occurrence) => (new EventOccurrenceResource(
+                    $occurrence,
+                    $preferences->get($occurrence->event->calendar_id),
+                    (bool) $writable->get($occurrence->event->calendar_id, false),
+                ))->toArray($request),
+                $this->expander->expand($roots, $start, $end),
+            ),
+            ...$this->holidays->between($start, $end),
+        ];
     }
 
     /**

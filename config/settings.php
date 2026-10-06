@@ -1,6 +1,7 @@
 <?php
 
 use App\Settings\GeneralSettings;
+use App\Settings\GoogleCalendarSettings;
 use App\Settings\RegistrationSettings;
 use Spatie\LaravelSettings\SettingsCasts\DateTimeInterfaceCast;
 use Spatie\LaravelSettings\SettingsCasts\DateTimeZoneCast;
@@ -16,6 +17,7 @@ return [
     'settings' => [
         GeneralSettings::class,
         RegistrationSettings::class,
+        GoogleCalendarSettings::class,
     ],
 
     /*

@@ -10,6 +10,7 @@ use App\Models\Resource;
 use App\Models\User;
 use App\Notifications\BookingDecidedNotification;
 use App\Notifications\BookingRequestedNotification;
+use App\Services\Google\GoogleBookingSync;
 use App\Settings\GeneralSettings;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
@@ -119,6 +120,11 @@ class BookingService
             );
         }
 
+        // Auto-approved types go straight to the requester's Google Calendar.
+        if ($booking->wasRecentlyCreated && $booking->status === BookingStatus::Approved) {
+            GoogleBookingSync::queue($booking);
+        }
+
         return $booking;
     }
 
@@ -211,6 +217,7 @@ class BookingService
 
         $this->queue->settle($booking);
         $booking->requester?->notify(new BookingDecidedNotification($booking));
+        GoogleBookingSync::queue($booking);
 
         return $booking;
     }
@@ -242,6 +249,7 @@ class BookingService
 
         $this->queue->settle($booking);
         $booking->requester?->notify(new BookingDecidedNotification($booking));
+        GoogleBookingSync::queue($booking);
 
         return $booking;
     }
@@ -284,6 +292,8 @@ class BookingService
         if ($by->isNot($booking->requester)) {
             $booking->requester?->notify(new BookingDecidedNotification($booking));
         }
+
+        GoogleBookingSync::queue($booking);
 
         return $booking;
     }

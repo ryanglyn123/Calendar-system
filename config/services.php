@@ -39,6 +39,17 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
+
+        // Google Calendar integration (same OAuth client as sign-in). The
+        // calendar connection has its own callback because sign-in routes
+        // are guest-only.
+        'calendar_redirect' => env('GOOGLE_CALENDAR_REDIRECT_URI', '/settings/google-calendar/callback'),
+        // Push notifications need a public HTTPS address; without one the
+        // app falls back to polling with sync tokens.
+        'calendar_webhook' => env('GOOGLE_CALENDAR_WEBHOOK_URL', rtrim((string) env('APP_URL'), '/').'/webhooks/google-calendar'),
+        // Server-side key for reading public holiday calendars (no user
+        // account involved). Restrict it to the Calendar API.
+        'calendar_api_key' => env('GOOGLE_CALENDAR_API_KEY'),
     ],
 
 ];

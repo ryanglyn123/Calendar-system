@@ -43,6 +43,8 @@ class EventController extends Controller
 
     public function update(UpdateEventRequest $request, Event $event): JsonResponse
     {
+        abort_if($event->isGoogleMirror(), 403, 'Events from Google Calendar are read-only here. Change them in Google Calendar.');
+
         $validated = $request->validated();
 
         $this->events->update(
@@ -63,6 +65,8 @@ class EventController extends Controller
 
     public function destroy(Request $request, Event $event): JsonResponse
     {
+        abort_if($event->isGoogleMirror(), 403, 'Events from Google Calendar are read-only here. Change them in Google Calendar.');
+
         $this->authorize('delete', $event);
 
         $this->events->delete($event);

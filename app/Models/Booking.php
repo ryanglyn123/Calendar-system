@@ -98,6 +98,16 @@ class Booking extends Model
         return $this->hasMany(BookingEditRequest::class);
     }
 
+    /**
+     * Copies of this booking in Google Calendar (the requester's).
+     *
+     * @return HasMany<GoogleBookingEvent, $this>
+     */
+    public function googleEvents(): HasMany
+    {
+        return $this->hasMany(GoogleBookingEvent::class);
+    }
+
     public function hasPendingEditRequest(): bool
     {
         return $this->editRequests()

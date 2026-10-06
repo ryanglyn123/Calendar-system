@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\GoogleCalendarController;
 use App\Http\Controllers\Settings\NotificationPreferenceController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
@@ -28,6 +29,17 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
 
     Route::get('settings/notifications', [NotificationPreferenceController::class, 'edit'])->name('notifications.edit');
     Route::put('settings/notifications', [NotificationPreferenceController::class, 'update'])->name('notifications.update');
+
+    Route::get('settings/google-calendar', [GoogleCalendarController::class, 'edit'])->name('google-calendar.edit');
+    Route::patch('settings/google-calendar', [GoogleCalendarController::class, 'update'])->name('google-calendar.update');
+    Route::delete('settings/google-calendar', [GoogleCalendarController::class, 'destroy'])->name('google-calendar.destroy');
+    Route::get('settings/google-calendar/connect', [GoogleCalendarController::class, 'redirect'])
+        ->middleware('throttle:10,1')->name('google-calendar.connect');
+    Route::get('settings/google-calendar/callback', [GoogleCalendarController::class, 'callback'])->name('google-calendar.callback');
+    Route::post('settings/google-calendar/sync', [GoogleCalendarController::class, 'sync'])
+        ->middleware('throttle:6,1')->name('google-calendar.sync');
+    Route::patch('settings/google-calendar/calendars/{calendar}', [GoogleCalendarController::class, 'updateCalendar'])
+        ->whereNumber('calendar')->name('google-calendar.calendars.update');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {

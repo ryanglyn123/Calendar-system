@@ -9,12 +9,14 @@ export type CalendarView =
  * section page all render the same shell under different scopes.
  */
 export type CalendarScope = {
-    types?: ('organization' | 'division' | 'personal' | 'resource')[];
+    types?: (
+        'organization' | 'division' | 'personal' | 'resource' | 'google'
+    )[];
     resourceTypeId?: number;
 };
 
 export type CalendarPanelGroup = {
-    key: 'organization' | 'division' | 'personal' | 'resource';
+    key: 'organization' | 'division' | 'personal' | 'resource' | 'google';
     label: string;
     /** Show unit-calendar management (create/edit/delete) for this group. */
     manageUnits?: boolean;
@@ -93,6 +95,39 @@ export type AppNotification = {
     created_at: string;
 };
 
+/** A person on a Google event (display only; Google owns the RSVPs). */
+export type GoogleAttendee = {
+    email?: string;
+    name?: string;
+    response: 'needsAction' | 'declined' | 'tentative' | 'accepted';
+    organizer?: boolean;
+    self?: boolean;
+    optional?: boolean;
+};
+
+/** Details of an event mirrored from the viewer's own Google Calendar. */
+export type GoogleEventInfo = {
+    /** The Google calendar it came from, as named here. */
+    calendar: string | null;
+    html_link: string | null;
+    event_type: string;
+    /** "Out of office", "Focus time"...; null for ordinary events. */
+    event_type_label: string | null;
+    /** Google's "Show as busy" (declined invitations count as free). */
+    busy: boolean;
+    organizer: { email?: string; name?: string; self?: boolean } | null;
+    attendees: GoogleAttendee[];
+    attendees_omitted: boolean;
+    conference: string | null;
+    working_location: string | null;
+};
+
+export type HolidayInfo = {
+    type: 'regular' | 'special_non_working' | 'company' | 'observance';
+    blocks_bookings: boolean;
+    from_google: boolean;
+};
+
 export type EventOccurrence = {
     occurrence_id: string;
     event_id: number;
@@ -120,6 +155,10 @@ export type EventOccurrence = {
     created_by: number | null;
     timezone: string;
     created_at: string | null;
+    /** app: this calendar's own event; google: read-only mirror; holiday: the org's holidays. */
+    source: 'app' | 'google' | 'holiday';
+    google: GoogleEventInfo | null;
+    holiday?: HolidayInfo | null;
 };
 
 export type EventDraft = {

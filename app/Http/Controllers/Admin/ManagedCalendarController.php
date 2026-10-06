@@ -57,7 +57,7 @@ class ManagedCalendarController extends Controller
 
     public function update(UpdateManagedCalendarRequest $request, Calendar $calendar): RedirectResponse
     {
-        abort_if($calendar->isPersonal(), 404);
+        abort_if($calendar->isPersonal() || $calendar->type === CalendarType::Google, 404);
 
         $this->calendars->update($calendar, $request->validated());
 
@@ -69,7 +69,7 @@ class ManagedCalendarController extends Controller
     public function destroy(Calendar $calendar): RedirectResponse
     {
         abort_unless(request()->user()->can('calendars.manage'), 403);
-        abort_if($calendar->isPersonal(), 404);
+        abort_if($calendar->isPersonal() || $calendar->type === CalendarType::Google, 404);
         abort_if($calendar->type === CalendarType::Resource, 403, 'Resource calendars are managed through their resource.');
 
         $this->calendars->delete($calendar);

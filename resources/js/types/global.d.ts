@@ -33,6 +33,11 @@ declare module '@inertiajs/core' {
             sidebarOpen: boolean;
             calendarPanelWidth: number | null;
             calendarPanelHidden: boolean;
+            googleCalendar: {
+                configured: boolean;
+                connected: boolean;
+                needs_reconnect: boolean;
+            } | null;
             reviewQueue: ReviewSummary | null;
             [key: string]: unknown;
         };

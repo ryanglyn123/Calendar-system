@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventOccurrenceController;
 use App\Http\Controllers\Api\EventRsvpController;
 use App\Http\Controllers\Api\EventWindowController;
+use App\Http\Controllers\Api\GoogleCalendarController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ResourceBrowserController;
 use App\Http\Controllers\Api\UserSearchController;
@@ -23,8 +24,10 @@ use App\Http\Controllers\Calendar\DivisionUnitController;
 use App\Http\Controllers\Calendar\PersonalCalendarController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DivisionCalendarController;
+use App\Http\Controllers\GoogleCalendarWebhookController;
 use App\Http\Controllers\PublicCalendarController;
 use App\Http\Controllers\ResourceSectionController;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -130,8 +133,22 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->middleware('throttle:booking-actions')->name('bookings.edit-requests.store');
 
         Route::post('announcements/{announcement}/dismiss', [AnnouncementDismissalController::class, 'store'])->name('announcements.dismiss');
+
+        // Google Calendar: the caller's own account only.
+        Route::get('google/busy', [GoogleCalendarController::class, 'busy'])->name('google.busy');
+        Route::post('google/sync', [GoogleCalendarController::class, 'sync'])
+            ->middleware('throttle:6,1')->name('google.sync');
+        Route::post('bookings/{booking}/google/restore', [GoogleCalendarController::class, 'restoreBooking'])
+            ->middleware('throttle:booking-actions')->name('bookings.google.restore');
     });
 });
+
+// Google Calendar push notifications. Called by Google, not a browser:
+// no CSRF token; each request proves itself with its channel token.
+Route::post('webhooks/google-calendar', GoogleCalendarWebhookController::class)
+    ->withoutMiddleware([ValidateCsrfToken::class])
+    ->middleware('throttle:600,1')
+    ->name('webhooks.google-calendar');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/admin.php';

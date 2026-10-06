@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\LogOptions;
@@ -36,7 +37,11 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class Calendar extends Model
 {
     /** @use HasFactory<CalendarFactory> */
-    use HasFactory, LogsActivity, SoftDeletes;
+    use HasFactory, SoftDeletes;
+
+    use LogsActivity {
+        shouldLogEvent as logsActivityShouldLogEvent;
+    }
 
     protected function casts(): array
     {
@@ -91,7 +96,7 @@ class Calendar extends Model
             CalendarType::Organization => $this->is_default,
             CalendarType::Division => in_array((int) $this->division_id, $user->relatedDivisionIds(), true),
             CalendarType::Resource => false,
-            CalendarType::Personal => true,
+            CalendarType::Personal, CalendarType::Google => true,
         };
     }
 
@@ -101,6 +106,25 @@ class Calendar extends Model
     public function scopeActive(Builder $query): void
     {
         $query->where('is_active', true);
+    }
+
+    /**
+     * Set on Google mirror calendars.
+     *
+     * @return HasOne<GoogleCalendar, $this>
+     */
+    public function googleCalendar(): HasOne
+    {
+        return $this->hasOne(GoogleCalendar::class);
+    }
+
+    /**
+     * Google mirrors carry the user's own calendar names; they stay out of
+     * the admin audit log.
+     */
+    protected function shouldLogEvent(string $eventName): bool
+    {
+        return $this->type !== CalendarType::Google && $this->logsActivityShouldLogEvent($eventName);
     }
 
     public function getActivitylogOptions(): LogOptions

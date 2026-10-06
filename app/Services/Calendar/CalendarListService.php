@@ -36,7 +36,7 @@ class CalendarListService
 
         $calendars = $this->access
             ->scoped($this->access->accessibleCalendars($user), $types, $resourceTypeId)
-            ->loadMissing('division');
+            ->loadMissing('division', 'googleCalendar');
 
         $preferences = CalendarUserPreference::query()
             ->where('user_id', $user->id)

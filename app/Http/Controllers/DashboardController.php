@@ -31,6 +31,8 @@ class DashboardController extends Controller
             CalendarType::Organization->value,
             CalendarType::Division->value,
             CalendarType::Personal->value,
+            // The user's own Google calendars, mirrored read-only.
+            CalendarType::Google->value,
         ];
 
         return Inertia::render('Dashboard', [

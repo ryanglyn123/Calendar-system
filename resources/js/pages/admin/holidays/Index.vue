@@ -62,12 +62,66 @@ defineOptions({
 const props = defineProps<{
     holidays: HolidayRow[];
     weekStartsOn: WeekStart;
+    google: {
+        configured: boolean;
+        calendar_ids: string[];
+        synced_at: string | null;
+        error: string | null;
+    };
 }>();
+
+/* ---- Google public holiday calendars feed this list ---- */
+
+const importing = ref(false);
+const sourcesOpen = ref(false);
+const sourcesForm = useForm({ calendar_ids: [] as string[] });
+const sourcesText = ref('');
+
+const sourceName = (id: string) =>
+    id
+        .replace(/#holiday@group\.v\.calendar\.google\.com$/i, '')
+        .replace(/^[a-z]{2}\./i, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+
+const importNow = () => {
+    importing.value = true;
+    router.post(
+        adminHolidays.googleSync().url,
+        {},
+        { preserveScroll: true, onFinish: () => (importing.value = false) },
+    );
+};
+
+const openSources = () => {
+    sourcesText.value = props.google.calendar_ids.join('\n');
+    sourcesForm.clearErrors();
+    sourcesOpen.value = true;
+};
+
+const saveSources = () => {
+    sourcesForm.calendar_ids = sourcesText.value
+        .split(/\s+/)
+        .map((id) => id.trim())
+        .filter(Boolean);
+    sourcesForm.put(adminHolidays.googleSources().url, {
+        preserveScroll: true,
+        onSuccess: () => (sourcesOpen.value = false),
+    });
+};
+
+const sourcesError = computed(
+    () =>
+        Object.entries(sourcesForm.errors).find(([key]) =>
+            key.startsWith('calendar_ids'),
+        )?.[1] ?? null,
+);
 
 const typeLabels: Record<HolidayKind, string> = {
     regular: 'Regular holiday',
     special_non_working: 'Special non-working',
     company: 'FDCP holiday',
+    observance: 'Observance',
 };
 
 const viewOptions: ViewOption<'list' | 'year'>[] = [
@@ -201,6 +255,57 @@ const destroy = async (holiday: HolidayRow) => {
             </template>
         </PageHeader>
 
+        <!-- Where the list comes from: Google's public holiday calendars -->
+        <section
+            class="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm"
+            aria-label="Google holiday import"
+        >
+            <div class="min-w-0">
+                <p v-if="google.configured && google.calendar_ids.length">
+                    Imported from Google:
+                    <span class="font-medium">
+                        {{ google.calendar_ids.map(sourceName).join(', ') }}
+                    </span>
+                </p>
+                <p v-else-if="google.configured">
+                    Not importing public holidays from Google.
+                </p>
+                <p v-else class="text-muted-foreground">
+                    Public holidays can be imported from Google Calendar once a
+                    Google API key is set on the server.
+                </p>
+                <p
+                    v-if="google.error"
+                    class="text-[13px] text-destructive"
+                    role="status"
+                >
+                    {{ google.error }}
+                </p>
+                <p
+                    v-else-if="google.synced_at"
+                    class="text-[13px] text-muted-foreground"
+                >
+                    Last imported
+                    {{ format(parseISO(google.synced_at), 'MMM d, h:mm a') }}.
+                    Edited or deleted imports stay as you left them.
+                </p>
+            </div>
+            <div v-if="google.configured" class="flex shrink-0 gap-2">
+                <Button variant="ghost" size="sm" @click="openSources">
+                    Sources
+                </Button>
+                <Button
+                    v-if="google.calendar_ids.length"
+                    variant="outline"
+                    size="sm"
+                    :disabled="importing"
+                    @click="importNow"
+                >
+                    {{ importing ? 'Importing…' : 'Import now' }}
+                </Button>
+            </div>
+        </section>
+
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-1">
                 <Button
@@ -309,6 +414,20 @@ const destroy = async (holiday: HolidayRow) => {
                             >
                                 <span>{{ typeLabels[holiday.type] }}</span>
                                 <span
+                                    v-if="holiday.source === 'google'"
+                                    :title="
+                                        holiday.overridden
+                                            ? 'Imported from Google, then edited here; imports leave it alone'
+                                            : 'Imported from Google Calendar'
+                                    "
+                                >
+                                    {{
+                                        holiday.overridden
+                                            ? 'From Google, edited'
+                                            : 'From Google'
+                                    }}
+                                </span>
+                                <span
                                     v-if="holiday.recurs_annually"
                                     class="inline-flex items-center gap-1"
                                 >
@@ -341,7 +460,10 @@ const destroy = async (holiday: HolidayRow) => {
                             <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                :class="[iconButton, 'text-destructive hover:bg-destructive/10 hover:text-destructive']"
+                                :class="[
+                                    iconButton,
+                                    'text-destructive hover:bg-destructive/10 hover:text-destructive',
+                                ]"
                                 :aria-label="`Delete ${holiday.name}`"
                                 @click="destroy(holiday)"
                             >
@@ -410,6 +532,9 @@ const destroy = async (holiday: HolidayRow) => {
                                     <SelectItem value="company">
                                         FDCP holiday
                                     </SelectItem>
+                                    <SelectItem value="observance">
+                                        Observance (no day off)
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -429,6 +554,43 @@ const destroy = async (holiday: HolidayRow) => {
                     <Button variant="outline" @click="close">Cancel</Button>
                     <Button :disabled="form.processing" @click="submit">
                         {{ editing ? 'Save changes' : 'Add holiday' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog v-model:open="sourcesOpen">
+            <DialogContent class="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Google holiday calendars</DialogTitle>
+                    <DialogDescription>
+                        One Google holiday calendar id per line. Imports run
+                        nightly and when you press Import now.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="grid gap-2">
+                    <Label for="holiday-sources">Calendar ids</Label>
+                    <textarea
+                        id="holiday-sources"
+                        v-model="sourcesText"
+                        rows="4"
+                        spellcheck="false"
+                        class="w-full rounded-md border bg-transparent px-3 py-2 font-mono text-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        placeholder="en.philippines#holiday@group.v.calendar.google.com"
+                    />
+                    <p v-if="sourcesError" class="text-sm text-destructive">
+                        {{ sourcesError }}
+                    </p>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" @click="sourcesOpen = false">
+                        Cancel
+                    </Button>
+                    <Button
+                        :disabled="sourcesForm.processing"
+                        @click="saveSources"
+                    >
+                        Save
                     </Button>
                 </DialogFooter>
             </DialogContent>
