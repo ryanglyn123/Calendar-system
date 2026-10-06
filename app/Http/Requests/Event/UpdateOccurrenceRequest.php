@@ -25,10 +25,11 @@ class UpdateOccurrenceRequest extends FormRequest
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'location' => ['sometimes', 'nullable', 'string', 'max:255'],
             'meeting_url' => ['sometimes', 'nullable', 'url', 'max:255'],
-            'starts_at' => ['sometimes', 'required', 'date'],
-            'ends_at' => ['sometimes', 'required', 'date'],
+            // A move needs both ends: one alone yields an occurrence that ends before it starts.
+            'starts_at' => ['required_with:ends_at', 'date'],
+            'ends_at' => ['required_with:starts_at', 'date'],
             'color' => ['sometimes', 'nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'event_type_id' => ['sometimes', 'nullable', 'integer', Rule::exists('event_types', 'id')],
+            'event_type_id' => ['sometimes', 'nullable', 'integer', Rule::exists('event_types', 'id')->where('is_active', true)->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', $this->user()->id)->orWhere('id', $this->route('event')->event_type_id))],
         ];
     }
 

@@ -40,6 +40,7 @@ class PersonalCalendarController extends Controller
 
         // Managed calendars are archived/deleted from the admin panel, not here.
         abort_unless($calendar->isPersonal(), 403, 'Only personal calendars can be deleted here.');
+        abort_if($calendar->is_default, 403, 'Your own calendar cannot be deleted.');
 
         $this->calendars->delete($calendar);
 

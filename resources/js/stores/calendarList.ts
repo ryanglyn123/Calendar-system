@@ -15,6 +15,14 @@ export const useCalendarListStore = defineStore('calendarList', () => {
      */
     const scope = ref<CalendarScope | null>(null);
 
+    /**
+     * Booking sections (Boardroom, Carpool) show one room or vehicle, or
+     * all of them: the calendar id picked, or null for all. It belongs to
+     * the tab (the page keeps it in its URL), so it is not saved like the
+     * checkboxes are, and a new scope starts from all.
+     */
+    const picked = ref<number | null>(null);
+
     function setScope(next: CalendarScope | null): void {
         const changed = JSON.stringify(next) !== JSON.stringify(scope.value);
 
@@ -23,21 +31,31 @@ export const useCalendarListStore = defineStore('calendarList', () => {
         if (changed) {
             calendars.value = [];
             loaded.value = false;
+            picked.value = null;
         }
     }
 
-    const visibleCalendarIds = computed(() =>
-        calendars.value.filter((c) => c.is_visible).map((c) => c.id),
-    );
+    const resourceScoped = computed(() => scope.value?.resourceTypeId != null);
 
-    const byId = computed(
-        () => new Map(calendars.value.map((c) => [c.id, c])),
-    );
+    const visibleCalendarIds = computed(() => {
+        if (resourceScoped.value) {
+            return picked.value !== null
+                ? [picked.value]
+                : calendars.value.map((c) => c.id);
+        }
+
+        return calendars.value.filter((c) => c.is_visible).map((c) => c.id);
+    });
+
+    const byId = computed(() => new Map(calendars.value.map((c) => [c.id, c])));
 
     const grouped = computed(() => ({
         organization: calendars.value.filter((c) => c.type === 'organization'),
         division: calendars.value.filter((c) => c.type === 'division'),
-        personal: calendars.value.filter((c) => c.type === 'personal'),
+        // The user's own calendar (is_default) leads the group.
+        personal: calendars.value
+            .filter((c) => c.type === 'personal')
+            .sort((a, b) => Number(b.is_default) - Number(a.is_default)),
         resource: calendars.value.filter((c) => c.type === 'resource'),
     }));
 
@@ -106,6 +124,8 @@ export const useCalendarListStore = defineStore('calendarList', () => {
         loading,
         scope,
         setScope,
+        picked,
+        resourceScoped,
         visibleCalendarIds,
         byId,
         grouped,

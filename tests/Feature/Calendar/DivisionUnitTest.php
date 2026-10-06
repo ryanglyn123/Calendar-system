@@ -73,49 +73,6 @@ test('unit members see the parent calendar but write only their own', function (
         ->assertJsonValidationErrors('calendar_id');
 });
 
-test('a unit has its own chat and also sees the parent chat', function () {
-    $unit = unitUnder($this->division);
-    $unitMember = User::factory()->create(['division_id' => $unit->id]);
-
-    $parentRoom = $this->division->conversation;
-    $unitRoom = $unit->conversation;
-
-    // The unit member's conversation list has BOTH rooms.
-    $conversations = collect($this->actingAs($unitMember)
-        ->get(route('dashboard'))
-        ->inertiaProps()['chatConversations'])
-        ->pluck('id');
-
-    expect($conversations)->toContain($parentRoom->id)->toContain($unitRoom->id);
-
-    // A parent member sees the parent room but NOT the unit's private room.
-    $parentList = collect($this->actingAs($this->member)
-        ->get(route('dashboard'))
-        ->inertiaProps()['chatConversations'])
-        ->pluck('id');
-
-    expect($parentList)->toContain($parentRoom->id)->not->toContain($unitRoom->id);
-
-    // Unit chat is private to unit members.
-    $this->actingAs($unitMember)
-        ->postJson(route('api.chat.messages.store', $unitRoom), ['body' => 'unit only'])
-        ->assertCreated();
-
-    $this->actingAs($this->member)
-        ->getJson(route('api.chat.messages.index', $unitRoom))
-        ->assertForbidden();
-
-    // Parent chat is shared: the unit member can post, parent members see it.
-    $this->actingAs($unitMember)
-        ->postJson(route('api.chat.messages.store', $parentRoom), ['body' => 'to the whole division'])
-        ->assertCreated();
-
-    $this->actingAs($this->member)
-        ->getJson(route('api.chat.messages.index', $parentRoom))
-        ->assertOk()
-        ->assertJsonPath('messages.0.body', 'to the whole division');
-});
-
 test('a member can rename and delete a unit of their division', function () {
     $unit = unitUnder($this->division, 'Old Unit');
 

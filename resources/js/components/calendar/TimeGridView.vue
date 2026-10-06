@@ -1,7 +1,16 @@
 <script setup lang="ts">
+import { useElementSize } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { layoutWeekLanes } from '@/components/calendar/monthLanes';
+import { peekClose, peekEnter, peekFocus } from '@/composables/useEventPeek';
+import {
+    bookingTone,
+    chipFill,
+    chipIcon,
+    chipState,
+    isShown,
+} from '@/lib/bookingDisplay';
 import {
     addDays,
     eventInk,
@@ -24,34 +33,49 @@ const SNAP_MINUTES = 30;
 const DRAG_THRESHOLD_PX = 4;
 const TOUCH_HOLD_MS = 350;
 const MIN_EVENT_MINUTES = 30;
+/** Narrower than this, a side-by-side event is a sliver nobody can read or hit. */
+const MIN_COLUMN_PX = 40;
 
 const props = defineProps<{
-    mode: 'week' | 'day';
+    mode: 'week' | 'day' | 'days4';
 }>();
 
 const emit = defineEmits<{
     createRange: [start: Date, end: Date];
     open: [occurrence: EventOccurrence];
     moveRecurring: [occurrence: EventOccurrence, start: Date, end: Date];
+    showDay: [date: Date, occurrences: EventOccurrence[]];
 }>();
 
 const grid = useCalendarGridStore();
 const list = useCalendarListStore();
 
-const days = computed(() =>
-    props.mode === 'day'
-        ? [startOfDay(grid.focusDate)]
-        : weekDays(grid.focusDate, grid.weekStartsOn),
-);
+const days = computed(() => {
+    const focus = startOfDay(grid.focusDate);
+
+    if (props.mode === 'day') {
+        return [focus];
+    }
+
+    if (props.mode === 'days4') {
+        return Array.from({ length: 4 }, (_, i) => addDays(focus, i));
+    }
+
+    // Weekends sit at the ends of the week, so what's left stays contiguous.
+    return weekDays(grid.focusDate, grid.weekStartsOn).filter(
+        (d) => grid.showWeekends || ![0, 6].includes(d.getDay()),
+    );
+});
 
 const visible = computed(() => {
     const start = days.value[0];
     const end = addDays(days.value[days.value.length - 1], 1);
     const visibleIds = new Set(list.visibleCalendarIds);
+    const listedIds = new Set(list.calendars.map((c) => c.id));
 
     return grid
         .occurrencesBetween(start, end)
-        .filter((o) => visibleIds.has(o.calendar_id));
+        .filter((o) => isShown(o, visibleIds, listedIds));
 });
 
 const laneItems = computed(() =>
@@ -102,64 +126,115 @@ type PositionedBox = {
     width: number;
 };
 
-const columns = computed<PositionedBox[][]>(() =>
-    days.value.map((day) => {
-        const dayStart = startOfDay(day);
-        const dayEnd = addDays(dayStart, 1);
+/** A "+N" tab standing in for the events a crowded cluster could not fit. */
+type FoldBox = Omit<PositionedBox, 'occurrence'> & {
+    key: string;
+    occurrences: EventOccurrence[];
+};
 
-        const items = timedItems.value
-            .filter((o) =>
-                occurrenceTouchesDay(
-                    new Date(o.starts_at),
-                    new Date(o.ends_at),
-                    day,
-                ),
-            )
-            .map((o) => {
-                const start = new Date(
-                    Math.max(
-                        new Date(o.starts_at).getTime(),
-                        dayStart.getTime(),
+const scroller = ref<HTMLElement | null>(null);
+const bodyRef = ref<HTMLElement | null>(null);
+
+// How many events fit side by side in one day column. Unmeasured (server
+// render, first client frame) means no limit, so hydration matches.
+const { width: bodyWidth } = useElementSize(bodyRef);
+const maxColumns = computed(() =>
+    bodyWidth.value > 0
+        ? Math.max(
+              1,
+              Math.floor(
+                  (bodyWidth.value - 64) / days.value.length / MIN_COLUMN_PX,
+              ),
+          )
+        : Infinity,
+);
+
+const dayLayouts = computed<{ boxes: PositionedBox[]; folds: FoldBox[] }[]>(
+    () =>
+        days.value.map((day) => {
+            const dayStart = startOfDay(day);
+            const dayEnd = addDays(dayStart, 1);
+
+            const items = timedItems.value
+                .filter((o) =>
+                    occurrenceTouchesDay(
+                        new Date(o.starts_at),
+                        new Date(o.ends_at),
+                        day,
                     ),
-                );
-                const end = new Date(
-                    Math.min(new Date(o.ends_at).getTime(), dayEnd.getTime()),
-                );
+                )
+                .map((o) => {
+                    const start = new Date(
+                        Math.max(
+                            new Date(o.starts_at).getTime(),
+                            dayStart.getTime(),
+                        ),
+                    );
+                    const end = new Date(
+                        Math.min(
+                            new Date(o.ends_at).getTime(),
+                            dayEnd.getTime(),
+                        ),
+                    );
 
-                return {
-                    occurrence: o,
-                    startMinutes: minutesIntoDay(start),
-                    endMinutes:
-                        end.getTime() === dayEnd.getTime()
-                            ? 1440
-                            : minutesIntoDay(end),
-                };
+                    return {
+                        occurrence: o,
+                        startMinutes: minutesIntoDay(start),
+                        endMinutes:
+                            end.getTime() === dayEnd.getTime()
+                                ? 1440
+                                : minutesIntoDay(end),
+                    };
+                });
+
+            const laid = layoutDayColumn(
+                items.map((i) => ({
+                    key: i.occurrence.occurrence_id,
+                    startMinutes: i.startMinutes,
+                    endMinutes: i.endMinutes,
+                })),
+                maxColumns.value,
+            );
+
+            const byKey = new Map(
+                items.map((i) => [i.occurrence.occurrence_id, i]),
+            );
+
+            const place = (box: (typeof laid)[number]) => ({
+                top: (box.startMinutes / 60) * HOUR_HEIGHT,
+                height: Math.max(
+                    20,
+                    ((box.endMinutes - box.startMinutes) / 60) * HOUR_HEIGHT,
+                ),
+                left: box.left,
+                width: box.width,
             });
 
-        const boxes = layoutDayColumn(
-            items.map((i) => ({
-                key: i.occurrence.occurrence_id,
-                startMinutes: i.startMinutes,
-                endMinutes: i.endMinutes,
-            })),
-        );
-
-        const byKey = new Map(
-            items.map((i) => [i.occurrence.occurrence_id, i]),
-        );
-
-        return boxes.map((box) => ({
-            occurrence: byKey.get(box.key)!.occurrence,
-            top: (box.startMinutes / 60) * HOUR_HEIGHT,
-            height: Math.max(
-                20,
-                ((box.endMinutes - box.startMinutes) / 60) * HOUR_HEIGHT,
-            ),
-            left: box.left,
-            width: box.width,
-        }));
-    }),
+            return {
+                boxes: laid
+                    .filter((box) => !box.folded)
+                    .map((box) => ({
+                        occurrence: byKey.get(box.key)!.occurrence,
+                        ...place(box),
+                    })),
+                folds: laid
+                    .filter((box) => box.folded)
+                    .map((box) => ({
+                        key: box.key,
+                        occurrences: box.folded!.map(
+                            (key) => byKey.get(key)!.occurrence,
+                        ),
+                        ...place(box),
+                    })),
+            };
+        }),
 );
+
+const columns = computed(() => dayLayouts.value.map((day) => day.boxes));
+const folds = computed(() => dayLayouts.value.map((day) => day.folds));
+
+const foldLabel = (fold: FoldBox) =>
+    `${fold.occurrences.length} more events, ${format(new Date(fold.occurrences[0].starts_at), 'HH:mm')} onward`;
 
 const hours = Array.from({ length: 24 }, (_, h) => h);
 
@@ -180,9 +255,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
     clearInterval(nowInterval);
 });
-
-const scroller = ref<HTMLElement | null>(null);
-const bodyRef = ref<HTMLElement | null>(null);
 
 const nowTop = computed(() => (minutesIntoDay(now.value) / 60) * HOUR_HEIGHT);
 
@@ -680,22 +752,39 @@ const draggingEventId = computed(() =>
                     :key="segment.occurrence.occurrence_id + segment.startCol"
                     type="button"
                     data-event
-                    class="absolute z-10 truncate rounded-md px-2 text-left text-xs leading-5 font-medium hover:opacity-90"
-                    :class="{
-                        'rounded-l-none': segment.continuesBefore,
-                        'rounded-r-none': segment.continuesAfter,
-                    }"
+                    class="ev-pill absolute z-10 flex items-center gap-1 truncate rounded-[6px] px-2 text-left text-xs leading-5 font-medium"
+                    :class="[
+                        chipFill(segment.occurrence),
+                        {
+                            'rounded-l-none': segment.continuesBefore,
+                            'rounded-r-none': segment.continuesAfter,
+                        },
+                    ]"
                     :style="{
                         left: `calc(${(segment.startCol / days.length) * 100}% + 4px)`,
                         width: `calc(${(segment.span / days.length) * 100}% - 8px)`,
                         top: `${4 + segment.lane * 24}px`,
                         height: '20px',
-                        background: eventWash(segment.occurrence.color),
-                        color: eventInk(segment.occurrence.color),
+                        '--wash': eventWash(bookingTone(segment.occurrence)),
+                        '--ink': eventInk(bookingTone(segment.occurrence)),
+                        '--ev': bookingTone(segment.occurrence) ?? '#d4d8dd',
                     }"
+                    :aria-label="`${chipState(segment.occurrence)}${segment.occurrence.title}`"
                     @click="emit('open', segment.occurrence)"
+                    @pointerenter="(e) => peekEnter(e, segment.occurrence)"
+                    @pointerleave="peekClose()"
+                    @focus="(e) => peekFocus(e, segment.occurrence)"
+                    @blur="peekClose()"
                 >
-                    {{ segment.occurrence.title }}
+                    <component
+                        :is="chipIcon(segment.occurrence)"
+                        v-if="chipIcon(segment.occurrence)"
+                        class="size-3 shrink-0"
+                        aria-hidden="true"
+                    />
+                    <span class="bk-title truncate">{{
+                        segment.occurrence.title
+                    }}</span>
                 </button>
             </div>
         </div>
@@ -748,8 +837,9 @@ const draggingEventId = computed(() =>
                         v-for="box in columns[d]"
                         :key="box.occurrence.occurrence_id"
                         data-event
-                        class="group absolute overflow-hidden rounded-lg shadow-xs"
+                        class="ev-pill group absolute overflow-hidden rounded-[6px] shadow-xs"
                         :class="{
+                            [chipFill(box.occurrence)]: true,
                             'opacity-40':
                                 draggingEventId === box.occurrence.event_id,
                             'cursor-grab active:cursor-grabbing':
@@ -760,28 +850,46 @@ const draggingEventId = computed(() =>
                             height: `${box.height}px`,
                             left: `calc(${box.left * 100}% + 2px)`,
                             width: `calc(${box.width * 100}% - 4px)`,
-                            background: eventWash(box.occurrence.color),
-                            color: eventInk(box.occurrence.color),
+                            '--wash': eventWash(bookingTone(box.occurrence)),
+                            '--ink': eventInk(bookingTone(box.occurrence)),
+                            '--ev': bookingTone(box.occurrence) ?? '#d4d8dd',
                         }"
+                        data-peek="clipped"
                         @pointerdown="(e) => onEventPointerDown(e, box, d)"
+                        @pointerenter="(e) => peekEnter(e, box.occurrence)"
+                        @pointerleave="peekClose()"
                     >
                         <button
                             type="button"
                             class="block h-full w-full px-1.5 py-0.5 text-left text-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                             :class="{
                                 'line-through opacity-70':
-                                    box.occurrence.status === 'cancelled',
+                                    box.occurrence.status === 'cancelled' &&
+                                    !box.occurrence.booking,
                             }"
-                            :aria-label="`${box.occurrence.title}, ${timeLabel(box.occurrence)}${box.occurrence.can_edit ? '. Ctrl+arrows to move, Shift+arrows to resize' : ''}`"
+                            :aria-label="`${chipState(box.occurrence)}${box.occurrence.title}, ${timeLabel(box.occurrence)}${box.occurrence.can_edit ? '. Ctrl+arrows to move, Shift+arrows to resize' : ''}`"
                             @click="onEventClick(box.occurrence)"
+                            @focus="(e) => peekFocus(e, box.occurrence)"
+                            @blur="peekClose()"
                             @keydown="(e) => onEventKeydown(e, box)"
                         >
-                            <span class="block truncate font-medium">
-                                {{ box.occurrence.title }}
+                            <span
+                                class="bk-title bk-label flex max-w-full items-center gap-1 font-medium"
+                            >
+                                <component
+                                    :is="chipIcon(box.occurrence)"
+                                    v-if="chipIcon(box.occurrence)"
+                                    class="size-3 shrink-0"
+                                    aria-hidden="true"
+                                />
+                                <span class="truncate">{{
+                                    box.occurrence.title
+                                }}</span>
                             </span>
                             <span
                                 v-if="box.height > 32"
-                                class="block truncate text-[10px] opacity-75"
+                                data-peek-time
+                                class="bk-label mt-0.5 block w-fit max-w-full truncate text-[10px] opacity-75"
                             >
                                 {{ timeLabel(box.occurrence) }}
                             </span>
@@ -799,15 +907,38 @@ const draggingEventId = computed(() =>
                         />
                     </div>
 
+                    <!-- Crowded clusters: the events that did not fit. -->
+                    <button
+                        v-for="fold in folds[d]"
+                        :key="fold.key"
+                        type="button"
+                        data-event
+                        class="ev-pill absolute z-10 flex items-start justify-center overflow-hidden rounded-[6px] bg-muted px-1 py-0.5 text-xs font-medium text-muted-foreground tabular-nums ring-1 ring-border ring-inset hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        :style="{
+                            top: `${fold.top}px`,
+                            height: `${fold.height}px`,
+                            left: `calc(${fold.left * 100}% + 2px)`,
+                            width: `calc(${fold.width * 100}% - 4px)`,
+                        }"
+                        :aria-label="foldLabel(fold)"
+                        @click="emit('showDay', day, fold.occurrences)"
+                    >
+                        {{
+                            fold.width === 1
+                                ? `${fold.occurrences.length} events`
+                                : `+${fold.occurrences.length}`
+                        }}
+                    </button>
+
                     <!-- Drag ghost -->
                     <div
                         v-if="ghost && ghost.dayIndex === d"
-                        class="pointer-events-none absolute right-1 left-1 z-30 rounded-md border-2 border-dashed px-1.5 py-0.5 text-xs font-medium"
+                        class="pointer-events-none absolute right-1 left-1 z-30 rounded-[6px] border-2 border-dashed px-1.5 py-0.5 text-xs font-medium"
                         :style="{
                             top: `${ghost.top}px`,
                             height: `${ghost.height}px`,
                             borderColor: ghost.color ?? 'var(--primary)',
-                            backgroundColor: (ghost.color ?? '#EFD95F') + '22',
+                            backgroundColor: (ghost.color ?? '#F6BF26') + '22',
                         }"
                         aria-hidden="true"
                     >

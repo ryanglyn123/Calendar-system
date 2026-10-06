@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Support\Toast;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -36,9 +37,31 @@ class SystemHealthController extends Controller
     {
         abort_unless($request->user()->can('settings.manage'), 403);
 
-        Artisan::call('queue:retry', ['id' => ['all']]);
+        $failer = app('queue.failer');
+        $retried = 0;
+        $dropped = 0;
 
-        Toast::success('Failed jobs queued for retry.');
+        // One at a time: queue:retry rebuilds each job, and a job about a
+        // booking or request that has since been deleted can never run.
+        // Retrying "all" stops at the first such job with a 404.
+        foreach ($failer->ids() as $id) {
+            try {
+                Artisan::call('queue:retry', ['id' => [$id]]);
+                $retried++;
+            } catch (ModelNotFoundException) {
+                $failer->forget($id);
+                $dropped++;
+            }
+        }
+
+        match (true) {
+            $retried + $dropped === 0 => Toast::success('No failed jobs to retry.'),
+            $dropped === 0 => Toast::success("{$retried} failed ".str('job')->plural($retried).' queued for retry.'),
+            default => Toast::success(
+                "{$retried} failed ".str('job')->plural($retried).' queued for retry. '
+                ."{$dropped} removed: the booking or request ".($dropped === 1 ? 'it was' : 'they were').' about no longer exists.'
+            ),
+        };
 
         return back();
     }

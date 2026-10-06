@@ -58,7 +58,9 @@ watch(
 
         const freq = parts.get('FREQ') ?? 'WEEKLY';
         const parsedInterval = Number(parts.get('INTERVAL') ?? '1');
-        const parsedByday = (parts.get('BYDAY') ?? '').split(',').filter(Boolean);
+        const parsedByday = (parts.get('BYDAY') ?? '')
+            .split(',')
+            .filter(Boolean);
 
         customFreq.value = freq as typeof customFreq.value;
         interval.value = Number.isFinite(parsedInterval) ? parsedInterval : 1;
@@ -112,9 +114,7 @@ const rebuild = () => {
         }
 
         if (endsMode.value === 'until' && untilDate.value) {
-            parts.push(
-                `UNTIL=${untilDate.value.replaceAll('-', '')}T235959Z`,
-            );
+            parts.push(`UNTIL=${untilDate.value.replaceAll('-', '')}T235959Z`);
         } else if (endsMode.value === 'count') {
             parts.push(`COUNT=${Math.max(1, count.value)}`);
         }
@@ -123,9 +123,13 @@ const rebuild = () => {
     rrule.value = parts.join(';');
 };
 
-watch([preset, interval, customFreq, byDay, endsMode, untilDate, count], rebuild, {
-    deep: true,
-});
+watch(
+    [preset, interval, customFreq, byDay, endsMode, untilDate, count],
+    rebuild,
+    {
+        deep: true,
+    },
+);
 
 const toggleDay = (code: string) => {
     byDay.value = byDay.value.includes(code)
@@ -147,11 +151,14 @@ const presetOptions = computed(() => [
 </script>
 
 <template>
-    <div class="grid gap-3">
-        <div class="grid gap-2">
-            <Label for="recurrence-preset">Repeats</Label>
+    <div class="grid gap-2">
+        <div>
+            <Label for="recurrence-preset" class="sr-only">Repeats</Label>
             <Select v-model="preset">
-                <SelectTrigger id="recurrence-preset">
+                <SelectTrigger
+                    id="recurrence-preset"
+                    class="h-9 w-fit border-transparent bg-transparent px-2 shadow-none hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/40"
+                >
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -166,7 +173,10 @@ const presetOptions = computed(() => [
             </Select>
         </div>
 
-        <div v-if="preset === 'custom'" class="grid gap-3 rounded-lg border p-3">
+        <div
+            v-if="preset === 'custom'"
+            class="ml-2 grid gap-3 rounded-lg bg-muted/50 p-3"
+        >
             <div class="flex items-center gap-2">
                 <Label for="recurrence-interval" class="shrink-0">
                     Every

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
 import CalendarShell from '@/components/calendar/CalendarShell.vue';
 import type {
     CalendarItem,
@@ -16,16 +16,18 @@ defineProps<{
     initialEvents: EventOccurrence[];
 }>();
 
-// Organization-wide calendars only: the FDCP events every staff member sees.
+// Organization-wide calendars only: the events every staff member sees.
 const scope: CalendarScope = { types: ['organization'] };
 
+const acronym = usePage().props.organization.acronym;
+
 const panelGroups: CalendarPanelGroup[] = [
-    { key: 'organization', label: 'FDCP calendars' },
+    { key: 'organization', label: `${acronym} calendars` },
 ];
 </script>
 
 <template>
-    <Head title="Public Calendar" />
+    <Head :title="`${acronym} Events`" />
 
     <CalendarShell
         :event-types="eventTypes.data"

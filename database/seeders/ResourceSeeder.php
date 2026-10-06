@@ -25,8 +25,9 @@ class ResourceSeeder extends Seeder
                 'min_lead_time_minutes' => 30,
                 'max_duration_minutes' => 480,
                 'max_advance_days' => 60,
-                'enforce_working_hours' => true,
-                'block_holidays' => true,
+                // Events run outside office hours too: bookable around the clock.
+                'enforce_working_hours' => false,
+                'block_holidays' => false,
                 'sort_order' => 0,
             ],
         );
@@ -47,15 +48,18 @@ class ResourceSeeder extends Seeder
         );
 
         $seed = [
-            [$boardRooms, 'Cinema Boardroom', 'Main conference room, 4F FDCP Building', 14, '#BFA8F5'],
-            [$boardRooms, 'Screening Room A', '2F, with projector and 5.1 audio', 30, '#86C6F5'],
-            [$boardRooms, 'Huddle Room', '3F, quick syncs', 6, '#86DBAE'],
-            [$vehicles, 'Toyota Hiace (SKB 1234)', 'Motor pool', 12, '#F5A6D8'],
-            [$vehicles, 'Toyota Innova (NEd 5678)', 'Motor pool', 6, '#EFD95F'],
-            [$vehicles, 'Mitsubishi L300 (UAM 9012)', 'Motor pool', 2, '#BFC6CE'],
+            [$boardRooms, '1st Floor Board Room', '1st Floor', null, '#039BE5'],
+            [$boardRooms, 'Mezzanine Board Room', 'Mezzanine', null, '#D50000'],
+            [$boardRooms, 'Occeo Board Room', '2nd Floor', null, '#33B679'],
+            [$boardRooms, '3rd Floor Board Room (Main)', '3rd Floor', null, '#7986CB'],
+            [$vehicles, 'Toyota Hiace Van 1', 'Motor pool', null, '#D81B60'],
+            [$vehicles, 'Toyota Hiace Van 2', 'Motor pool', null, '#616161'],
+            [$vehicles, 'Toyota Innova', 'Motor pool', null, '#F6BF26'],
+            [$vehicles, 'Toyota Tamaraw', 'Motor pool', null, '#EF6C00'],
+            [$vehicles, 'Toyota Fortuner', 'Motor pool', null, '#0B8043'],
         ];
 
-        foreach ($seed as [$type, $name, $location, $capacity, $color]) {
+        foreach ($seed as $order => [$type, $name, $location, $capacity, $color]) {
             $exists = $type->resources()->where('name', $name)->exists();
 
             if (! $exists) {
@@ -65,6 +69,7 @@ class ResourceSeeder extends Seeder
                     'location' => $location,
                     'capacity' => $capacity,
                     'color' => $color,
+                    'sort_order' => $order,
                     'is_active' => true,
                 ], $admin);
             }

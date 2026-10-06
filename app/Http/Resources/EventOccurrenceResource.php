@@ -3,13 +3,17 @@
 namespace App\Http\Resources;
 
 use App\Models\User;
+use App\Services\Booking\BookingService;
 use App\Services\Event\EventOccurrence;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Serializes one occurrence for the calendar grid. Private events are
- * masked to "Busy" for everyone but their creator.
+ * masked to "Busy" for everyone but their creator. A booking shows its full
+ * record (purpose, headcount, reasons, reviewer) only to the requester and
+ * to people who review that resource type; everyone else sees who holds
+ * the slot and its state.
  */
 class EventOccurrenceResource extends JsonResource
 {
@@ -34,47 +38,66 @@ class EventOccurrenceResource extends JsonResource
         $isCreator = $event->created_by === $user->id;
         $masked = $event->visibility === 'private' && ! $isCreator;
 
+        $booking = $event->relationLoaded('booking') ? $event->booking : null;
+        $isMine = $booking !== null && $booking->requested_by === $user->id;
+        $canReview = $booking !== null && $user->can('approve', $booking);
+        $fullBooking = $isMine || $canReview;
+
         return [
             'occurrence_id' => $this->occurrence->id(),
             'event_id' => $event->id,
             'calendar_id' => $event->calendar_id,
             'title' => $masked ? 'Busy' : $event->title,
-            'description' => $masked ? null : $event->description,
+            // A booking event's description is its purpose.
+            'description' => $masked || ($booking !== null && ! $fullBooking) ? null : $event->description,
             'location' => $masked ? null : $event->location,
             'meeting_url' => $masked ? null : $event->meeting_url,
             'starts_at' => $this->occurrence->startsAt->toIso8601String(),
             'ends_at' => $this->occurrence->endsAt->toIso8601String(),
             'all_day' => $event->all_day,
             'status' => $event->status->value,
-            // Booking status projects onto color at render time, never stored.
-            'color' => ($event->relationLoaded('booking') ? $event->booking?->status->color() : null)
-                ?? $event->color
+            // Bookings keep their room's or vehicle's color; their state is
+            // drawn from booking.status (fill pattern and icon), not from hue.
+            'color' => $event->color
                 ?? $event->eventType->color
                 ?? $this->preferenceColor
                 ?? $event->calendar->color,
-            'booking' => $masked || ! $event->relationLoaded('booking') || $event->booking === null
+            'booking' => $masked || $booking === null
                 ? null
                 : [
-                    'id' => $event->booking->id,
-                    'status' => $event->booking->status->value,
-                    'status_label' => $event->booking->status->label(),
-                    'status_color' => $event->booking->status->color(),
-                    'resource' => $event->booking->resource?->name,
-                    'resource_type' => $event->booking->resource?->relationLoaded('type')
-                        ? $event->booking->resource->type?->name
+                    'id' => $booking->id,
+                    'reference' => $booking->reference(),
+                    'status' => $booking->status->value,
+                    'status_label' => $booking->status->label(),
+                    'status_color' => $booking->status->color(),
+                    'resource' => $booking->resource?->name,
+                    'resource_type' => $booking->resource?->relationLoaded('type')
+                        ? $booking->resource->type?->name
                         : null,
-                    'capacity' => $event->booking->resource?->capacity,
-                    'purpose' => $event->booking->purpose,
-                    'attendee_count' => $event->booking->attendee_count,
-                    'requested_by' => $event->booking->relationLoaded('requester')
-                        ? $event->booking->requester?->name
+                    'resource_type_slug' => $booking->resource?->relationLoaded('type')
+                        ? $booking->resource->type?->slug
                         : null,
-                    'reviewed_by' => $event->booking->relationLoaded('reviewer')
-                        ? $event->booking->reviewer?->name
+                    'capacity' => $booking->resource?->capacity,
+                    'requested_by' => $booking->relationLoaded('requester')
+                        ? $booking->requester?->name
                         : null,
-                    'reviewed_at' => $event->booking->reviewed_at?->toIso8601String(),
-                    'rejection_reason' => $event->booking->rejection_reason,
-                    'cancellation_reason' => $event->booking->cancellation_reason,
+                    'is_mine' => $isMine,
+                    'can_review' => $canReview,
+                    'can_cancel' => $fullBooking && $user->can('cancel', $booking),
+                    'purpose' => $fullBooking ? $booking->purpose : null,
+                    'attendee_count' => $fullBooking ? $booking->attendee_count : null,
+                    'people' => $fullBooking ? ($booking->people ?? []) : null,
+                    'requested_at' => $fullBooking ? $booking->created_at?->toIso8601String() : null,
+                    'reviewed_by' => $fullBooking && $booking->relationLoaded('reviewer')
+                        ? $booking->reviewer?->name
+                        : null,
+                    'reviewed_at' => $fullBooking ? $booking->reviewed_at?->toIso8601String() : null,
+                    'rejection_reason' => $fullBooking ? $booking->rejection_reason : null,
+                    'cancellation_reason' => $fullBooking ? $booking->cancellation_reason : null,
+                    'cancelled_by_reviewer' => $fullBooking
+                        && $booking->cancelled_by !== null
+                        && $booking->cancelled_by !== $booking->requested_by,
+                    'version' => $fullBooking ? BookingService::versionOf($booking) : null,
                 ],
             'event_type' => $masked || ! $event->relationLoaded('eventType') || $event->eventType === null
                 ? null

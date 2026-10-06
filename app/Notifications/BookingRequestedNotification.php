@@ -4,6 +4,8 @@ namespace App\Notifications;
 
 use App\Models\Booking;
 use App\Models\User;
+use App\Notifications\Concerns\WritesInAppCopyNow;
+use App\Settings\GeneralSettings;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -11,7 +13,7 @@ use Illuminate\Notifications\Notification;
 
 class BookingRequestedNotification extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, WritesInAppCopyNow;
 
     public const KEY = 'booking.requested';
 
@@ -27,24 +29,37 @@ class BookingRequestedNotification extends Notification implements ShouldQueue
         return $notifiable->notificationChannelsFor(self::KEY);
     }
 
+    /** "Boardroom request needs review": the type comes first, so a
+     *  Carpool request can never be mistaken for a Boardroom one. */
+    private function title(): string
+    {
+        return ($this->booking->resource?->type?->name ?? 'Booking').' request needs review';
+    }
+
+    /** The one booking's review page, whatever has happened to it since. */
+    private function reviewUrl(bool $absolute = true): string
+    {
+        return route('admin.bookings.show', $this->booking->id, absolute: $absolute);
+    }
+
     private function summary(): string
     {
         return sprintf(
             '%s requested %s on %s.',
             $this->booking->requester?->name,
             $this->booking->resource?->name,
-            $this->booking->starts_at->timezone('Asia/Manila')->format('M j, H:i'),
+            $this->booking->starts_at->timezone(app(GeneralSettings::class)->timezone)->format('M j, H:i'),
         );
     }
 
     public function toMail(User $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Booking approval needed')
+            ->subject($this->title())
             ->greeting("Hello {$notifiable->name},")
             ->line($this->summary())
             ->lineIf((bool) $this->booking->purpose, "Purpose: {$this->booking->purpose}")
-            ->action('Review pending bookings', route('admin.bookings.index'));
+            ->action('Review this request', $this->reviewUrl());
     }
 
     /**
@@ -54,10 +69,11 @@ class BookingRequestedNotification extends Notification implements ShouldQueue
     {
         return [
             'key' => self::KEY,
-            'title' => 'Booking approval needed',
+            'title' => $this->title(),
             'message' => $this->summary(),
-            'action_url' => route('admin.bookings.index', absolute: false),
+            'action_url' => $this->reviewUrl(absolute: false),
             'booking_id' => $this->booking->id,
+            'resource_type' => $this->booking->resource?->type?->slug,
         ];
     }
 }

@@ -5,6 +5,8 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import SheetDescription from '@/components/ui/sheet/SheetDescription.vue'
 import SheetHeader from '@/components/ui/sheet/SheetHeader.vue'
 import SheetTitle from '@/components/ui/sheet/SheetTitle.vue'
+import { onMounted, ref, useTemplateRef } from "vue"
+import { useSidebarMotion } from '@/composables/useSidebarMotion'
 import { SIDEBAR_WIDTH_MOBILE, useSidebar } from "./utils"
 
 defineOptions({
@@ -18,6 +20,16 @@ const props = withDefaults(defineProps<SidebarProps>(), {
 })
 
 const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+
+// SSR cannot know the viewport, so it renders the (CSS-hidden) desktop
+// sidebar; swapping to the mobile sheet only after mount keeps hydration
+// in step instead of warning and re-rendering.
+const hydrated = ref(false)
+onMounted(() => {
+  hydrated.value = true
+})
+
+useSidebarMotion(useTemplateRef<HTMLElement>("desktop"), state)
 </script>
 
 <template>
@@ -30,7 +42,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
     <slot />
   </div>
 
-  <Sheet v-else-if="isMobile" :open="openMobile" v-bind="$attrs" @update:open="setOpenMobile">
+  <Sheet v-else-if="isMobile && hydrated" :open="openMobile" v-bind="$attrs" @update:open="setOpenMobile">
     <SheetContent
       data-sidebar="sidebar"
       data-slot="sidebar"
@@ -53,6 +65,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
   <div
     v-else
+    ref="desktop"
     class="group peer text-sidebar-foreground hidden md:block"
     data-slot="sidebar"
     :data-state="state"
@@ -60,10 +73,13 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
     :data-variant="variant"
     :data-side="side"
   >
-    <!-- This is what handles the sidebar gap on desktop  -->
+    <!-- This is what handles the sidebar gap on desktop. Its width (and the
+         panel's) is tweened by useSidebarMotion, so neither has a CSS width
+         transition to fight it. -->
     <div
+      data-sidebar-track
       :class="cn(
-        'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
+        'relative w-(--sidebar-width) bg-transparent',
         'group-data-[collapsible=offcanvas]:w-0',
         'group-data-[side=right]:rotate-180',
         variant === 'floating' || variant === 'inset'
@@ -72,8 +88,9 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
       )"
     />
     <div
+      data-sidebar-track
       :class="cn(
-        'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex',
+        'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right] duration-200 ease-linear md:flex',
         side === 'left'
           ? 'left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]'
           : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',

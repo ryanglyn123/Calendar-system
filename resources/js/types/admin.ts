@@ -70,6 +70,8 @@ export type CalendarItem = {
 export type EventTypeItem = {
     id: number;
     name: string;
+    /** A user's private category (only its owner receives it). */
+    is_personal: boolean;
     color: string;
     icon: string | null;
     description: string | null;

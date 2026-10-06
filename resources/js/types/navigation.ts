@@ -11,8 +11,6 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon;
     isActive?: boolean;
-    /** Small count pill after the title (e.g. unread chat messages). */
-    badge?: number;
 };
 
 /** Shared by the backend for the per-resource-type sidebar sections. */

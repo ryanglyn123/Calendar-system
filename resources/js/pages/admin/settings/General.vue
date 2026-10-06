@@ -91,6 +91,10 @@ const submit = () => {
                             id="org-timezone"
                             v-model="form.general.timezone"
                         />
+                        <p class="text-xs text-muted-foreground">
+                            Office time for working hours, holidays and booking
+                            rules.
+                        </p>
                         <p
                             v-if="form.errors['general.timezone']"
                             class="text-sm text-destructive"

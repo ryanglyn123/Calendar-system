@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { Pencil, Plus, Trash2 } from '@lucide/vue';
-import { ref } from 'vue';
+import { Megaphone, Pencil, Plus, Trash2 } from '@lucide/vue';
+import { computed, ref, watchEffect } from 'vue';
+import EmptyNote from '@/components/admin/EmptyNote.vue';
+import FilterTabs from '@/components/admin/FilterTabs.vue';
+import type { FilterTab } from '@/components/admin/FilterTabs.vue';
 import PageHeader from '@/components/PageHeader.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -23,16 +25,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableEmpty,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useConfirm } from '@/composables/useConfirm';
+import { format, parseISO } from '@/lib/calendarMath';
 import admin from '@/routes/admin';
 import adminAnnouncements from '@/routes/admin/announcements';
 import type { Division } from '@/types';
@@ -59,10 +54,112 @@ type AnnouncementRow = {
     is_active: boolean;
 };
 
-defineProps<{
-    announcements: AnnouncementRow[];
+type Status = 'live' | 'scheduled' | 'ended' | 'draft';
+
+const props = defineProps<{
+    /**
+     * Not `announcements`: that name is the shared banner prop, and a page prop
+     * of the same name would replace it (showing scheduled ones as banners).
+     */
+    rows: AnnouncementRow[];
     divisions: { data: Division[] };
+    /** The office's date (Y-m-d); dates are compared as strings. */
+    today: string;
 }>();
+
+/**
+ * Mirrors the server's "live" test: active, started, and not yet at its end
+ * date (the banner drops as the end day begins, so that day counts as ended).
+ */
+const statusOf = (announcement: AnnouncementRow): Status => {
+    if (!announcement.is_active) {
+        return 'draft';
+    }
+
+    if (announcement.starts_at > props.today) {
+        return 'scheduled';
+    }
+
+    return announcement.ends_at !== null && announcement.ends_at <= props.today
+        ? 'ended'
+        : 'live';
+};
+
+const statusLabels: Record<Status, string> = {
+    live: 'Live',
+    scheduled: 'Scheduled',
+    ended: 'Ended',
+    draft: 'Draft',
+};
+
+const levels: Record<
+    AnnouncementRow['level'],
+    { label: string; class: string }
+> = {
+    critical: { label: 'Critical', class: 'text-destructive' },
+    warning: { label: 'Warning', class: 'text-warning-ink' },
+    info: { label: 'Info', class: 'text-muted-foreground' },
+};
+
+const rows = computed(() =>
+    props.rows.map((announcement) => ({
+        ...announcement,
+        status: statusOf(announcement),
+    })),
+);
+
+const filter = ref<Status | 'all'>('all');
+
+const counts = computed(() => {
+    const tally: Record<Status, number> = {
+        live: 0,
+        scheduled: 0,
+        ended: 0,
+        draft: 0,
+    };
+
+    rows.value.forEach((row) => tally[row.status]++);
+
+    return tally;
+});
+
+const filterOptions = computed<FilterTab<Status | 'all'>[]>(() => [
+    { value: 'all', label: 'All', count: rows.value.length },
+    ...(Object.keys(statusLabels) as Status[])
+        .filter((status) => counts.value[status] > 0)
+        .map((status) => ({
+            value: status,
+            label: status === 'draft' ? 'Drafts' : statusLabels[status],
+            count: counts.value[status],
+        })),
+]);
+
+// An edit can empty the tab you are on; fall back rather than show nothing.
+watchEffect(() => {
+    if (filter.value !== 'all' && counts.value[filter.value] === 0) {
+        filter.value = 'all';
+    }
+});
+
+const visible = computed(() =>
+    filter.value === 'all'
+        ? rows.value
+        : rows.value.filter((row) => row.status === filter.value),
+);
+
+const day = (iso: string) =>
+    format(
+        parseISO(iso),
+        iso.startsWith(props.today.slice(0, 4)) ? 'MMM d' : 'MMM d, yyyy',
+    );
+
+const runs = (announcement: AnnouncementRow) =>
+    announcement.ends_at
+        ? `${day(announcement.starts_at)} – ${day(announcement.ends_at)}`
+        : `From ${day(announcement.starts_at)}`;
+
+const iconButton =
+    'rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60';
 
 const editing = ref<AnnouncementRow | null>(null);
 const creating = ref(false);
@@ -112,15 +209,27 @@ const submit = () => {
     }
 };
 
-const destroy = (announcement: AnnouncementRow) =>
+const { confirm } = useConfirm();
+
+const destroy = async (announcement: AnnouncementRow) => {
+    const confirmed = await confirm({
+        title: `Delete “${announcement.title}”?`,
+        description:
+            statusOf(announcement) === 'live'
+                ? 'It is live now; the banner disappears for its audience.'
+                : undefined,
+        confirmLabel: 'Delete',
+        destructive: true,
+    });
+
+    if (!confirmed) {
+        return;
+    }
+
     router.delete(adminAnnouncements.destroy(announcement.id).url, {
         preserveScroll: true,
     });
-
-const levelVariant = (level: AnnouncementRow['level']) =>
-    ((
-        { info: 'secondary', warning: 'default', critical: 'destructive' }
-    )[level]) as 'secondary' | 'default' | 'destructive';
+};
 </script>
 
 <template>
@@ -132,97 +241,114 @@ const levelVariant = (level: AnnouncementRow['level']) =>
             description="Banners shown to everyone, or to one division only."
         >
             <template #actions>
-                <Button @click="openCreate">
+                <Button class="rounded-full" @click="openCreate">
                     <Plus aria-hidden="true" />
                     New announcement
                 </Button>
             </template>
         </PageHeader>
 
-        <div class="rounded-xl border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Announcement</TableHead>
-                        <TableHead>Level</TableHead>
-                        <TableHead>Audience</TableHead>
-                        <TableHead>Runs</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead class="w-24 text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    <TableEmpty v-if="announcements.length === 0" :colspan="6">
-                        No announcements yet.
-                    </TableEmpty>
-                    <TableRow
-                        v-for="announcement in announcements"
-                        :key="announcement.id"
+        <EmptyNote
+            v-if="rows.length === 0"
+            :icon="Megaphone"
+            title="No announcements yet"
+        >
+            A banner across the top of the calendar, for everyone or one
+            division, between the dates you set.
+            <template #action>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    class="rounded-full"
+                    @click="openCreate"
+                >
+                    <Plus aria-hidden="true" />
+                    New announcement
+                </Button>
+            </template>
+        </EmptyNote>
+
+        <template v-else>
+            <FilterTabs
+                v-model="filter"
+                :options="filterOptions"
+                label="Filter announcements by status"
+            />
+
+            <ul class="divide-y divide-border border-y border-border">
+                <li
+                    v-for="announcement in visible"
+                    :key="announcement.id"
+                    class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-2 py-3 md:grid-cols-[minmax(0,1fr)_10rem_10rem_auto] md:items-center md:gap-x-6"
+                >
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium">
+                            {{ announcement.title }}
+                        </p>
+                        <p class="truncate text-[13px] text-muted-foreground">
+                            <span :class="levels[announcement.level].class">
+                                {{ levels[announcement.level].label }}
+                            </span>
+                            · {{ announcement.body }}
+                        </p>
+                    </div>
+
+                    <div
+                        class="col-start-1 text-[13px] tabular-nums md:col-start-2 md:row-start-1"
                     >
-                        <TableCell>
-                            <div class="font-medium">
-                                {{ announcement.title }}
-                            </div>
-                            <div
-                                class="max-w-72 truncate text-xs text-muted-foreground"
-                            >
-                                {{ announcement.body }}
-                            </div>
-                        </TableCell>
-                        <TableCell>
-                            <Badge :variant="levelVariant(announcement.level)">
-                                {{ announcement.level }}
-                            </Badge>
-                        </TableCell>
-                        <TableCell>
-                            {{ announcement.division ?? 'Everyone' }}
-                        </TableCell>
-                        <TableCell class="text-muted-foreground">
-                            {{ announcement.starts_at }}
-                            <template v-if="announcement.ends_at">
-                                to {{ announcement.ends_at }}
-                            </template>
-                        </TableCell>
-                        <TableCell>
-                            <Badge
-                                :variant="
-                                    announcement.is_active
-                                        ? 'default'
-                                        : 'secondary'
-                                "
-                            >
-                                {{
-                                    announcement.is_active
-                                        ? 'Active'
-                                        : 'Draft'
-                                }}
-                            </Badge>
-                        </TableCell>
-                        <TableCell class="text-right">
-                            <div class="flex justify-end gap-1">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    :aria-label="`Edit ${announcement.title}`"
-                                    @click="openEdit(announcement)"
-                                >
-                                    <Pencil aria-hidden="true" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    class="text-destructive hover:text-destructive"
-                                    :aria-label="`Delete ${announcement.title}`"
-                                    @click="destroy(announcement)"
-                                >
-                                    <Trash2 aria-hidden="true" />
-                                </Button>
-                            </div>
-                        </TableCell>
-                    </TableRow>
-                </TableBody>
-            </Table>
-        </div>
+                        <p
+                            class="flex items-center gap-1.5"
+                            :class="{
+                                'font-medium': announcement.status === 'live',
+                                'text-muted-foreground': [
+                                    'ended',
+                                    'draft',
+                                ].includes(announcement.status),
+                            }"
+                        >
+                            <span
+                                v-if="announcement.status === 'live'"
+                                class="size-1.5 rounded-full bg-success"
+                                aria-hidden="true"
+                            />
+                            {{ statusLabels[announcement.status] }}
+                        </p>
+                        <p class="text-muted-foreground">
+                            {{ runs(announcement) }}
+                        </p>
+                    </div>
+
+                    <p
+                        class="col-start-1 truncate text-[13px] text-muted-foreground md:col-start-3 md:row-start-1"
+                    >
+                        {{ announcement.division ?? 'Everyone' }}
+                    </p>
+
+                    <div
+                        class="col-start-2 row-span-3 row-start-1 flex gap-1 self-start md:col-start-4 md:row-span-1 md:self-center"
+                    >
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            :class="iconButton"
+                            :aria-label="`Edit ${announcement.title}`"
+                            @click="openEdit(announcement)"
+                        >
+                            <Pencil aria-hidden="true" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            :class="[iconButton, 'text-destructive hover:bg-destructive/10 hover:text-destructive']"
+                            :aria-label="`Delete ${announcement.title}`"
+                            @click="destroy(announcement)"
+                        >
+                            <Trash2 aria-hidden="true" />
+                        </Button>
+                    </div>
+                </li>
+            </ul>
+        </template>
 
         <Dialog
             :open="creating || editing !== null"
@@ -241,10 +367,7 @@ const levelVariant = (level: AnnouncementRow['level']) =>
                 <div class="grid gap-4">
                     <div class="grid gap-2">
                         <Label for="announcement-title">Title</Label>
-                        <Input
-                            id="announcement-title"
-                            v-model="form.title"
-                        />
+                        <Input id="announcement-title" v-model="form.title" />
                         <p
                             v-if="form.errors.title"
                             class="text-sm text-destructive"

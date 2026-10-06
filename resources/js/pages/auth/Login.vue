@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
+import { ArrowBigUp, LockKeyhole, Mail } from '@lucide/vue';
+import { computed, ref } from 'vue';
 import InputError from '@/components/InputError.vue';
 import PasskeyVerify from '@/components/PasskeyVerify.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
@@ -24,7 +26,45 @@ defineOptions({
 defineProps<{
     status?: string;
     canResetPassword: boolean;
+    canRegister: boolean;
 }>();
+
+const field =
+    'h-11 pl-10 bg-muted/60 hover:border-foreground/25 focus-visible:bg-card transition-[color,box-shadow,background-color,border-color]';
+
+// Staff all share one domain, so offer to finish the address.
+const domain = '@fdcp.gov.ph';
+const email = ref('');
+
+const suffix = computed(() => {
+    const v = email.value;
+
+    if (!v || /\s/.test(v)) {
+        return '';
+    }
+
+    const typed = v.slice(v.indexOf('@') === -1 ? v.length : v.indexOf('@'));
+
+    return domain.startsWith(typed) ? domain.slice(typed.length) : '';
+});
+
+function completeEmail(e: KeyboardEvent) {
+    const el = e.target as HTMLInputElement;
+    const accept =
+        (e.key === 'Tab' && !e.shiftKey) ||
+        (e.key === 'ArrowRight' && el.selectionStart === el.value.length);
+
+    if (suffix.value && accept) {
+        e.preventDefault();
+        email.value += suffix.value;
+    }
+}
+
+const capsLock = ref(false);
+
+function checkCaps(e: KeyboardEvent) {
+    capsLock.value = e.getModifierState?.('CapsLock') ?? false;
+}
 </script>
 
 <template>
@@ -81,16 +121,46 @@ defineProps<{
         <div class="grid gap-6">
             <div class="grid gap-2">
                 <Label for="email">Email address</Label>
-                <Input
-                    id="email"
-                    type="email"
-                    name="email"
-                    required
-                    autofocus
-                    :tabindex="1"
-                    autocomplete="email"
-                    placeholder="name@fdcp.gov.ph"
-                />
+                <div class="group relative">
+                    <Input
+                        id="email"
+                        v-model="email"
+                        type="email"
+                        name="email"
+                        required
+                        autofocus
+                        :tabindex="1"
+                        autocomplete="email"
+                        placeholder="name@fdcp.gov.ph"
+                        :class="field"
+                        @keydown="completeEmail"
+                    />
+                    <Mail
+                        class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-foreground"
+                    />
+                    <!-- Ghost completion: typed text is invisible, only the
+                         missing domain shows, lined up after the caret. -->
+                    <div
+                        v-if="suffix"
+                        class="pointer-events-none absolute inset-px flex items-center overflow-hidden pr-14 pl-10 text-base whitespace-pre opacity-0 group-focus-within:opacity-100 md:text-sm"
+                        aria-hidden="true"
+                    >
+                        <span class="invisible">{{ email }}</span>
+                        <span class="text-muted-foreground/70">{{
+                            suffix
+                        }}</span>
+                    </div>
+                    <kbd
+                        v-if="suffix"
+                        class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded border bg-card px-1.5 py-0.5 text-[11px] leading-none font-medium text-muted-foreground opacity-0 group-focus-within:opacity-100"
+                        aria-hidden="true"
+                    >
+                        Tab
+                    </kbd>
+                    <span class="sr-only" aria-live="polite">
+                        {{ suffix ? `Press Tab to add ${domain}` : '' }}
+                    </span>
+                </div>
                 <InputError :message="errors.email" />
             </div>
 
@@ -106,13 +176,30 @@ defineProps<{
                         Forgot your password?
                     </TextLink>
                 </div>
-                <PasswordInput
-                    id="password"
-                    name="password"
-                    required
-                    :tabindex="2"
-                    autocomplete="current-password"
-                />
+                <div class="group relative">
+                    <PasswordInput
+                        id="password"
+                        name="password"
+                        required
+                        :tabindex="2"
+                        autocomplete="current-password"
+                        :class="field"
+                        @keydown="checkCaps"
+                        @keyup="checkCaps"
+                        @blur="capsLock = false"
+                    />
+                    <LockKeyhole
+                        class="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-foreground"
+                    />
+                </div>
+                <p
+                    v-if="capsLock"
+                    class="flex w-fit items-center gap-1.5 rounded-md bg-warning/15 px-2 py-1 text-xs font-medium"
+                    role="status"
+                >
+                    <ArrowBigUp class="size-3.5 text-warning" />
+                    Caps Lock is on
+                </p>
                 <InputError :message="errors.password" />
             </div>
 
@@ -135,7 +222,10 @@ defineProps<{
             </Button>
         </div>
 
-        <div class="text-center text-sm text-muted-foreground">
+        <div
+            v-if="canRegister"
+            class="text-center text-sm text-muted-foreground"
+        >
             Don't have an account?
             <TextLink :href="register()" :tabindex="5">Sign up</TextLink>
         </div>

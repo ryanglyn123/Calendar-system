@@ -23,7 +23,7 @@ export function layoutWeekLanes(
     weekDays: Date[],
 ): WeekLaneSegment[] {
     const weekStart = startOfDay(weekDays[0]);
-    const weekEnd = addDays(startOfDay(weekDays[6]), 1);
+    const weekEnd = addDays(startOfDay(weekDays[weekDays.length - 1]), 1);
 
     const segments: Omit<WeekLaneSegment, 'lane'>[] = [];
 
@@ -35,12 +35,16 @@ export function layoutWeekLanes(
             continue;
         }
 
-        const clampedStart = startsAt < weekStart ? weekStart : startOfDay(startsAt);
+        const clampedStart =
+            startsAt < weekStart ? weekStart : startOfDay(startsAt);
 
         // End-exclusive: an event ending exactly at midnight covers up to the
         // previous day.
         const lastMoment = new Date(endsAt.getTime() - 1);
-        const clampedEnd = lastMoment >= weekEnd ? addDays(weekEnd, -1) : startOfDay(lastMoment);
+        const clampedEnd =
+            lastMoment >= weekEnd
+                ? addDays(weekEnd, -1)
+                : startOfDay(lastMoment);
 
         const startCol = Math.round(
             (clampedStart.getTime() - weekStart.getTime()) / 86_400_000,
@@ -52,7 +56,10 @@ export function layoutWeekLanes(
         segments.push({
             occurrence,
             startCol: Math.max(0, startCol),
-            span: Math.min(6, endCol) - Math.max(0, startCol) + 1,
+            span:
+                Math.min(weekDays.length - 1, endCol) -
+                Math.max(0, startCol) +
+                1,
             continuesBefore: startsAt < weekStart,
             continuesAfter: endsAt > weekEnd,
         });
@@ -73,7 +80,7 @@ export function layoutWeekLanes(
         let lane = 0;
 
         while (true) {
-            lanes[lane] ??= new Array(7).fill(false);
+            lanes[lane] ??= new Array(weekDays.length).fill(false);
 
             const free = Array.from(
                 { length: segment.span },

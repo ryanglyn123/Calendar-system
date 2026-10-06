@@ -2,11 +2,13 @@
 import { CalendarX2 } from '@lucide/vue';
 import { computed } from 'vue';
 import {
-    addDays,
-    format,
-    isSameDay,
-    startOfDay,
-} from '@/lib/calendarMath';
+    BOOKING_STATE,
+    bookingTone,
+    chipFill,
+    chipState,
+    isShown,
+} from '@/lib/bookingDisplay';
+import { addDays, format, isSameDay, startOfDay } from '@/lib/calendarMath';
 import { useCalendarGridStore } from '@/stores/calendarGrid';
 import { useCalendarListStore } from '@/stores/calendarList';
 import type { EventOccurrence } from '@/types/calendar';
@@ -24,10 +26,11 @@ const groups = computed(() => {
     const start = startOfDay(grid.focusDate);
     const end = addDays(start, DAYS_AHEAD);
     const visibleIds = new Set(list.visibleCalendarIds);
+    const listedIds = new Set(list.calendars.map((c) => c.id));
 
     const occurrences = grid
         .occurrencesBetween(start, end)
-        .filter((o) => visibleIds.has(o.calendar_id));
+        .filter((o) => isShown(o, visibleIds, listedIds));
 
     const byDay = new Map<string, { day: Date; items: EventOccurrence[] }>();
 
@@ -97,17 +100,31 @@ const timeLabel = (occurrence: EventOccurrence) =>
                     >
                         <button
                             type="button"
+                            data-event
                             class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted"
                             :class="{
-                                'opacity-70 line-through':
-                                    occurrence.status === 'cancelled',
+                                'line-through opacity-70':
+                                    occurrence.status === 'cancelled' &&
+                                    !occurrence.booking,
                             }"
+                            :aria-label="`${chipState(occurrence)}${occurrence.title}, ${timeLabel(occurrence)}`"
                             @click="emit('open', occurrence)"
                         >
                             <span
                                 class="size-3 shrink-0 rounded-full"
+                                :class="
+                                    occurrence.booking
+                                        ? chipFill(occurrence)
+                                        : ''
+                                "
                                 :style="{
-                                    backgroundColor: occurrence.color,
+                                    backgroundColor: occurrence.booking
+                                        ? undefined
+                                        : occurrence.color,
+                                    '--ev':
+                                        bookingTone(occurrence) ?? '#d4d8dd',
+                                    '--wash':
+                                        bookingTone(occurrence) ?? '#d4d8dd',
                                 }"
                                 aria-hidden="true"
                             />
@@ -116,8 +133,34 @@ const timeLabel = (occurrence: EventOccurrence) =>
                             >
                                 {{ timeLabel(occurrence) }}
                             </span>
-                            <span class="truncate text-sm font-medium">
+                            <span
+                                class="truncate text-sm font-medium"
+                                :class="{
+                                    'text-muted-foreground line-through':
+                                        occurrence.booking &&
+                                        !BOOKING_STATE[
+                                            occurrence.booking.status
+                                        ].active,
+                                }"
+                            >
                                 {{ occurrence.title }}
+                            </span>
+                            <span
+                                v-if="occurrence.booking"
+                                class="ml-auto inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
+                            >
+                                <component
+                                    :is="
+                                        BOOKING_STATE[occurrence.booking.status]
+                                            .icon
+                                    "
+                                    class="size-3.5"
+                                    aria-hidden="true"
+                                />
+                                {{
+                                    BOOKING_STATE[occurrence.booking.status]
+                                        .label
+                                }}
                             </span>
                             <span
                                 v-if="occurrence.location"

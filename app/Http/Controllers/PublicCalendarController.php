@@ -32,7 +32,7 @@ class PublicCalendarController extends Controller
 
         return Inertia::render('PublicCalendar', [
             'eventTypes' => EventTypeResource::collection(
-                EventType::query()->active()->orderBy('sort_order')->get(),
+                EventType::query()->active()->visibleTo($request->user())->orderBy('sort_order')->get(),
             ),
             'weekStartsOn' => $settings->week_starts_on,
             'initialCalendars' => fn () => $list->forUser($request, $user, $types),

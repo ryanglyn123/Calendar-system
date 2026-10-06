@@ -40,16 +40,13 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(20)->by($request->user()?->id ?: $request->ip());
         });
 
-        RateLimiter::for('chat-send', function (Request $request) {
+        // Rendering a PDF is the heaviest thing a person can ask for.
+        RateLimiter::for('booking-documents', function (Request $request) {
             return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
         });
 
-        RateLimiter::for('chat-react', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
-        });
-
-        RateLimiter::for('chat-media', function (Request $request) {
-            return Limit::perMinute(240)->by($request->user()?->id ?: $request->ip());
+        RateLimiter::for('comments', function (Request $request) {
+            return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
         });
     }
 

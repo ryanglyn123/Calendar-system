@@ -2,10 +2,12 @@
 
 use App\Enums\BookingStatus;
 use App\Models\Booking;
+use App\Models\Holiday;
 use App\Models\Resource;
 use App\Models\ResourceType;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\WorkingHour;
 use App\Notifications\BookingDecidedNotification;
 use App\Notifications\BookingRequestedNotification;
 use Illuminate\Support\Carbon;
@@ -36,7 +38,7 @@ function bookingPayload(Resource $resource, string $start = '+2 days 09:00', int
         'starts_at' => $startAt->toIso8601String(),
         'ends_at' => $startAt->copy()->addHours($hours)->toIso8601String(),
         'purpose' => 'Quarterly planning session',
-        'attendee_count' => 5,
+        'people' => ['Ana Reyes', 'Ben Cruz', 'Carla Lim', 'Dan Tan', 'Ela Go'],
     ];
 }
 
@@ -179,19 +181,16 @@ test('booking rules are enforced', function () {
         ->assertCreated();
 });
 
-test('capacity limits attendee count', function () {
+test('capacity limits the people listed', function () {
     $this->resource->update(['capacity' => 4]);
 
-    $payload = bookingPayload($this->resource);
-    $payload['attendee_count'] = 10;
-
     $this->actingAs($this->requester)
-        ->postJson(route('api.bookings.store'), $payload)
+        ->postJson(route('api.bookings.store'), bookingPayload($this->resource))
         ->assertUnprocessable()
-        ->assertJsonValidationErrors('attendee_count');
+        ->assertJsonValidationErrors(['people' => 'holds at most 4 people; this lists 5']);
 });
 
-test('booking events adopt the booking status color on the grid', function () {
+test('booking events keep their resource color and carry their state separately', function () {
     $payload = bookingPayload($this->resource);
 
     $this->actingAs($this->requester)->postJson(route('api.bookings.store'), $payload)->assertCreated();
@@ -205,6 +204,51 @@ test('booking events adopt the booking status color on the grid', function () {
         ->firstWhere('booking.status', 'pending');
 
     expect($occurrence)->not->toBeNull()
-        ->and($occurrence['color'])->toBe(BookingStatus::Pending->color())
+        ->and($occurrence['color'])->toBe($this->resource->calendar->color)
+        ->and($occurrence['booking']['is_mine'])->toBeTrue()
         ->and($occurrence['can_edit'])->toBeFalse();
+});
+
+test('availability reports the day\'s bookings, opening hours, and blocking holiday', function () {
+    $this->type->update(['enforce_working_hours' => true, 'block_holidays' => true]);
+
+    WorkingHour::query()->updateOrCreate(
+        ['resource_id' => null, 'day_of_week' => Carbon::MONDAY],
+        ['opens_at' => '08:00', 'closes_at' => '18:00'],
+    );
+    WorkingHour::query()->updateOrCreate(
+        ['resource_id' => null, 'day_of_week' => Carbon::SUNDAY],
+        ['opens_at' => null, 'closes_at' => null],
+    );
+
+    $monday = Carbon::parse('next monday', 'Asia/Manila');
+
+    Booking::factory()->approved()->create([
+        'resource_id' => $this->resource->id,
+        'starts_at' => $monday->copy()->setTime(9, 0)->utc(),
+        'ends_at' => $monday->copy()->setTime(10, 0)->utc(),
+    ]);
+
+    $availability = fn (Carbon $day) => $this->actingAs($this->requester)
+        ->getJson(route('api.resources.availability', $this->resource).'?date='.$day->toDateString())
+        ->assertOk();
+
+    $availability($monday)
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('hours', ['opens' => '08:00', 'closes' => '18:00'])
+        ->assertJsonPath('closed', false)
+        ->assertJsonPath('holiday', null);
+
+    $availability($monday->copy()->subDay())
+        ->assertJsonPath('hours', null)
+        ->assertJsonPath('closed', true);
+
+    Holiday::query()->create([
+        'name' => 'Founding Day',
+        'date' => $monday->toDateString(),
+        'recurs_annually' => false,
+        'blocks_bookings' => true,
+    ]);
+
+    $availability($monday)->assertJsonPath('holiday', 'Founding Day');
 });

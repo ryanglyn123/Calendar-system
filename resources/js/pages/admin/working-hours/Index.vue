@@ -111,7 +111,7 @@ const submit = () => {
             <div
                 v-for="day in form.days"
                 :key="day.day_of_week"
-                class="grid grid-cols-[7rem_4rem_1fr] items-center gap-3 border-b px-4 py-2.5 last:border-b-0"
+                class="grid grid-cols-[1fr_auto] items-center gap-3 border-b px-4 py-2.5 last:border-b-0 sm:grid-cols-[7rem_4rem_1fr]"
             >
                 <Label class="font-medium">
                     {{ DAY_NAMES[day.day_of_week] }}
@@ -125,16 +125,14 @@ const submit = () => {
 
                 <div
                     v-if="day.opens_at !== null"
-                    class="flex items-center gap-2"
+                    class="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1"
                 >
                     <Input
                         :model-value="day.opens_at ?? ''"
                         type="time"
                         class="w-28"
                         :aria-label="`${DAY_NAMES[day.day_of_week]} opens at`"
-                        @update:model-value="
-                            (v) => (day.opens_at = String(v))
-                        "
+                        @update:model-value="(v) => (day.opens_at = String(v))"
                     />
                     <span class="text-sm text-muted-foreground">to</span>
                     <Input
@@ -142,12 +140,13 @@ const submit = () => {
                         type="time"
                         class="w-28"
                         :aria-label="`${DAY_NAMES[day.day_of_week]} closes at`"
-                        @update:model-value="
-                            (v) => (day.closes_at = String(v))
-                        "
+                        @update:model-value="(v) => (day.closes_at = String(v))"
                     />
                 </div>
-                <span v-else class="text-sm text-muted-foreground">
+                <span
+                    v-else
+                    class="col-span-2 text-sm text-muted-foreground sm:col-span-1"
+                >
                     Closed
                 </span>
             </div>

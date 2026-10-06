@@ -23,7 +23,7 @@ class StoreEventRequest extends FormRequest
     {
         return [
             'calendar_id' => ['required', 'integer', Rule::exists('calendars', 'id')->whereNull('deleted_at')],
-            'event_type_id' => ['nullable', 'integer', Rule::exists('event_types', 'id')->where('is_active', true)],
+            'event_type_id' => ['nullable', 'integer', Rule::exists('event_types', 'id')->where('is_active', true)->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', $this->user()->id))],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'location' => ['nullable', 'string', 'max:255'],

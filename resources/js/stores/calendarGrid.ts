@@ -1,7 +1,12 @@
+import { useStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { api } from '@/lib/api';
-import { monthFetchRange, monthKey, windowKeysAround } from '@/lib/calendarMath';
+import {
+    monthFetchRange,
+    monthKey,
+    windowKeysAround,
+} from '@/lib/calendarMath';
 import type { WeekStart } from '@/lib/calendarMath';
 import {
     index as eventsIndex,
@@ -24,7 +29,11 @@ export function originalStartOf(occurrence: EventOccurrence): string {
 }
 
 type WindowState = {
-    status: 'loading' | 'ready' | 'stale';
+    /**
+     * `stale` and `refreshing` windows keep showing their last data, so a
+     * background refresh never blanks the grid; only a first load does.
+     */
+    status: 'loading' | 'ready' | 'stale' | 'refreshing';
     occurrences: EventOccurrence[];
 };
 
@@ -32,6 +41,15 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
     const view = ref<CalendarView>('month');
     const focusDate = ref<Date>(new Date());
     const weekStartsOn = ref<WeekStart>(1);
+
+    // View options from the view menu. Per-viewer conveniences, kept in the
+    // browser; read after mount so server and client first paint agree.
+    const showWeekends = useStorage('fdcp-calendar-weekends', true, undefined, {
+        initOnMounted: true,
+    });
+    const showDeclined = useStorage('fdcp-calendar-declined', true, undefined, {
+        initOnMounted: true,
+    });
     const windows = ref(new Map<string, WindowState>());
 
     /**
@@ -49,7 +67,28 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         return `${scope.value.types?.join('+') ?? ''}#${scope.value.resourceTypeId ?? ''}`;
     });
 
-    function setScope(next: CalendarScope | null): void {
+    // Booking calendars (Boardroom, Carpool) open where their page says (it
+    // knows the type and the viewer's role); leaving one restores the view
+    // and date the other calendars were on.
+    let outsideBooking = { view: view.value, date: focusDate.value };
+    const isBooking = (s: CalendarScope | null) => s?.resourceTypeId != null;
+
+    function setScope(
+        next: CalendarScope | null,
+        at?: { view: CalendarView; date: Date },
+    ): void {
+        if (isBooking(next) && !isBooking(scope.value)) {
+            outsideBooking = { view: view.value, date: focusDate.value };
+        } else if (!isBooking(next) && isBooking(scope.value)) {
+            view.value = outsideBooking.view;
+            focusDate.value = outsideBooking.date;
+        }
+
+        if (at) {
+            view.value = at.view;
+            focusDate.value = at.date;
+        }
+
         scope.value = next;
         version.value++;
     }
@@ -101,7 +140,11 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
                 const startsAt = new Date(occurrence.starts_at);
                 const endsAt = new Date(occurrence.ends_at);
 
-                if (startsAt < end && endsAt > start) {
+                if (
+                    startsAt < end &&
+                    endsAt > start &&
+                    (showDeclined.value || occurrence.my_rsvp !== 'declined')
+                ) {
                     seen.add(occurrence.occurrence_id);
                     result.push(occurrence);
                 }
@@ -161,10 +204,11 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         );
 
         for (const month of missing) {
+            const existing = windows.value.get(scopedKey(month));
+
             windows.value.set(scopedKey(month), {
-                status: 'loading',
-                occurrences:
-                    windows.value.get(scopedKey(month))?.occurrences ?? [],
+                status: existing ? 'refreshing' : 'loading',
+                occurrences: existing?.occurrences ?? [],
             });
         }
 
@@ -191,7 +235,14 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
             }
         } catch (error) {
             for (const month of missing) {
-                windows.value.delete(scopedKey(month));
+                const existing = windows.value.get(scopedKey(month));
+
+                // A failed refresh keeps the last good data, marked for retry.
+                if (existing?.status === 'refreshing') {
+                    existing.status = 'stale';
+                } else {
+                    windows.value.delete(scopedKey(month));
+                }
             }
 
             throw error;
@@ -373,6 +424,8 @@ export const useCalendarGridStore = defineStore('calendarGrid', () => {
         view,
         focusDate,
         weekStartsOn,
+        showWeekends,
+        showDeclined,
         windows,
         scope,
         setScope,

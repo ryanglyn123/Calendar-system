@@ -8,7 +8,7 @@ return new class extends Migration
 {
     /**
      * Units are divisions with a parent (one level deep): own members and
-     * calendar, but they share the parent division's chat room.
+     * calendar.
      */
     public function up(): void
     {

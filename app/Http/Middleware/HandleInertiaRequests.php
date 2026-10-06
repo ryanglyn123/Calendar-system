@@ -4,7 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Models\Announcement;
 use App\Models\ResourceType;
-use App\Services\Chat\ConversationService;
+use App\Services\Booking\ReviewQueue;
+use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -46,6 +47,10 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'organization' => fn () => [
+                'name' => app(GeneralSettings::class)->organization_name,
+                'acronym' => app(GeneralSettings::class)->organization_acronym,
+            ],
             'auth' => fn () => [
                 'user' => $user === null ? null : [
                     'id' => $user->id,
@@ -54,6 +59,8 @@ class HandleInertiaRequests extends Middleware
                     'avatar_path' => $user->avatar_path,
                     'status' => $user->status->value,
                     'timezone' => $user->timezone,
+                    // Their own names for colors; null until first edited.
+                    'color_labels' => $user->color_labels,
                     'division' => $user->division === null ? null : [
                         'id' => $user->division->id,
                         'name' => $user->division->name,
@@ -75,7 +82,7 @@ class HandleInertiaRequests extends Middleware
                     ->toArray(),
             // Each active resource type gets its own sidebar section
             // (Boardroom, Carpool, ...) with a calendar + booking page.
-            'resourceTypes' => fn () => $user === null || ! $user->isActive()
+            'resourceSections' => fn () => $user === null || ! $user->isActive()
                 ? []
                 : ResourceType::query()
                     ->active()
@@ -83,15 +90,22 @@ class HandleInertiaRequests extends Middleware
                     ->orderBy('name')
                     ->get(['id', 'name', 'slug', 'icon'])
                     ->toArray(),
-            // Chat conversation list for the sidebar badge and the dock:
-            // division rooms + custom group chats the user belongs to.
-            'chatConversations' => fn () => $user === null || ! $user->isActive()
-                ? []
-                : app(ConversationService::class)->summaries($user),
+            // What waits on this reviewer, for the top bar's "to review"
+            // control; null for everyone who reviews nothing.
+            'reviewQueue' => fn () => $user === null || ! $user->isActive()
+                ? null
+                : app(ReviewQueue::class)->summary($user),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            // The calendar side panel's dragged width, so the server paints
+            // it at the user's size; null (default width) when unset or bad.
+            'calendarPanelWidth' => filter_var($request->cookie('calendar_panel_width'), FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 200, 'max_range' => 400],
+            ]) ?: null,
+            // Dragged shut past its minimum; reopened from the edge tab.
+            'calendarPanelHidden' => $request->cookie('calendar_panel_hidden') === '1',
             // Lets the theme toggle render its real state on first paint
             // (explicit light/dark); 'system' still resolves client-side.
-            'appearance' => $request->cookie('appearance') ?? 'system',
+            'appearance' => $request->cookie('appearance') ?? 'light',
         ];
     }
 }

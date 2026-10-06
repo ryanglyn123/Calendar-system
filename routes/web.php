@@ -5,8 +5,8 @@ use App\Http\Controllers\Api\AnnouncementDismissalController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CalendarListController;
 use App\Http\Controllers\Api\CalendarPreferenceController;
-use App\Http\Controllers\Api\ChatController;
-use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\ColorLabelController;
+use App\Http\Controllers\Api\EventCategoryController;
 use App\Http\Controllers\Api\EventCommentController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventOccurrenceController;
@@ -17,12 +17,12 @@ use App\Http\Controllers\Api\ResourceBrowserController;
 use App\Http\Controllers\Api\UserSearchController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\InvitationAcceptanceController;
+use App\Http\Controllers\BookingPageController;
 use App\Http\Controllers\Calendar\CalendarShareController;
 use App\Http\Controllers\Calendar\DivisionUnitController;
 use App\Http\Controllers\Calendar\PersonalCalendarController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DivisionCalendarController;
-use App\Http\Controllers\DivisionChatController;
 use App\Http\Controllers\PublicCalendarController;
 use App\Http\Controllers\ResourceSectionController;
 use Illuminate\Support\Facades\Route;
@@ -52,11 +52,16 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('calendar/public', PublicCalendarController::class)->name('calendar.public');
     Route::get('calendar/division', DivisionCalendarController::class)->name('calendar.division');
-    Route::get('chat', DivisionChatController::class)->name('chat.index');
 
     // One section page per active resource type (Boardroom, Carpool, ...):
     // the type's calendar plus booking, linked from the sidebar.
     Route::get('resources/{resourceType:slug}', ResourceSectionController::class)->name('resources.section');
+
+    // One booking, for its requester and its type's approvers: the details,
+    // and once approved, the printable booking form.
+    Route::get('bookings/{booking}', [BookingPageController::class, 'show'])->name('bookings.show');
+    Route::get('bookings/{booking}/form.pdf', [BookingPageController::class, 'pdf'])
+        ->middleware('throttle:booking-documents')->name('bookings.pdf');
 
     // Personal calendar management + person-to-person sharing (Inertia forms).
     Route::post('calendars', [PersonalCalendarController::class, 'store'])->name('calendars.store');
@@ -88,11 +93,17 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         // Event discussion — open to anyone who can view the event's calendar.
         Route::get('events/{event}/comments', [EventCommentController::class, 'index'])->name('events.comments.index');
         Route::post('events/{event}/comments', [EventCommentController::class, 'store'])
-            ->middleware('throttle:chat-send')->name('events.comments.store');
+            ->middleware('throttle:comments')->name('events.comments.store');
         Route::delete('events/comments/{comment}', [EventCommentController::class, 'destroy'])->name('events.comments.destroy');
 
         // Inline event-type creation from the event editor (admins only; gated in the request).
         Route::post('event-types', [EventTypeController::class, 'store'])->name('event-types.store');
+
+        // Private per-user categories, added from the Create menu.
+        Route::post('event-categories', [EventCategoryController::class, 'store'])->name('event-categories.store');
+
+        // Personal names for event colors, edited from the color menu.
+        Route::put('color-labels', [ColorLabelController::class, 'update'])->name('color-labels.update');
 
         Route::get('users/search', UserSearchController::class)->name('users.search');
 
@@ -107,49 +118,18 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         Route::post('bookings', [BookingController::class, 'store'])
             ->middleware('throttle:booking-actions')->name('bookings.store');
         Route::get('bookings/mine', [BookingController::class, 'mine'])->name('bookings.mine');
+        Route::patch('bookings/{booking}', [BookingController::class, 'update'])
+            ->middleware('throttle:booking-actions')->name('bookings.update');
+        Route::post('bookings/{booking}/approve', [BookingController::class, 'approve'])
+            ->middleware('throttle:booking-actions')->name('bookings.approve');
+        Route::post('bookings/{booking}/reject', [BookingController::class, 'reject'])
+            ->middleware('throttle:booking-actions')->name('bookings.reject');
         Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel'])
             ->middleware('throttle:booking-actions')->name('bookings.cancel');
         Route::post('bookings/{booking}/edit-requests', [BookingController::class, 'requestEdit'])
             ->middleware('throttle:booking-actions')->name('bookings.edit-requests.store');
 
         Route::post('announcements/{announcement}/dismiss', [AnnouncementDismissalController::class, 'store'])->name('announcements.dismiss');
-
-        // Chat conversations: division rooms + custom group chats. The
-        // conversation list, plus custom-chat creation and management.
-        Route::get('conversations', [ConversationController::class, 'index'])->name('conversations.index');
-        Route::get('conversations/candidates', [ConversationController::class, 'participantCandidates'])->name('conversations.candidates');
-        Route::post('conversations', [ConversationController::class, 'store'])
-            ->middleware('throttle:chat-send')->name('conversations.store');
-        Route::patch('conversations/{conversation}', [ConversationController::class, 'update'])
-            ->middleware('throttle:chat-send')->name('conversations.update');
-        Route::post('conversations/{conversation}/leave', [ConversationController::class, 'leave'])
-            ->middleware('throttle:chat-send')->name('conversations.leave');
-
-        // Per-conversation reads/writes. Reads share the group throttle;
-        // writes get their own limiters, media streaming a generous one.
-        Route::get('conversations/{conversation}/messages', [ChatController::class, 'index'])->name('chat.messages.index');
-        Route::post('conversations/{conversation}/messages', [ChatController::class, 'store'])
-            ->middleware('throttle:chat-send')->name('chat.messages.store');
-        Route::get('conversations/{conversation}/members', [ChatController::class, 'members'])->name('chat.members');
-        Route::get('conversations/{conversation}/pinned', [ChatController::class, 'pinned'])->name('chat.pinned');
-        Route::post('conversations/{conversation}/read', [ChatController::class, 'markRead'])
-            ->middleware('throttle:chat-react')->name('chat.read');
-        Route::post('conversations/{conversation}/photo', [ChatController::class, 'updatePhoto'])
-            ->middleware('throttle:chat-send')->name('chat.photo.update');
-        Route::get('conversations/{conversation}/photo', [ChatController::class, 'showPhoto'])
-            ->middleware('throttle:chat-media')->name('chat.photo.show');
-
-        // Message-level actions, bound directly to the message/poll/attachment.
-        Route::delete('chat/messages/{message}', [ChatController::class, 'destroy'])
-            ->middleware('throttle:chat-send')->name('chat.messages.destroy');
-        Route::post('chat/messages/{message}/reactions', [ChatController::class, 'toggleReaction'])
-            ->middleware('throttle:chat-react')->name('chat.reactions.toggle');
-        Route::post('chat/messages/{message}/pin', [ChatController::class, 'togglePin'])
-            ->middleware('throttle:chat-react')->name('chat.pin.toggle');
-        Route::put('chat/polls/{poll}/votes', [ChatController::class, 'vote'])
-            ->middleware('throttle:chat-react')->name('chat.polls.votes');
-        Route::get('chat/attachments/{attachment}', [ChatController::class, 'showAttachment'])
-            ->middleware('throttle:chat-media')->name('chat.attachments.show');
     });
 });
 

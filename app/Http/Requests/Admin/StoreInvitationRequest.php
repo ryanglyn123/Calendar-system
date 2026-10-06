@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\Invitation;
+use App\Rules\AssignableRole;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,17 +22,17 @@ class StoreInvitationRequest extends FormRequest
         return [
             'email' => [
                 'required', 'email', 'max:255',
-                Rule::unique('users', 'email')->whereNull('deleted_at'),
+                Rule::unique('users', 'email'),
             ],
             'division_id' => ['nullable', 'integer', Rule::exists('divisions', 'id')->where('is_active', true)],
-            'role' => ['nullable', 'string', Rule::exists('roles', 'name')],
+            'role' => ['nullable', 'string', Rule::exists('roles', 'name'), new AssignableRole($this->user())],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'email.unique' => 'A user with this email already exists.',
+            'email.unique' => 'An account (possibly archived) already exists for this email.',
         ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Holiday;
+use App\Settings\GeneralSettings;
 use App\Support\Toast;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,7 +14,7 @@ use Inertia\Response;
 
 class HolidayController extends Controller
 {
-    public function index(): Response
+    public function index(GeneralSettings $settings): Response
     {
         abort_unless(request()->user()->can('holidays.manage'), 403);
 
@@ -29,6 +30,7 @@ class HolidayController extends Controller
                     'type' => $holiday->type,
                     'blocks_bookings' => $holiday->blocks_bookings,
                 ]),
+            'weekStartsOn' => $settings->week_starts_on,
         ]);
     }
 

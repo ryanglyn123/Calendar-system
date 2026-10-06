@@ -161,7 +161,7 @@ const capitalize = (text: string) =>
     text.charAt(0).toUpperCase() + text.slice(1);
 
 /** Coarse relative phrase between two instants, e.g. "in 3 days", "5 hr ago". */
-const relative = (targetMs: number, nowMs: number): string => {
+export const relative = (targetMs: number, nowMs: number): string => {
     const diff = targetMs - nowMs;
     const ahead = diff >= 0;
     const abs = Math.abs(diff);

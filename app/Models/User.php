@@ -62,6 +62,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'two_factor_confirmed_at' => 'datetime',
             'status' => UserStatus::class,
             'approved_at' => 'datetime',
+            'color_labels' => 'array',
         ];
     }
 
@@ -69,39 +70,6 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
-    }
-
-    /**
-     * The division whose chat room this user belongs to: unit members share
-     * their parent division's room instead of getting their own.
-     */
-    public function chatDivision(): ?Division
-    {
-        $division = $this->division;
-
-        return $division === null ? null : ($division->parent ?? $division);
-    }
-
-    /**
-     * Divisions whose chat rooms this user belongs to: their own division,
-     * plus the parent division when they are a unit member (units also see
-     * the parent room; the parent does not see unit rooms).
-     *
-     * @return list<int>
-     */
-    public function chatDivisionIds(): array
-    {
-        if ($this->division_id === null) {
-            return [];
-        }
-
-        $ids = [(int) $this->division_id];
-
-        if ($this->division?->parent_id !== null) {
-            $ids[] = (int) $this->division->parent_id;
-        }
-
-        return $ids;
     }
 
     /**

@@ -24,7 +24,7 @@ class UpdateEventRequest extends FormRequest
     {
         return [
             'calendar_id' => ['sometimes', 'integer', Rule::exists('calendars', 'id')->whereNull('deleted_at')],
-            'event_type_id' => ['sometimes', 'nullable', 'integer', Rule::exists('event_types', 'id')->where('is_active', true)],
+            'event_type_id' => ['sometimes', 'nullable', 'integer', Rule::exists('event_types', 'id')->where('is_active', true)->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', $this->user()->id)->orWhere('id', $this->route('event')->event_type_id))],
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'location' => ['sometimes', 'nullable', 'string', 'max:255'],

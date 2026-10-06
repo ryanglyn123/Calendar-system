@@ -1,4 +1,5 @@
 import type { Auth } from '@/types/auth';
+import type { ReviewSummary } from '@/types/desk';
 
 declare module '*.png' {
     const src: string;
@@ -27,8 +28,12 @@ declare module '@inertiajs/core' {
     export interface InertiaConfig {
         sharedPageProps: {
             name: string;
+            organization: { name: string; acronym: string };
             auth: Auth;
             sidebarOpen: boolean;
+            calendarPanelWidth: number | null;
+            calendarPanelHidden: boolean;
+            reviewQueue: ReviewSummary | null;
             [key: string]: unknown;
         };
     }

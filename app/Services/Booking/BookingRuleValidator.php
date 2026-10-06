@@ -8,6 +8,7 @@ use App\Models\Holiday;
 use App\Models\Resource;
 use App\Models\User;
 use App\Models\WorkingHour;
+use App\Settings\GeneralSettings;
 use Carbon\CarbonInterface;
 use Illuminate\Validation\ValidationException;
 
@@ -53,6 +54,7 @@ class BookingRuleValidator
                 ->whereIn('status', [BookingStatus::Pending->value, BookingStatus::Approved->value])
                 ->where('ends_at', '>', now())
                 ->when($ignoreBooking, fn ($q) => $q->whereKeyNot($ignoreBooking->id))
+                ->lockForUpdate()
                 ->count();
 
             if ($active >= $type->max_active_bookings_per_user) {
@@ -60,8 +62,9 @@ class BookingRuleValidator
             }
         }
 
-        if ($type->block_holidays && Holiday::blockingOn($start)) {
-            $this->fail('The selected day is a holiday; this resource cannot be booked then.');
+        // Holidays are office days: 07:00 Manila on a holiday is still 23:00 UTC the day before.
+        if ($type->block_holidays && ($holiday = Holiday::blockingWithin($start, $end)) !== null) {
+            $this->fail("{$holiday->name} is a holiday; this resource cannot be booked then.");
         }
 
         if ($type->enforce_working_hours) {
@@ -71,8 +74,9 @@ class BookingRuleValidator
 
     private function assertWithinWorkingHours(Resource $resource, CarbonInterface $start, CarbonInterface $end): void
     {
-        $local = $start->avoidMutation()->timezone('Asia/Manila');
-        $localEnd = $end->avoidMutation()->timezone('Asia/Manila');
+        $office = app(GeneralSettings::class)->timezone;
+        $local = $start->avoidMutation()->timezone($office);
+        $localEnd = $end->avoidMutation()->timezone($office);
 
         if (! $local->isSameDay($localEnd)) {
             $this->fail('Bookings must start and end on the same day when working hours apply.');

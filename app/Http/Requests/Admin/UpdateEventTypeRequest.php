@@ -20,7 +20,7 @@ class UpdateEventTypeRequest extends FormRequest
         return [
             'name' => [
                 'required', 'string', 'max:100',
-                Rule::unique('event_types', 'name')->ignore($this->route('event_type')),
+                Rule::unique('event_types', 'name')->whereNull('user_id')->ignore($this->route('event_type')),
             ],
             'color' => ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'icon' => ['nullable', 'string', 'max:50'],

@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Enums\EditRequestStatus;
 use App\Models\BookingEditRequest;
 use App\Models\User;
+use App\Notifications\Concerns\WritesInAppCopyNow;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -12,7 +13,7 @@ use Illuminate\Notifications\Notification;
 
 class EditRequestDecidedNotification extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, WritesInAppCopyNow;
 
     public function __construct(
         public readonly BookingEditRequest $editRequest,
@@ -42,14 +43,12 @@ class EditRequestDecidedNotification extends Notification implements ShouldQueue
             : "Your change to the {$resource} booking was rejected: {$this->editRequest->rejection_reason}";
     }
 
-    /** The booking's own section page (Boardroom, Carpool, ...). */
-    private function sectionPath(): string
+    /** The booking itself, now carrying the change if it was applied. */
+    private function bookingPath(): string
     {
-        $slug = $this->editRequest->booking?->resource?->type?->slug;
-
-        return $slug === null
+        return $this->editRequest->booking === null
             ? route('dashboard', absolute: false)
-            : route('resources.section', $slug, absolute: false);
+            : route('bookings.show', $this->editRequest->booking, absolute: false);
     }
 
     public function toMail(User $notifiable): MailMessage
@@ -58,7 +57,7 @@ class EditRequestDecidedNotification extends Notification implements ShouldQueue
             ->subject('Booking change '.$this->editRequest->status->value)
             ->greeting("Hello {$notifiable->name},")
             ->line($this->summary())
-            ->action('View my bookings', url($this->sectionPath()));
+            ->action('Open the booking', url($this->bookingPath()));
     }
 
     /**
@@ -70,8 +69,9 @@ class EditRequestDecidedNotification extends Notification implements ShouldQueue
             'key' => $this->key(),
             'title' => 'Booking change '.$this->editRequest->status->value,
             'message' => $this->summary(),
-            'action_url' => $this->sectionPath(),
+            'action_url' => $this->bookingPath(),
             'edit_request_id' => $this->editRequest->id,
+            'booking_id' => $this->editRequest->booking_id,
         ];
     }
 }

@@ -1,6 +1,7 @@
 import type { CalendarItem, EventTypeItem } from './admin';
 
-export type CalendarView = 'month' | 'week' | 'day' | 'agenda';
+export type CalendarView =
+    'month' | 'week' | 'day' | 'days4' | 'year' | 'agenda';
 
 /**
  * Narrows a calendar page to a subset of the accessible calendars: the
@@ -39,19 +40,34 @@ export type BookingStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
 export type EventBookingInfo = {
     id: number;
+    /** "BK-000123", as printed on the booking form. */
+    reference: string;
     status: BookingStatus;
     status_label: string;
     status_color: string;
     resource: string | null;
     resource_type: string | null;
+    resource_type_slug: string | null;
     capacity: number | null;
+    /** Who holds the slot; shown to everyone who can see the booking. */
+    requested_by: string | null;
+    is_mine: boolean;
+    /** The viewer reviews this resource type (approve, reject, cancel). */
+    can_review: boolean;
+    can_cancel: boolean;
+    /* The rest is null unless the viewer is the requester or a reviewer. */
     purpose: string | null;
     attendee_count: number | null;
-    requested_by: string | null;
+    /** Named attendees or passengers; null when the viewer may not see them. */
+    people: string[] | null;
+    requested_at: string | null;
     reviewed_by: string | null;
     reviewed_at: string | null;
     rejection_reason: string | null;
     cancellation_reason: string | null;
+    cancelled_by_reviewer: boolean;
+    /** Echoed back on decisions so a stale view is refused, not acted on. */
+    version: string | null;
 };
 
 export type UserSearchResult = {
@@ -63,9 +79,16 @@ export type UserSearchResult = {
 
 export type AppNotification = {
     id: string;
+    key: string | null;
     title: string;
     message: string;
     action_url: string | null;
+    /** The booking a booking notice is about. */
+    booking_id: number | null;
+    /** For booking notices: where the booking stands now, which may have
+     *  moved on since the notice was sent. */
+    booking_status:
+        'pending' | 'approved' | 'rejected' | 'cancelled' | 'removed' | null;
     read_at: string | null;
     created_at: string;
 };

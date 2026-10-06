@@ -29,6 +29,13 @@ class CalendarShareController extends Controller
             $request->user(),
         );
 
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($calendar)
+            ->event('shared')
+            ->withProperties(['user_id' => $user->id, 'permission' => $request->validated('permission')])
+            ->log("Shared calendar {$calendar->name} with {$user->name}");
+
         Toast::success("Calendar shared with {$user->name}.");
 
         return back();
@@ -42,6 +49,13 @@ class CalendarShareController extends Controller
         abort_unless($share->calendar_id === $calendar->id, 404);
 
         $this->calendars->revokeShare($share);
+
+        activity()
+            ->causedBy(request()->user())
+            ->performedOn($calendar)
+            ->event('share-revoked')
+            ->withProperties(['user_id' => $share->user_id])
+            ->log("Revoked a share on calendar {$calendar->name}");
 
         Toast::success('Share removed.');
 

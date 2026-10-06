@@ -19,6 +19,7 @@ class EventTypeResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'is_personal' => $this->user_id !== null,
             'color' => $this->color,
             'icon' => $this->icon,
             'description' => $this->description,

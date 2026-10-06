@@ -1,27 +1,15 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
-import { ArrowRight, CheckCircle2, Inbox, XCircle } from '@lucide/vue';
-import { ref } from 'vue';
-import PageHeader from '@/components/PageHeader.vue';
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { format } from '@/lib/calendarMath';
+import { Head, usePage } from '@inertiajs/vue3';
+import { Inbox } from '@lucide/vue';
+import { defaultWindow, useEventListener, useNow } from '@vueuse/core';
+import { computed, onMounted, ref, watch } from 'vue';
+import EmptyNote from '@/components/admin/EmptyNote.vue';
+import { dayLabel, timeRange } from '@/components/desk/desk';
+import ChangeReview from '@/components/review/ChangeReview.vue';
+import type { PendingChange } from '@/components/review/ChangeReview.vue';
+import ReviewInbox from '@/components/review/ReviewInbox.vue';
+import ReviewRow from '@/components/review/ReviewRow.vue';
+import type { RowFlag } from '@/components/review/ReviewRow.vue';
 import admin from '@/routes/admin';
 import adminEditRequests from '@/routes/admin/edit-requests';
 
@@ -34,171 +22,200 @@ defineOptions({
     },
 });
 
-type Slot = {
-    starts_at: string | null;
-    ends_at: string | null;
-    purpose: string | null;
-};
-
-type PendingChange = {
-    id: number;
-    resource: string;
-    requester: string | null;
-    note: string | null;
-    current: Slot;
-    proposed: Slot;
-};
-
-defineProps<{
+const props = defineProps<{
+    today: string;
     pending: PendingChange[];
 }>();
 
-const slotLabel = (slot: Slot) =>
-    slot.starts_at
-        ? `${format(new Date(slot.starts_at), 'MMM d, HH:mm')} - ${format(new Date(slot.ends_at ?? slot.starts_at), 'HH:mm')}`
-        : 'unchanged';
+const now = useNow({ interval: 60_000 });
 
-const apply = (change: PendingChange) =>
-    router.post(
-        adminEditRequests.apply(change.id).url,
-        {},
-        { preserveScroll: true },
-    );
+/* ---- Selection: changes have no page of their own, so it's held here -- */
 
-const rejecting = ref<PendingChange | null>(null);
+// ?request=12 opens one directly (a link from a notification or the desk).
+const fromUrl =
+    Number(
+        new URL(usePage().url, 'http://localhost').searchParams.get('request'),
+    ) || null;
 
-const rejectForm = useForm({ reason: '' });
+const selectedId = ref<number | null>(
+    props.pending.some((p) => p.id === fromUrl) ? fromUrl : null,
+);
+const selected = computed(
+    () => props.pending.find((p) => p.id === selectedId.value) ?? null,
+);
 
-const submitReject = () => {
-    if (!rejecting.value) {
+// Where the open one sat, so deciding it opens whatever moved into its place.
+const lastIndex = ref(0);
+watch(
+    () => props.pending.findIndex((p) => p.id === selectedId.value),
+    (i) => i >= 0 && (lastIndex.value = i),
+    { immediate: true },
+);
+
+watch(
+    () => props.pending,
+    (list) => {
+        if (
+            selectedId.value !== null &&
+            !list.some((p) => p.id === selectedId.value)
+        ) {
+            selectedId.value =
+                (list[lastIndex.value] ?? list.at(-1))?.id ?? null;
+        }
+    },
+);
+
+onMounted(() => {
+    // Wide screens open the first change straight away; narrow ones show the list.
+    if (
+        selectedId.value === null &&
+        props.pending.length > 0 &&
+        window.matchMedia('(min-width: 1024px)').matches
+    ) {
+        selectedId.value = props.pending[0].id;
+    }
+});
+
+const step = (by: 1 | -1) => {
+    const i = props.pending.findIndex((p) => p.id === selectedId.value);
+    const next = props.pending[i + by];
+
+    if (next) {
+        selectedId.value = next.id;
+    }
+};
+
+useEventListener(defaultWindow, 'keydown', (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+
+    if (
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        target?.closest('input, textarea, select, [contenteditable]') ||
+        document.querySelector('[role="dialog"], [role="menu"]')
+    ) {
         return;
     }
 
-    rejectForm.post(adminEditRequests.reject(rejecting.value.id).url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            rejecting.value = null;
-            rejectForm.reset();
-        },
-    });
+    if (e.key === 'j') {
+        step(1);
+    } else if (e.key === 'k') {
+        step(-1);
+    }
+});
+
+/* ---- Rows ------------------------------------------------------------- */
+
+/** What the request does, in a few words: the move first, else the rest. */
+const summary = (c: PendingChange) => {
+    if (c.proposed.starts_at || c.proposed.ends_at) {
+        const start = c.proposed.starts_at ?? c.current.starts_at;
+        const end = c.proposed.ends_at ?? c.current.ends_at;
+
+        return `Moves to ${dayLabel(start, now.value)} ${timeRange(start, end)}`;
+    }
+
+    const parts = [
+        c.proposed.purpose !== null && 'new purpose',
+        (c.proposed.people !== null || c.proposed.attendee_count !== null) &&
+            'new people',
+    ].filter(Boolean) as string[];
+
+    const text = parts.join(', ') || 'No visible change';
+
+    return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+const flagOf = (c: PendingChange): RowFlag | null => {
+    if (c.clash?.status === 'approved') {
+        return {
+            text: 'Taken',
+            tone: 'danger',
+            detail: `“${c.clash.title}” holds ${timeRange(c.clash.starts_at, c.clash.ends_at)}`,
+        };
+    }
+
+    if (c.passed) {
+        return {
+            text: 'Passed',
+            tone: 'quiet',
+            detail: 'The new time has already started',
+        };
+    }
+
+    return c.clash
+        ? {
+              text: 'Overlap',
+              tone: 'warn',
+              detail: `“${c.clash.title}” is also requested then`,
+          }
+        : null;
 };
 </script>
 
 <template>
     <Head title="Change Requests" />
 
-    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
-        <PageHeader
-            title="Change Requests"
-            description="Review requested changes to existing bookings before they take effect."
-        />
+    <div class="flex flex-1 flex-col gap-5 p-4 sm:p-6">
+        <header class="flex items-baseline gap-3">
+            <h1 class="text-2xl font-semibold tracking-tight">
+                Change requests
+            </h1>
+            <span
+                v-if="pending.length"
+                class="text-sm text-muted-foreground tabular-nums"
+            >
+                {{ pending.length }} waiting
+            </span>
+        </header>
 
-        <div
+        <EmptyNote
             v-if="pending.length === 0"
-            class="flex flex-1 flex-col items-center justify-center gap-3 text-center"
+            :icon="Inbox"
+            title="No changes are waiting."
         >
-            <Inbox class="size-10 text-muted-foreground" aria-hidden="true" />
-            <p class="text-sm text-muted-foreground">
-                No booking changes are waiting for review.
-            </p>
-        </div>
+            When someone asks to move or reword an approved booking, it shows up
+            here for a decision.
+        </EmptyNote>
 
-        <div v-else class="grid gap-4 md:grid-cols-2">
-            <Card v-for="change in pending" :key="change.id">
-                <CardHeader>
-                    <CardTitle>{{ change.resource }}</CardTitle>
-                    <CardDescription>
-                        Requested by {{ change.requester }}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent class="space-y-3">
-                    <div class="flex items-center gap-2 text-sm">
-                        <span class="text-muted-foreground line-through">
-                            {{ slotLabel(change.current) }}
-                        </span>
-                        <ArrowRight
-                            class="size-4 shrink-0 text-muted-foreground"
-                            aria-hidden="true"
-                        />
-                        <span class="font-medium">
-                            {{ slotLabel(change.proposed) }}
-                        </span>
-                    </div>
-
-                    <p
-                        v-if="change.proposed.purpose"
-                        class="text-sm text-muted-foreground"
-                    >
-                        New purpose: {{ change.proposed.purpose }}
-                    </p>
-                    <p
-                        v-if="change.note"
-                        class="rounded-md bg-muted/50 px-2.5 py-1.5 text-sm"
-                    >
-                        {{ change.note }}
-                    </p>
-
-                    <div class="flex justify-end gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            class="text-destructive"
-                            @click="rejecting = change"
-                        >
-                            <XCircle aria-hidden="true" />
-                            Reject
-                        </Button>
-                        <Button size="sm" @click="apply(change)">
-                            <CheckCircle2 aria-hidden="true" />
-                            Apply change
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-
-        <Dialog
-            :open="rejecting !== null"
-            @update:open="(open) => !open && (rejecting = null)"
+        <ReviewInbox
+            v-else
+            :has-selection="selected !== null"
+            list-label="Change requests waiting for review"
         >
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Reject this change?</DialogTitle>
-                    <DialogDescription>
-                        The requester keeps the original booking and sees your
-                        reason.
-                    </DialogDescription>
-                </DialogHeader>
+            <template #list>
+                <ul>
+                    <ReviewRow
+                        v-for="change in pending"
+                        :key="change.id"
+                        :title="change.title"
+                        :meta="`${summary(change)} · ${change.resource.name}`"
+                        :color="change.resource.color"
+                        :flag="flagOf(change)"
+                        :selected="change.id === selectedId"
+                        @select="selectedId = change.id"
+                    />
+                </ul>
+            </template>
 
-                <div class="grid gap-2">
-                    <Label for="change-reject-reason">Reason</Label>
-                    <Textarea
-                        id="change-reject-reason"
-                        v-model="rejectForm.reason"
-                        rows="3"
-                        placeholder="At least 10 characters"
+            <template #detail>
+                <div class="flex min-h-[calc(100svh-12rem)] flex-1 flex-col">
+                    <ChangeReview
+                        v-if="selected"
+                        :key="selected.id"
+                        :change="selected"
+                        :now="now"
+                        @back="selectedId = null"
                     />
                     <p
-                        v-if="rejectForm.errors.reason"
-                        class="text-sm text-destructive"
+                        v-else
+                        class="flex flex-1 items-center justify-center text-sm text-muted-foreground"
                     >
-                        {{ rejectForm.errors.reason }}
+                        Pick a change to review it.
                     </p>
                 </div>
-
-                <DialogFooter>
-                    <Button variant="outline" @click="rejecting = null">
-                        Cancel
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        :disabled="rejectForm.processing"
-                        @click="submitReject"
-                    >
-                        Reject change
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            </template>
+        </ReviewInbox>
     </div>
 </template>

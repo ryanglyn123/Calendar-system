@@ -78,3 +78,44 @@ test('managed calendars cannot be deleted through the personal endpoint', functi
         ->delete(route('calendars.destroy', $calendar))
         ->assertForbidden();
 });
+
+test('every user gets one primary personal calendar named after them', function () {
+    $user = User::factory()->create(['name' => 'Marco Santos']);
+
+    $this->actingAs($user)->get(route('dashboard'))->assertOk();
+    $props = $this->actingAs($user)->get(route('dashboard'))->inertiaProps();
+
+    $primary = Calendar::query()
+        ->where('owner_id', $user->id)
+        ->where('type', CalendarType::Personal->value)
+        ->get();
+
+    expect($primary)->toHaveCount(1)
+        ->and($primary->first()->name)->toBe('Marco Santos')
+        ->and($primary->first()->is_default)->toBeTrue();
+
+    $listed = collect($props['initialCalendars'])->firstWhere('id', $primary->first()->id);
+
+    expect($listed['type'])->toBe('personal')
+        ->and($listed['is_visible'])->toBeTrue()
+        ->and($listed['can_write_events'])->toBeTrue();
+});
+
+test('pages without personal calendars do not provision one', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get(route('calendar.public'))->assertOk();
+
+    expect(Calendar::query()->where('owner_id', $user->id)->exists())->toBeFalse();
+});
+
+test('the primary personal calendar cannot be deleted', function () {
+    $user = User::factory()->create();
+    $primary = Calendar::factory()->ownedBy($user)->create(['is_default' => true]);
+
+    $this->actingAs($user)
+        ->delete(route('calendars.destroy', $primary))
+        ->assertForbidden();
+
+    expect($primary->fresh())->not->toBeNull();
+});

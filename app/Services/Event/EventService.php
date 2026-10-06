@@ -5,6 +5,7 @@ namespace App\Services\Event;
 use App\Models\Event;
 use App\Models\User;
 use App\Notifications\EventInvitedNotification;
+use App\Settings\GeneralSettings;
 use Illuminate\Support\Carbon;
 
 class EventService
@@ -24,7 +25,7 @@ class EventService
      */
     public function create(User $creator, array $attributes): Event
     {
-        $timezone = $creator->timezone ?: 'Asia/Manila';
+        $timezone = $creator->timezone ?: app(GeneralSettings::class)->timezone;
 
         $event = Event::query()->create([
             ...$this->normalize($attributes, $timezone),

@@ -5,6 +5,8 @@
  * the sign-in card. Purely presentational; animations are transform/opacity
  * only and collapse to a static composition under prefers-reduced-motion.
  */
+import { onMounted, onUnmounted, ref } from 'vue';
+
 type ScenePill = {
     /** viewport-relative position */
     x: string;
@@ -73,12 +75,32 @@ const pills: ScenePill[] = [
     },
 ];
 
+// Pointer parallax: the scene leans away from the cursor, near pills more
+// than far ones. CSS reads --px/--py in the range -1..1.
+const scene = ref<HTMLElement>();
+
+function lean(e: PointerEvent) {
+    scene.value?.style.setProperty(
+        '--px',
+        `${(e.clientX / innerWidth) * 2 - 1}`,
+    );
+    scene.value?.style.setProperty(
+        '--py',
+        `${(e.clientY / innerHeight) * 2 - 1}`,
+    );
+}
+
+onMounted(() =>
+    window.addEventListener('pointermove', lean, { passive: true }),
+);
+onUnmounted(() => window.removeEventListener('pointermove', lean));
+
 const wash = (color: string) =>
     `linear-gradient(180deg, color-mix(in oklab, ${color} 82%, white) 0%, ${color} 100%)`;
 </script>
 
 <template>
-    <div class="auth-scene" aria-hidden="true">
+    <div ref="scene" class="auth-scene" aria-hidden="true">
         <div class="auth-scene-grid" />
         <span
             v-for="(pill, i) in pills"

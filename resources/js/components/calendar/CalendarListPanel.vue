@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3';
+import { useForm, usePage } from '@inertiajs/vue3';
 import { Pencil, Plus } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useConfirm } from '@/composables/useConfirm';
+import { colorName, DEFAULT_COLOR, EVENT_COLORS } from '@/lib/eventColors';
 import { store as calendarsStore } from '@/routes/calendars';
 import divisionUnits from '@/routes/division-units';
 import { useCalendarListStore } from '@/stores/calendarList';
@@ -22,42 +23,35 @@ import type { CalendarItem, CalendarPanelGroup } from '@/types/calendar';
 
 const list = useCalendarListStore();
 const { confirm } = useConfirm();
+const page = usePage();
+
+const props = defineProps<{
+    groups?: CalendarPanelGroup[];
+}>();
 
 // Resource calendars are absent from the default (merged) panel on purpose:
 // each resource type has its own section page now.
-const props = withDefaults(
-    defineProps<{
-        groups?: CalendarPanelGroup[];
-    }>(),
-    {
-        groups: () => [
-            { key: 'organization', label: 'FDCP' },
-            { key: 'division', label: 'Division' },
+const groups = computed<CalendarPanelGroup[]>(
+    () =>
+        props.groups ?? [
             { key: 'personal', label: 'My calendars' },
+            { key: 'organization', label: page.props.organization.acronym },
+            { key: 'division', label: 'Division' },
         ],
-    },
 );
 
 const hasPersonalGroup = computed(() =>
-    props.groups.some((group) => group.key === 'personal'),
+    groups.value.some((group) => group.key === 'personal'),
 );
 
-const swatches = [
-    '#EFD95F',
-    '#F5CD7E',
-    '#BFA8F5',
-    '#F5A6D8',
-    '#86C6F5',
-    '#86DBAE',
-    '#F7A79B',
-    '#B29AF5',
-];
+// Google's palette, so calendars and events share one set of colors.
+const swatches = EVENT_COLORS.map((c) => c.hex);
 
 const creating = ref(false);
 
 const form = useForm({
     name: '',
-    color: '#86C6F5',
+    color: DEFAULT_COLOR,
 });
 
 const submit = () => {
@@ -79,7 +73,7 @@ const toggle = (calendar: CalendarItem) => {
 
 const unitDialogOpen = ref(false);
 const editingUnit = ref<CalendarItem | null>(null);
-const unitForm = useForm({ name: '', color: '#86C6F5' });
+const unitForm = useForm({ name: '', color: DEFAULT_COLOR });
 
 const openUnitCreate = () => {
     editingUnit.value = null;
@@ -182,20 +176,23 @@ const removeUnit = async () => {
                     <li
                         v-for="calendar in list.grouped[group.key]"
                         :key="calendar.id"
-                        class="group/cal flex items-center gap-0.5"
+                        class="group/cal relative flex items-center gap-0.5"
                     >
                         <Label
                             class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-sm font-normal hover:bg-muted"
                         >
                             <Checkbox
                                 :model-value="calendar.is_visible"
+                                class="border-(--primary)"
                                 :style="{
                                     '--primary': calendar.effective_color,
                                 }"
                                 :aria-label="`Toggle ${calendar.name}`"
                                 @update:model-value="() => toggle(calendar)"
                             />
-                            <span class="truncate">{{ calendar.name }}</span>
+                            <span class="truncate" :title="calendar.name">
+                                {{ calendar.name }}
+                            </span>
                         </Label>
                         <Button
                             v-if="group.manageUnits && calendar.unit_manageable"
@@ -269,7 +266,8 @@ const removeUnit = async () => {
                                         form.color === swatch,
                                 }"
                                 :style="{ backgroundColor: swatch }"
-                                :aria-label="`Color ${swatch}`"
+                                :aria-label="colorName(swatch)"
+                                :title="colorName(swatch)"
                                 :aria-pressed="form.color === swatch"
                                 @click="form.color = swatch"
                             />
@@ -335,7 +333,8 @@ const removeUnit = async () => {
                                         unitForm.color === swatch,
                                 }"
                                 :style="{ backgroundColor: swatch }"
-                                :aria-label="`Color ${swatch}`"
+                                :aria-label="colorName(swatch)"
+                                :title="colorName(swatch)"
                                 :aria-pressed="unitForm.color === swatch"
                                 @click="unitForm.color = swatch"
                             />

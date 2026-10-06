@@ -1,11 +1,24 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
-import { ArrowRight, Building2, UserCheck, Users } from '@lucide/vue';
-import PageHeader from '@/components/PageHeader.vue';
+import { Head, Link, router, usePoll } from '@inertiajs/vue3';
+import { useNow } from '@vueuse/core';
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
+import DeskBoard from '@/components/desk/DeskBoard.vue';
+import DeskHorizon from '@/components/desk/DeskHorizon.vue';
+import DeskNotes from '@/components/desk/DeskNotes.vue';
+import DeskQueue from '@/components/desk/DeskQueue.vue';
+import { useAuth } from '@/composables/useAuth';
+import { format, parseISO } from '@/lib/calendarMath';
 import admin from '@/routes/admin';
-import adminDivisions from '@/routes/admin/divisions';
-import adminPending from '@/routes/admin/pending-registrations';
-import adminUsers from '@/routes/admin/users';
+import adminHealth from '@/routes/admin/health';
+import type {
+    DeskActivity,
+    DeskAnnouncements,
+    DeskDemandDay,
+    DeskHealth,
+    DeskPeople,
+    DeskQueueItem,
+    DeskSchedule,
+} from '@/types';
 
 defineOptions({
     layout: {
@@ -13,101 +26,163 @@ defineOptions({
     },
 });
 
-defineProps<{
-    stats: {
-        total_users: number;
-        pending_users: number;
-        divisions: number;
-    };
+const props = defineProps<{
+    today: string;
+    queue: DeskQueueItem[];
+    schedule: DeskSchedule;
+    demand: DeskDemandDay[];
+    people: DeskPeople | null;
+    notices: DeskAnnouncements | null;
+    activity: DeskActivity[] | null;
+    health: DeskHealth | null;
 }>();
+
+const { hasPermission, hasAnyPermission } = useAuth();
+
+const now = useNow({ interval: 60_000 });
+
+// Other reviewers and requesters act meanwhile: keep the queue, the day and
+// the strip current. Inertia pauses polling while the tab is hidden.
+usePoll(60_000, {
+    only: ['queue', 'schedule', 'demand', 'health'],
+});
+
+/** What lands in this person's queue, in words, for its empty state. */
+const receives = computed(() =>
+    [
+        hasPermission('bookings.approve') && 'booking and change requests',
+        hasAnyPermission('users.approve', 'users.manage') && 'sign-ups',
+    ]
+        .filter(Boolean)
+        .join(' and '),
+);
+
+const loading = ref(false);
+const spotlight = ref<number | null>(null);
+let spotlightTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Move the schedule to another day, reloading only its lanes. */
+const goTo = (date: string, onDone?: () => void) => {
+    router.get(
+        admin.dashboard({
+            query: { date: date === props.today ? undefined : date },
+        }).url,
+        {},
+        {
+            only: ['schedule'],
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            onStart: () => (loading.value = true),
+            onFinish: () => {
+                loading.value = false;
+                onDone?.();
+            },
+        },
+    );
+};
+
+/** From a queue row: bring its day onto the schedule and point at it. */
+const show = (date: string, bookingId: number) => {
+    const reveal = () => {
+        clearTimeout(spotlightTimer);
+        spotlight.value = bookingId;
+        spotlightTimer = setTimeout(() => (spotlight.value = null), 2400);
+
+        nextTick(() =>
+            document.getElementById('desk-schedule')?.scrollIntoView({
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)')
+                    .matches
+                    ? 'auto'
+                    : 'smooth',
+                block: 'start',
+            }),
+        );
+    };
+
+    if (date === props.schedule.date) {
+        reveal();
+    } else {
+        goTo(date, reveal);
+    }
+};
+
+const hover = (bookingId: number | null) => {
+    clearTimeout(spotlightTimer);
+    spotlight.value = bookingId;
+};
+
+onBeforeUnmount(() => clearTimeout(spotlightTimer));
 </script>
 
 <template>
-    <Head title="Admin Dashboard" />
+    <Head title="Admin desk" />
 
-    <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
-        <PageHeader
-            title="Admin Dashboard"
-            description="Accounts, divisions and access at a glance."
+    <div
+        class="mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-4 pt-4 pb-10 sm:px-6 lg:px-8"
+    >
+        <header
+            class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2"
+        >
+            <div>
+                <h1 class="text-2xl font-semibold tracking-tight">
+                    {{ format(parseISO(today), 'EEEE, MMMM d') }}
+                </h1>
+                <p class="text-sm text-muted-foreground">Admin desk</p>
+            </div>
+
+            <Link
+                v-if="health"
+                :href="adminHealth.index()"
+                class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] ring-1 ring-border outline-none ring-inset hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60"
+            >
+                <span
+                    class="size-2 rounded-full"
+                    :class="health.failed > 0 ? 'bg-warning' : 'bg-success'"
+                    aria-hidden="true"
+                />
+                <span
+                    v-if="health.failed > 0"
+                    class="font-medium text-warning-ink tabular-nums"
+                >
+                    {{ health.failed }} failed
+                    {{ health.failed === 1 ? 'job' : 'jobs' }}
+                </span>
+                <span v-else>Jobs running</span>
+            </Link>
+        </header>
+
+        <DeskQueue
+            v-if="receives"
+            :items="queue"
+            :now="now"
+            :receives="receives"
+            @spotlight="hover"
+            @show="show"
         />
 
-        <!-- What needs attention right now -->
-        <Link
-            :href="adminPending.index()"
-            class="group flex items-center justify-between gap-4 rounded-xl border p-5 transition-colors"
-            :class="
-                stats.pending_users > 0
-                    ? 'border-primary/40 bg-primary/10 hover:bg-primary/15'
-                    : 'bg-card hover:bg-muted/50'
-            "
-        >
-            <div class="flex items-center gap-4">
-                <span
-                    class="flex size-11 shrink-0 items-center justify-center rounded-lg"
-                    :class="
-                        stats.pending_users > 0
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground'
-                    "
-                >
-                    <UserCheck class="size-5" aria-hidden="true" />
-                </span>
-                <div class="space-y-0.5">
-                    <p class="text-sm font-semibold">
-                        {{
-                            stats.pending_users > 0
-                                ? `${stats.pending_users} registration${stats.pending_users === 1 ? '' : 's'} waiting for review`
-                                : 'No registrations waiting'
-                        }}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                        {{
-                            stats.pending_users > 0
-                                ? 'New sign-ups need approval and a division before they can book.'
-                                : "You're all caught up."
-                        }}
-                    </p>
-                </div>
-            </div>
-            <ArrowRight
-                class="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-                aria-hidden="true"
-            />
-        </Link>
+        <DeskBoard
+            :schedule="schedule"
+            :today="today"
+            :now="now"
+            :spotlight="spotlight"
+            :loading="loading"
+            @date="goTo"
+        />
 
-        <!-- Standing totals — one panel, hairline-divided, both cells navigable -->
-        <div
-            class="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2"
-        >
-            <Link
-                :href="adminUsers.index()"
-                class="flex flex-col gap-2 bg-card p-5 transition-colors hover:bg-muted/40"
-            >
-                <span
-                    class="flex items-center gap-2 text-sm text-muted-foreground"
-                >
-                    <Users class="size-4" aria-hidden="true" />
-                    Total users
-                </span>
-                <span class="text-3xl font-semibold tabular-nums">
-                    {{ stats.total_users }}
-                </span>
-            </Link>
+        <DeskHorizon
+            :days="demand"
+            :selected="schedule.date"
+            :today="today"
+            @select="goTo"
+        />
 
-            <Link
-                :href="adminDivisions.index()"
-                class="flex flex-col gap-2 bg-card p-5 transition-colors hover:bg-muted/40"
-            >
-                <span
-                    class="flex items-center gap-2 text-sm text-muted-foreground"
-                >
-                    <Building2 class="size-4" aria-hidden="true" />
-                    Active divisions
-                </span>
-                <span class="text-3xl font-semibold tabular-nums">
-                    {{ stats.divisions }}
-                </span>
-            </Link>
-        </div>
+        <DeskNotes
+            :people="people"
+            :announcements="notices"
+            :activity="activity"
+            :now="now"
+            :can-invite="hasPermission('users.manage')"
+        />
     </div>
 </template>

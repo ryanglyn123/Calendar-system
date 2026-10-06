@@ -18,6 +18,7 @@ class BookingFactory extends Factory
     public function definition(): array
     {
         $start = Carbon::now()->addDays(fake()->numberBetween(1, 10))->setTime(fake()->numberBetween(8, 15), 0);
+        $people = array_map(fn () => fake()->unique()->name(), range(1, fake()->numberBetween(1, 6)));
 
         return [
             'resource_id' => Resource::factory(),
@@ -27,7 +28,8 @@ class BookingFactory extends Factory
             'starts_at' => $start,
             'ends_at' => $start->copy()->addHours(2),
             'purpose' => fake()->sentence(),
-            'attendee_count' => fake()->numberBetween(1, 10),
+            'attendee_count' => count($people),
+            'people' => $people,
         ];
     }
 

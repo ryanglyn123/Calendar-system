@@ -62,7 +62,7 @@ class ResourceTypeController extends Controller
     public function destroy(ResourceType $resourceType): RedirectResponse
     {
         abort_unless(request()->user()->can('resource-types.manage'), 403);
-        abort_if($resourceType->resources()->exists(), 403, 'Delete or move its resources first.');
+        abort_if($resourceType->resources()->withTrashed()->exists(), 403, 'Delete or move its resources (including archived ones) first.');
 
         $resourceType->delete();
 
@@ -77,7 +77,20 @@ class ResourceTypeController extends Controller
     private function validated(Request $request, ?ResourceType $existing = null): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:100', Rule::unique('resource_types', 'name')->ignore($existing)],
+            'name' => [
+                'required', 'string', 'max:100', Rule::unique('resource_types', 'name')->ignore($existing),
+                // The URL slug is derived from the name and unique as well ("Board Room" vs "Board-Room").
+                function (string $attribute, mixed $value, \Closure $fail) use ($existing) {
+                    $taken = ResourceType::query()
+                        ->where('slug', Str::slug((string) $value))
+                        ->when($existing, fn ($query) => $query->whereKeyNot($existing->id))
+                        ->exists();
+
+                    if ($taken) {
+                        $fail('Another resource type already uses this name\'s URL slug.');
+                    }
+                },
+            ],
             'description' => ['nullable', 'string', 'max:255'],
             'approver_role_id' => ['required', 'integer', Rule::exists('roles', 'id')],
             'requires_approval' => ['boolean'],

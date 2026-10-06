@@ -72,6 +72,8 @@ Route::prefix('admin')
         Route::delete('resources/{resource}', [ResourceController::class, 'destroy'])->name('resources.destroy');
 
         Route::get('bookings', [BookingApprovalController::class, 'index'])->name('bookings.index');
+        // Not model-bound: an unknown or removed id still gets a page that says so.
+        Route::get('bookings/{booking}', [BookingApprovalController::class, 'show'])->name('bookings.show');
         Route::post('bookings/{booking}/approve', [BookingApprovalController::class, 'approve'])
             ->middleware('throttle:booking-actions')->name('bookings.approve');
         Route::post('bookings/{booking}/reject', [BookingApprovalController::class, 'reject'])

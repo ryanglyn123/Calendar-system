@@ -41,7 +41,7 @@ class DivisionCalendarController extends Controller
         return Inertia::render('DivisionCalendar', [
             'divisionName' => $user->division->name,
             'eventTypes' => EventTypeResource::collection(
-                EventType::query()->active()->orderBy('sort_order')->get(),
+                EventType::query()->active()->visibleTo($request->user())->orderBy('sort_order')->get(),
             ),
             'weekStartsOn' => $settings->week_starts_on,
             'initialCalendars' => fn () => $list->forUser($request, $user, $types),

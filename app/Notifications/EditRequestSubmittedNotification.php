@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\BookingEditRequest;
 use App\Models\User;
+use App\Notifications\Concerns\WritesInAppCopyNow;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
 
 class EditRequestSubmittedNotification extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, WritesInAppCopyNow;
 
     public const KEY = 'edit-request.submitted';
 

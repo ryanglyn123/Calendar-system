@@ -32,10 +32,18 @@ class GoogleAuthController extends Controller
             ]);
         }
 
-        $user = User::query()
-            ->where('google_id', $googleUser->getId())
-            ->orWhere('email', $googleUser->getEmail())
+        $user = User::withTrashed()
+            ->where(fn ($query) => $query
+                ->where('google_id', $googleUser->getId())
+                ->orWhere('email', $googleUser->getEmail()))
             ->first();
+
+        // An archived account still owns its email; creating a twin would hit the unique index.
+        if ($user?->trashed()) {
+            return redirect()->route('login')->withErrors([
+                'email' => 'This account has been deactivated. Ask an administrator to restore it.',
+            ]);
+        }
 
         if ($user === null) {
             if (! $settings->self_registration_enabled || ! $settings->emailDomainAllowed($googleUser->getEmail())) {

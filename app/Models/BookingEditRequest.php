@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $proposed_ends_at
  * @property string|null $proposed_purpose
  * @property int|null $proposed_attendee_count
+ * @property list<string>|null $proposed_people
  * @property string|null $note
  * @property int|null $reviewed_by
  * @property Carbon|null $reviewed_at
@@ -24,7 +25,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'booking_id', 'requested_by', 'status', 'proposed_starts_at', 'proposed_ends_at',
-    'proposed_purpose', 'proposed_attendee_count', 'note', 'reviewed_by',
+    'proposed_purpose', 'proposed_attendee_count', 'proposed_people', 'note', 'reviewed_by',
     'reviewed_at', 'rejection_reason',
 ])]
 class BookingEditRequest extends Model
@@ -35,6 +36,7 @@ class BookingEditRequest extends Model
             'status' => EditRequestStatus::class,
             'proposed_starts_at' => 'datetime',
             'proposed_ends_at' => 'datetime',
+            'proposed_people' => 'array',
             'reviewed_at' => 'datetime',
         ];
     }

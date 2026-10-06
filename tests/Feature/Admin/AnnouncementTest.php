@@ -128,3 +128,23 @@ test('admins can update system settings', function () {
         ->and(app(RegistrationSettings::class)->self_registration_enabled)->toBeFalse()
         ->and(app(RegistrationSettings::class)->allowed_email_domain)->toBe('fdcp.gov.ph');
 });
+
+test('the admin list does not replace the shared banner prop', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole('super_admin');
+
+    Announcement::query()->create([
+        'title' => 'Next week',
+        'body' => 'Body',
+        'level' => 'info',
+        'starts_at' => now()->addWeek(),
+        'is_dismissible' => true,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('admin.announcements.index'))
+        ->assertInertia(fn ($page) => $page
+            ->has('rows', 1)
+            ->has('announcements', 0));
+});

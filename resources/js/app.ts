@@ -7,9 +7,6 @@ import AuthLayout from '@/layouts/AuthLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
 
-// Echo (websockets) is created lazily in @/echo.ts by the chat store —
-// never at module load, which would break SSR hydration.
-
 const appName = import.meta.env.VITE_APP_NAME || 'FDCP Calendar';
 
 // Admin settings area: every configuration section shares one persistent
@@ -21,6 +18,9 @@ createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     layout: (name) => {
         switch (true) {
+            // Error pages may come from routes that never shared auth props.
+            case name === 'Error':
+                return undefined;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):

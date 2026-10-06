@@ -363,9 +363,7 @@ const numberOrNull = (value: string | number): number | null =>
                             />
                         </div>
                         <div class="grid gap-2">
-                            <Label for="type-cap">
-                                Active per user
-                            </Label>
+                            <Label for="type-cap"> Active per user </Label>
                             <Input
                                 id="type-cap"
                                 :model-value="

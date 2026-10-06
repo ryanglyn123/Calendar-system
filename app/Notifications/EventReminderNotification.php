@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Event;
 use App\Models\User;
+use App\Settings\GeneralSettings;
 use Carbon\CarbonInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -27,15 +28,19 @@ class EventReminderNotification extends Notification implements ShouldQueue
      */
     public function via(User $notifiable): array
     {
-        // The reminder row already picked its channel.
-        return [$this->channel];
+        // The reminder row picked its channel; the user's notification
+        // settings can still switch that channel off.
+        return array_values(array_intersect(
+            [$this->channel],
+            $notifiable->notificationChannelsFor(self::KEY),
+        ));
     }
 
     private function when(User $notifiable): string
     {
         return $this->occurrenceStartsAt
             ->avoidMutation()
-            ->timezone($notifiable->timezone ?: 'Asia/Manila')
+            ->timezone($notifiable->timezone ?: app(GeneralSettings::class)->timezone)
             ->format('l, F j \a\t H:i');
     }
 

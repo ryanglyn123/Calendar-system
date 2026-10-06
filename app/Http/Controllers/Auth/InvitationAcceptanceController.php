@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Concerns\PasswordValidationRules;
 use App\Http\Controllers\Controller;
 use App\Models\Invitation;
+use App\Models\User;
 use App\Services\Identity\InvitationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,12 +19,10 @@ class InvitationAcceptanceController extends Controller
 
     public function show(string $token): Response|RedirectResponse
     {
-        $invitation = Invitation::query()->where('token', $token)->first();
+        $invitation = $this->usable($token);
 
-        if ($invitation === null || $invitation->isAccepted() || $invitation->isExpired()) {
-            return redirect()->route('login')->withErrors([
-                'email' => 'This invitation link is no longer valid. Ask an administrator for a new one.',
-            ]);
+        if ($invitation === null) {
+            return $this->invalid();
         }
 
         return Inertia::render('auth/AcceptInvitation', [
@@ -35,12 +34,10 @@ class InvitationAcceptanceController extends Controller
 
     public function store(Request $request, string $token, InvitationService $invitations): RedirectResponse
     {
-        $invitation = Invitation::query()->where('token', $token)->first();
+        $invitation = $this->usable($token);
 
-        if ($invitation === null || $invitation->isAccepted() || $invitation->isExpired()) {
-            return redirect()->route('login')->withErrors([
-                'email' => 'This invitation link is no longer valid. Ask an administrator for a new one.',
-            ]);
+        if ($invitation === null) {
+            return $this->invalid();
         }
 
         $validated = $request->validate([
@@ -55,5 +52,32 @@ class InvitationAcceptanceController extends Controller
         $request->session()->regenerate();
 
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * The invitation behind the token, if it can still be accepted. An
+     * account that already exists for the address (active or archived)
+     * would collide with the users.email unique index.
+     */
+    private function usable(string $token): ?Invitation
+    {
+        $invitation = Invitation::query()->where('token', $token)->first();
+
+        if ($invitation === null || $invitation->isAccepted() || $invitation->isExpired()) {
+            return null;
+        }
+
+        if (User::withTrashed()->where('email', $invitation->email)->exists()) {
+            return null;
+        }
+
+        return $invitation;
+    }
+
+    private function invalid(): RedirectResponse
+    {
+        return redirect()->route('login')->withErrors([
+            'email' => 'This invitation link is no longer valid. Ask an administrator for a new one.',
+        ]);
     }
 }

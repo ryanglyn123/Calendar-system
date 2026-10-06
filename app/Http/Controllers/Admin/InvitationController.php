@@ -14,25 +14,42 @@ use App\Services\Identity\InvitationService;
 use App\Support\Toast;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class InvitationController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', Invitation::class);
 
+        $status = $request->validate([
+            'status' => ['nullable', Rule::in(['waiting', 'expired'])],
+        ])['status'] ?? null;
+
+        $pending = fn () => Invitation::query()->whereNull('accepted_at');
+        $waiting = fn ($q) => $q->where('expires_at', '>=', now());
+        $expired = fn ($q) => $q->where('expires_at', '<', now());
+
         return Inertia::render('admin/invitations/Index', [
             'invitations' => InvitationResource::collection(
-                Invitation::query()
+                $pending()
                     ->with(['division', 'role', 'inviter'])
-                    ->whereNull('accepted_at')
+                    ->when($status === 'waiting', $waiting)
+                    ->when($status === 'expired', $expired)
                     ->latest()
-                    ->paginate(15),
+                    ->paginate(15)
+                    ->withQueryString(),
             ),
+            'counts' => [
+                'all' => $pending()->count(),
+                'waiting' => $pending()->where($waiting)->count(),
+                'expired' => $pending()->where($expired)->count(),
+            ],
             'divisions' => DivisionResource::collection(Division::query()->active()->orderBy('sort_order')->get()),
             'roles' => RoleResource::collection(Role::query()->orderBy('name')->get()),
+            'filters' => $request->only(['status']),
         ]);
     }
 

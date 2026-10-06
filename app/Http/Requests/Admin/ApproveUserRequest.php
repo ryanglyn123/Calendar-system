@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\User;
+use App\Rules\AssignableRole;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,7 +25,7 @@ class ApproveUserRequest extends FormRequest
     {
         return [
             'division_id' => ['required', 'integer', Rule::exists('divisions', 'id')->where('is_active', true)],
-            'role' => ['required', 'string', Rule::exists('roles', 'name')],
+            'role' => ['required', 'string', Rule::exists('roles', 'name'), new AssignableRole($this->user())],
         ];
     }
 }

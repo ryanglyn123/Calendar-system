@@ -41,3 +41,49 @@ export function resourceTypeIcon(type: {
 
     return Boxes;
 }
+
+/**
+ * What a type's resources are called in copy ("Book a room", "3 of 5
+ * vehicles free") and the view its calendar opens in, which differs by
+ * role. Rooms are booked by the hour, so both sides open on a day of
+ * lanes. Vehicles are booked by the trip: staff plan a week ahead, while
+ * the fleet's approver opens on the month to see the whole fleet's load.
+ */
+export function resourceNouns(type: { icon?: string | null; name: string }): {
+    one: string;
+    many: string;
+    action: string;
+    view: { manage: BookingView; book: BookingView };
+} {
+    const icon = resourceTypeIcon(type);
+
+    if (icon === CarFront) {
+        return {
+            one: 'vehicle',
+            many: 'vehicles',
+            action: 'Book a vehicle',
+            view: { manage: 'month', book: 'week' },
+        };
+    }
+
+    if (icon === DoorOpen || icon === Presentation) {
+        return {
+            one: 'room',
+            many: 'rooms',
+            action: 'Book a room',
+            view: { manage: 'day', book: 'day' },
+        };
+    }
+
+    return {
+        one: 'item',
+        many: 'items',
+        action: 'New booking',
+        view: { manage: 'week', book: 'week' },
+    };
+}
+
+/** The views a booking calendar offers. */
+export const BOOKING_VIEWS = ['day', 'week', 'month'] as const;
+
+export type BookingView = (typeof BOOKING_VIEWS)[number];

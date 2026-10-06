@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $ends_at
  * @property string|null $purpose
  * @property int|null $attendee_count
+ * @property list<string>|null $people the named attendees or passengers, in the requester's order
  * @property int|null $reviewed_by
  * @property Carbon|null $reviewed_at
  * @property string|null $rejection_reason
@@ -34,7 +35,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'resource_id', 'event_id', 'requested_by', 'status', 'starts_at', 'ends_at',
-    'purpose', 'attendee_count', 'reviewed_by', 'reviewed_at', 'rejection_reason',
+    'purpose', 'attendee_count', 'people', 'reviewed_by', 'reviewed_at', 'rejection_reason',
     'cancelled_by', 'cancelled_at', 'cancellation_reason',
 ])]
 class Booking extends Model
@@ -48,15 +49,23 @@ class Booking extends Model
             'status' => BookingStatus::class,
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'people' => 'array',
             'reviewed_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];
     }
 
+    /** The number people quote on paper and on the phone: BK-000123. */
+    public function reference(): string
+    {
+        return 'BK-'.str_pad((string) $this->id, 6, '0', STR_PAD_LEFT);
+    }
+
     /** @return BelongsTo<\App\Models\Resource, $this> */
     public function resource(): BelongsTo
     {
-        return $this->belongsTo(Resource::class);
+        // Archived rooms/vehicles keep their bookings readable.
+        return $this->belongsTo(Resource::class)->withTrashed();
     }
 
     /** @return BelongsTo<Event, $this> */
@@ -68,13 +77,19 @@ class Booking extends Model
     /** @return BelongsTo<User, $this> */
     public function requester(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'requested_by');
+        return $this->belongsTo(User::class, 'requested_by')->withTrashed();
     }
 
     /** @return BelongsTo<User, $this> */
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function canceller(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     /** @return HasMany<BookingEditRequest, $this> */

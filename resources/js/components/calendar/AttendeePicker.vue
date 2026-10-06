@@ -50,32 +50,15 @@ const remove = (id: number) => {
 </script>
 
 <template>
-    <div class="grid gap-2">
-        <Label for="attendee-search">Guests</Label>
-
-        <div v-if="selected.length > 0" class="flex flex-wrap gap-1.5">
-            <span
-                v-for="person in selected"
-                :key="person.id"
-                class="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pr-1 pl-2.5 text-xs"
-            >
-                {{ person.name }}
-                <button
-                    type="button"
-                    class="rounded-full p-0.5 hover:bg-background"
-                    :aria-label="`Remove ${person.name}`"
-                    @click="remove(person.id)"
-                >
-                    <X class="size-3" aria-hidden="true" />
-                </button>
-            </span>
-        </div>
+    <div class="grid gap-1.5">
+        <Label for="attendee-search" class="sr-only">Guests</Label>
 
         <div class="relative">
             <Input
                 id="attendee-search"
                 v-model="query"
-                placeholder="Search people by name or email"
+                placeholder="Add guests"
+                class="h-9 border-transparent bg-transparent px-2 shadow-none hover:bg-muted/60 focus-visible:bg-background dark:bg-transparent dark:hover:bg-muted/40"
                 autocomplete="off"
                 @input="runSearch"
             />
@@ -106,6 +89,27 @@ const remove = (id: number) => {
                     </button>
                 </li>
             </ul>
+        </div>
+
+        <div
+            v-if="selected.length > 0"
+            class="flex flex-wrap gap-1.5 pb-1 pl-2"
+        >
+            <span
+                v-for="person in selected"
+                :key="person.id"
+                class="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pr-1 pl-2.5 text-xs"
+            >
+                {{ person.name }}
+                <button
+                    type="button"
+                    class="rounded-full p-0.5 hover:bg-background"
+                    :aria-label="`Remove ${person.name}`"
+                    @click="remove(person.id)"
+                >
+                    <X class="size-3" aria-hidden="true" />
+                </button>
+            </span>
         </div>
     </div>
 </template>

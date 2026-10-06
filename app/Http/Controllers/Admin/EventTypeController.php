@@ -21,7 +21,7 @@ class EventTypeController extends Controller
 
         return Inertia::render('admin/event-types/Index', [
             'eventTypes' => EventTypeResource::collection(
-                EventType::query()->orderBy('sort_order')->orderBy('name')->get(),
+                EventType::query()->shared()->orderBy('sort_order')->orderBy('name')->get(),
             ),
         ]);
     }

@@ -24,7 +24,7 @@ class EditRequestService
      * Approved bookings cannot be edited in place; the owner proposes a
      * change instead. One pending proposal per booking at a time.
      *
-     * @param  array{starts_at?: CarbonInterface|null, ends_at?: CarbonInterface|null, purpose?: string|null, attendee_count?: int|null, note?: string|null}  $proposal
+     * @param  array{starts_at?: CarbonInterface|null, ends_at?: CarbonInterface|null, purpose?: string|null, people?: list<string>|null, note?: string|null}  $proposal
      */
     public function submit(Booking $booking, User $user, array $proposal): BookingEditRequest
     {
@@ -34,6 +34,25 @@ class EditRequestService
             if ($booking->status !== BookingStatus::Approved) {
                 throw ValidationException::withMessages([
                     'booking' => 'Only approved bookings take edit requests; pending ones can be cancelled and re-made.',
+                ]);
+            }
+
+            $people = $proposal['people'] ?? null;
+
+            if ($people !== null) {
+                PeopleList::assertFits($people, $booking->resource);
+            }
+
+            $changes = array_filter([
+                $proposal['starts_at'] ?? null,
+                $proposal['ends_at'] ?? null,
+                $proposal['purpose'] ?? null,
+                $people,
+            ], fn ($value) => $value !== null);
+
+            if ($changes === []) {
+                throw ValidationException::withMessages([
+                    'booking' => 'Change at least one thing: the time, the purpose or the people.',
                 ]);
             }
 
@@ -48,7 +67,8 @@ class EditRequestService
                 'proposed_starts_at' => $proposal['starts_at'] ?? null,
                 'proposed_ends_at' => $proposal['ends_at'] ?? null,
                 'proposed_purpose' => $proposal['purpose'] ?? null,
-                'proposed_attendee_count' => $proposal['attendee_count'] ?? null,
+                'proposed_attendee_count' => $people === null ? null : count($people),
+                'proposed_people' => $people,
                 'note' => $proposal['note'] ?? null,
             ]);
 
@@ -76,7 +96,15 @@ class EditRequestService
             $newStart = $editRequest->proposed_starts_at ?? $booking->starts_at;
             $newEnd = $editRequest->proposed_ends_at ?? $booking->ends_at;
 
-            if ($editRequest->proposed_starts_at !== null || $editRequest->proposed_ends_at !== null) {
+            $movesTime = $editRequest->proposed_starts_at !== null || $editRequest->proposed_ends_at !== null;
+
+            if ($movesTime && $newStart->isPast()) {
+                throw ValidationException::withMessages([
+                    'starts_at' => 'The proposed time has already passed. Reject this request and ask for a new one.',
+                ]);
+            }
+
+            if ($movesTime) {
                 $this->rules->validate($booking->requester, $booking->resource, $newStart, $newEnd, $booking);
 
                 $conflicts = Booking::query()
@@ -97,6 +125,7 @@ class EditRequestService
                 'ends_at' => $newEnd,
                 'purpose' => $editRequest->proposed_purpose ?? $booking->purpose,
                 'attendee_count' => $editRequest->proposed_attendee_count ?? $booking->attendee_count,
+                'people' => $editRequest->proposed_people ?? $booking->people,
             ]);
 
             $booking->event?->update([

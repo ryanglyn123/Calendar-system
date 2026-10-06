@@ -33,6 +33,16 @@ class BookingPolicy
             && in_array($booking->status, [BookingStatus::Pending, BookingStatus::Approved], true);
     }
 
+    /**
+     * Requesters correct their own request directly while it is pending;
+     * the service refuses once a decision lands, and refuses anyone but the
+     * requester (super admins pass every policy, so it checks too).
+     */
+    public function update(User $user, Booking $booking): bool
+    {
+        return $booking->requested_by === $user->id;
+    }
+
     public function requestEdit(User $user, Booking $booking): bool
     {
         return $booking->requested_by === $user->id

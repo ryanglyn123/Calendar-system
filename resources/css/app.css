@@ -9,7 +9,7 @@
 
 @theme inline {
     --font-sans:
-        Poppins, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        Inter, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
         'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
     --radius-lg: var(--radius);
@@ -52,6 +52,7 @@
 
     --color-warning: var(--warning);
     --color-warning-foreground: var(--warning-foreground);
+    --color-warning-ink: var(--warning-ink);
 
     --color-border: var(--border);
     --color-input: var(--input);
@@ -95,9 +96,8 @@
     body,
     html {
         --font-sans:
-            'Poppins', ui-sans-serif, system-ui, sans-serif,
-            'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-            'Noto Color Emoji';
+            'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+            'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
     }
 
     /* "Today" marker and highlight chips: the primary ink pill in both themes
@@ -125,15 +125,26 @@
     background-attachment: fixed;
 }
 
+/* Dark: a near-black field; all the blue comes from a glow top-left and a
+   bloom bottom-right, so the glass panels have something to frost. Both glows
+   are oversized with a long eased falloff so they melt into one even wash. */
 .dark [data-slot='sidebar-wrapper'] {
     background:
         radial-gradient(
-            180% 158% at 3% 22%,
-            oklch(0.5 0.09 250 / 0.42) 0%,
-            oklch(0.45 0.06 248 / 0.2) 40%,
-            transparent 70%
+            140% 120% at 85% 110%,
+            oklch(0.55 0.17 252 / 0.5) 0%,
+            oklch(0.5 0.14 252 / 0.26) 35%,
+            oklch(0.45 0.1 252 / 0.08) 65%,
+            transparent 95%
         ),
-        var(--background);
+        radial-gradient(
+            130% 110% at 0% 0%,
+            oklch(0.48 0.11 250 / 0.42) 0%,
+            oklch(0.44 0.09 250 / 0.2) 35%,
+            oklch(0.4 0.07 250 / 0.06) 65%,
+            transparent 95%
+        ),
+        linear-gradient(165deg, oklch(0.17 0 0), oklch(0.11 0 0));
     background-attachment: fixed;
 }
 
@@ -216,6 +227,8 @@
     box-shadow: 0 1px 2px oklch(0.3 0.03 250 / 0.1);
     animation: auth-drift ease-in-out infinite alternate;
     will-change: transform;
+    translate: calc(var(--px, 0) * -18px) calc(var(--py, 0) * -12px);
+    transition: translate 0.9s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* The little "time dot" every event pill in the product carries. */
@@ -234,6 +247,7 @@
 .auth-scene-pill.is-soft {
     height: 30px;
     filter: blur(3px);
+    translate: calc(var(--px, 0) * -7px) calc(var(--py, 0) * -5px);
 }
 
 .dark .auth-scene-pill {
@@ -279,6 +293,10 @@
     .auth-stagger {
         animation: none !important;
     }
+
+    .auth-scene-pill {
+        translate: none !important;
+    }
 }
 
 /* Only the sidebar is transparent, so the wash shows there. The main panel is
@@ -286,6 +304,8 @@
    continues behind it but is hidden, and the wash breathes around its edges. */
 [data-sidebar='sidebar'] {
     background: transparent;
+    /* Nav labels are controls, not copy: no text selection on drag. */
+    user-select: none;
 }
 
 [data-slot='sidebar-inset'] {
@@ -302,16 +322,77 @@
     border-radius: 9999px;
 }
 
-/* The active nav item is a white pill floating on the sidebar wash; it needs
-   a whisper of elevation to read against the pale lower half. */
-[data-sidebar='menu-button'][data-active='true'] {
+/* Orbit rail: the active nav item is a solid pill in the sidebar's primary
+   ink (near-black in light, blue in dark) glowing in its own colour. */
+[data-sidebar='menu-button'][data-active='true'],
+[data-liquid-blob] {
+    background: var(--sidebar-primary);
+    color: var(--sidebar-primary-foreground);
     box-shadow:
-        0 1px 2px oklch(0.2 0.01 90 / 0.07),
-        0 0 0 1px oklch(0.2 0.01 90 / 0.05);
+        0 8px 22px -8px
+            color-mix(in oklch, var(--sidebar-primary) 80%, transparent),
+        inset 0 1px 0 oklch(1 0 0 / 0.22);
 }
 
-.dark [data-sidebar='menu-button'][data-active='true'] {
-    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.08);
+/* Liquid nav (useLiquidNav): while it runs, the blob is the one pill and the
+   lit item keeps only its light text. Mid-drag no item paints a background:
+   the one the drag began on keeps :hover and :active under pointer capture.
+   The lit item claims touches so a drag on it doesn't scroll the nav. */
+[data-liquid-blob] {
+    display: none;
+}
+
+[data-liquid] > [data-liquid-blob] {
+    display: block;
+}
+
+[data-liquid] [data-sidebar='menu-button'][data-active='true'],
+[data-liquid='drag'] [data-sidebar='menu-button'] {
+    background: none;
+    box-shadow: none;
+}
+
+[data-liquid] [data-sidebar='menu-button'][data-active='true'] {
+    touch-action: none;
+    -webkit-touch-callout: none;
+}
+
+/* The pill's glow would otherwise replace the keyboard ring, and the ring's
+   ink matches the pill in light mode; a card-coloured gap keeps it apart. */
+[data-sidebar='menu-button'][data-active='true']:focus-visible {
+    box-shadow:
+        0 0 0 2px var(--card),
+        0 0 0 4px var(--sidebar-ring);
+}
+
+/* Rail resting state. These rules alone decide first paint and a restored
+   cookie; useSidebarMotion only tweens between them and then clears its
+   inline styles. Opacity rather than display/visibility, so collapsed links
+   keep their accessible names. */
+[data-collapsible='icon'] [data-sidebar-fade] {
+    opacity: 0;
+}
+
+/* The reel mark never fades: the 40px rail icon, it shrinks onto the spot
+   of the wordmark's own (clipped) square when the panel opens. From the
+   art: that square is 100x102 of 116px at 32px tall, the mark's 98x101 of
+   116px at 40px. It moves on its own transition, timed to the panel's GSAP
+   tween (power3.out opening, power2.inOut closing). */
+[data-sidebar-mark] {
+    transform-origin: top left;
+    transform: translate(-7.5px, 3.7px) scale(0.81);
+    transition: transform 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+[data-collapsible='icon'] [data-sidebar-mark] {
+    transform: none;
+    transition: transform 0.26s cubic-bezier(0.455, 0.03, 0.515, 0.955) 0.02s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-sidebar-mark] {
+        transition: none !important;
+    }
 }
 
 :root {
@@ -334,10 +415,12 @@
     --accent-foreground: oklch(0.31 0.045 155);
     --destructive: oklch(0.55 0.18 27);
     --destructive-foreground: oklch(0.99 0.003 95);
-    --success: oklch(0.58 0.11 160);
+    --success: oklch(0.53 0.14 155);
     --success-foreground: oklch(0.99 0.003 95);
     --warning: oklch(0.66 0.14 65);
     --warning-foreground: oklch(0.99 0.003 95);
+    /* Warning as text on white: the amber darkened to hold 4.5:1. */
+    --warning-ink: oklch(0.5 0.115 62);
     --border: oklch(0.907 0.004 95);
     --input: oklch(0.885 0.005 95);
     --ring: oklch(0.24 0.012 90);
@@ -360,45 +443,359 @@
     color-scheme: light;
 }
 
+/* Dark is "night glass": a slate-navy field, frosted panels, and one blue
+   accent for actions, today and the active nav item. */
 .dark {
-    --background: #262624;
-    --foreground: hsl(0 0% 98%);
-    --card: #141413;
-    --card-foreground: hsl(0 0% 98%);
-    --popover: #141413;
-    --popover-foreground: hsl(0 0% 98%);
-    --primary: oklch(0.96 0.003 95);
-    --primary-foreground: oklch(0.21 0.01 90);
-    --secondary: #30302e;
-    --secondary-foreground: hsl(0 0% 98%);
-    --muted: #30302e;
-    --muted-foreground: hsl(0 0% 66%);
-    --accent: oklch(0.34 0.03 155);
-    --accent-foreground: oklch(0.9 0.04 155);
-    --destructive: hsl(0 84% 60%);
-    --destructive-foreground: hsl(0 0% 98%);
-    --success: hsl(160 70% 42%);
-    --success-foreground: hsl(0 0% 8%);
-    --warning: oklch(0.75 0.15 65);
+    --background: oklch(0.235 0.028 258);
+    --foreground: oklch(0.96 0.008 255);
+    --card: oklch(0.275 0.03 257);
+    --card-foreground: oklch(0.96 0.008 255);
+    --popover: oklch(0.27 0.03 257);
+    --popover-foreground: oklch(0.96 0.008 255);
+    /* Deep enough that white labels on it hold 4.5:1. */
+    --primary: oklch(0.57 0.18 254);
+    --primary-foreground: oklch(0.99 0.004 255);
+    --secondary: oklch(0.32 0.03 257);
+    --secondary-foreground: oklch(0.95 0.008 255);
+    --muted: oklch(0.31 0.028 257);
+    --muted-foreground: oklch(0.74 0.025 255);
+    --accent: oklch(0.34 0.05 252);
+    --accent-foreground: oklch(0.93 0.03 250);
+    --destructive: oklch(0.66 0.2 25);
+    --destructive-foreground: oklch(0.99 0.004 255);
+    --success: oklch(0.74 0.16 155);
+    --success-foreground: oklch(0.2 0.04 155);
+    --warning: oklch(0.78 0.15 70);
     --warning-foreground: oklch(0.2 0.02 80);
-    --border: hsl(60 2% 22%);
-    --input: hsl(60 2% 24%);
-    --ring: oklch(0.96 0.003 95);
+    --warning-ink: oklch(0.83 0.13 75);
+    --border: oklch(0.9 0.02 255 / 0.1);
+    --input: oklch(0.9 0.02 255 / 0.14);
+    --ring: oklch(0.7 0.14 252);
     --chart-1: oklch(0.72 0.11 292);
     --chart-2: oklch(0.7 0.11 235);
     --chart-3: oklch(0.74 0.1 160);
     --chart-4: oklch(0.78 0.1 60);
     --chart-5: oklch(0.72 0.11 350);
-    --sidebar-background: #141413;
-    --sidebar-foreground: hsl(0 0% 95.9%);
-    --sidebar-primary: oklch(0.96 0.003 95);
-    --sidebar-primary-foreground: oklch(0.21 0.01 90);
-    --sidebar-accent: #30302e;
-    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-    --sidebar-border: hsl(60 2% 18%);
-    --sidebar-ring: oklch(0.96 0.003 95);
-    --sidebar: #262624;
+    --sidebar-background: oklch(0.235 0.028 258);
+    --sidebar-foreground: oklch(0.93 0.01 255);
+    --sidebar-primary: oklch(0.57 0.18 254);
+    --sidebar-primary-foreground: oklch(0.99 0.004 255);
+    --sidebar-accent: oklch(1 0 0 / 0.07);
+    --sidebar-accent-foreground: oklch(0.97 0.006 255);
+    --sidebar-border: oklch(0.9 0.02 255 / 0.08);
+    --sidebar-ring: oklch(0.7 0.14 252);
+    --sidebar: oklch(0.235 0.028 258);
     color-scheme: dark;
+}
+
+/* ---- Night glass surfaces (dark only) --------------------------------- */
+
+/* The main panel is neutral frosted glass over the black field; its only
+   blue is the glow showing through. */
+.dark [data-slot='sidebar-inset'] {
+    background: oklch(0.3 0 0 / 0.4);
+    backdrop-filter: blur(24px) saturate(140%);
+    box-shadow:
+        inset 0 1px 0 oklch(1 0 0 / 0.06),
+        0 0 0 1px oklch(0.9 0.02 255 / 0.1),
+        0 24px 60px -24px oklch(0.12 0.04 262 / 0.7);
+}
+
+/* Floating surfaces (dialogs, drawers, popovers, menus) are darker glass. */
+.dark [role='dialog'],
+.dark [role='alertdialog'],
+.dark [data-slot='select-content'],
+.dark [data-slot='dropdown-menu-content'] {
+    background: oklch(0.25 0.03 257 / 0.84);
+    backdrop-filter: blur(24px) saturate(150%);
+    border-color: oklch(0.9 0.02 255 / 0.12);
+}
+
+.dark [data-slot='dialog-overlay'],
+.dark [data-slot='sheet-overlay'] {
+    background: oklch(0.14 0.03 262 / 0.55);
+    backdrop-filter: blur(3px);
+}
+
+/* Month grid: each day is its own glass tile. The tile is drawn inset on a
+   pseudo-element so the cell box, and the chip budget MonthView measures from
+   it, stays exactly as in light mode. */
+.dark .month-row,
+.dark .month-cell {
+    border-color: transparent;
+}
+
+.dark .month-cell {
+    position: relative;
+    isolation: isolate;
+    background: none;
+    box-shadow: none;
+}
+
+.dark .month-cell::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    z-index: -1;
+    border: 1px solid oklch(0.9 0.02 255 / 0.1);
+    border-radius: 14px;
+    background: oklch(1 0 0 / 0.04);
+    transition:
+        background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+        border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .month-cell:hover::before {
+    border-color: oklch(0.9 0.02 255 / 0.18);
+    background: oklch(1 0 0 / 0.075);
+}
+
+.dark .month-cell.is-outside::before {
+    background: oklch(1 0 0 / 0.015);
+    border-color: oklch(0.9 0.02 255 / 0.05);
+}
+
+/* Previous/next-month days recede so they never read as the current month;
+   a chip comes back to full strength when pointed at or focused. */
+.month-cell.is-outside .month-daynum {
+    opacity: 0.35;
+}
+
+.month-cell.is-outside .ev-chip {
+    opacity: 0.5;
+}
+
+.month-cell.is-outside .ev-chip:hover,
+.month-cell.is-outside .ev-chip:focus-visible {
+    opacity: 1;
+}
+
+.dark .month-cell.is-today::before {
+    border-color: oklch(0.75 0.13 250 / 0.55);
+    background: radial-gradient(
+        130% 110% at 50% 0%,
+        oklch(0.62 0.17 252 / 0.95) 0%,
+        oklch(0.48 0.15 256 / 0.7) 55%,
+        oklch(0.36 0.09 258 / 0.45) 100%
+    );
+    box-shadow: 0 12px 30px -14px oklch(0.55 0.18 252 / 0.8);
+}
+
+.dark .month-cell.is-drop::before {
+    border: 1.5px dashed oklch(0.75 0.13 250);
+    background: oklch(0.57 0.18 254 / 0.16);
+}
+
+/* Day numbers stay centered, as in Google, and read larger on the tiles. */
+.dark .month-daynum > span {
+    width: auto;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.dark .month-cell.is-today .month-daynum > span {
+    background: none;
+    color: oklch(0.99 0.004 255);
+    font-weight: 600;
+}
+
+/* Events: pastel washes in light; tinted glass in dark. --wash, --ink and
+   --ev (the raw event color) are set inline per event. */
+/* Light: Google Calendar's pill, the event's own color solid with white
+   text (dark on the light yellows; --ink picks by luminance). */
+.ev-wash {
+    background: var(--ev);
+    color: var(--ink);
+}
+
+/* Timed events in the month grid read like Google's: a color dot, the time
+   and title in plain text, no fill. */
+.ev-chip.ev-wash {
+    background: none;
+    color: var(--foreground);
+}
+
+.ev-chip.ev-wash::before {
+    content: '';
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--ev);
+}
+
+.ev-chip.ev-wash:hover {
+    background: oklch(0 0 0 / 0.05);
+}
+
+.dark .ev-wash {
+    background: color-mix(in oklab, var(--ev) 24%, oklch(0.3 0.03 257 / 0.55));
+    color: var(--foreground);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ev) 32%, transparent);
+}
+
+/* Timed month chips drop the fill in dark: a small color tick and light text
+   straight on the tile. */
+.dark .ev-chip {
+    background: none;
+    box-shadow: none;
+}
+
+.dark .ev-chip::before {
+    content: '';
+    flex-shrink: 0;
+    width: 2px;
+    height: 0.7rem;
+    border-radius: 1px;
+    background: var(--ev);
+}
+
+/* Pills answer the pointer without lifting (the system is flat): pointing
+   deepens a pill in its own ink, pressing deepens it further and squeezes it
+   3% so the click lands. The tint is currentColor, so it is the hue-matched
+   ink on a wash, neutral on holds and closed bookings, and a light veil in
+   dark. Opacity transitions also soften the drag-source dim. */
+.ev-pill {
+    transition:
+        opacity 150ms ease,
+        scale 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ev-pill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease;
+}
+
+.ev-pill:hover::after {
+    opacity: 0.07;
+}
+
+.ev-pill:active::after {
+    opacity: 0.14;
+    transition-duration: 60ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .ev-pill:active {
+        scale: 0.97;
+        transition-duration: 150ms, 70ms;
+    }
+}
+
+/* The hover peek floats over its neighbours, so it takes the system's soft,
+   low, cool shadow. A drop-shadow on the frame (not a box-shadow on the
+   card) so the shadow follows the card's clip as it unfurls. --lift (0-1,
+   tweened by EventPeek) grows it in: flat like the pill at first. */
+.ev-peek {
+    --lift: 1;
+    filter: drop-shadow(
+            0 calc(4px * var(--lift)) calc(10px * var(--lift))
+                oklch(0.3 0.03 250 / calc(0.16 * var(--lift)))
+        )
+        drop-shadow(
+            0 calc(1px * var(--lift)) calc(2px * var(--lift))
+                oklch(0.3 0.03 250 / calc(0.1 * var(--lift)))
+        );
+}
+
+.dark .ev-peek {
+    filter: drop-shadow(
+        0 calc(6px * var(--lift)) calc(16px * var(--lift))
+            oklch(0 0 0 / calc(0.5 * var(--lift)))
+    );
+}
+
+/* The event card opens out of the pill it came from (EventQuickView sets
+   transform-origin on the pill). Under reduced motion it only fades. */
+@media (prefers-reduced-motion: reduce) {
+    [data-quick-view],
+    [data-create-card] {
+        --tw-enter-scale: 1;
+        --tw-exit-scale: 1;
+    }
+}
+
+/* ---- Admin desk ------------------------------------------------------- */
+/* A hold (pending booking) on the schedule: the resource's own hue, hatched,
+   so "waiting" reads without a legend and survives grayscale. --ev is set
+   inline per booking. Labels sit on the flat base so stripes never cross
+   the glyphs. */
+.bk-hold {
+    --hold-base: color-mix(in oklab, var(--ev) 22%, var(--card));
+    background:
+        repeating-linear-gradient(
+            135deg,
+            color-mix(in oklab, var(--ev) 45%, transparent) 0 2px,
+            transparent 2px 7px
+        ),
+        var(--hold-base);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ev) 75%, black 10%);
+    color: var(--foreground);
+}
+
+.dark .bk-hold {
+    --hold-base: color-mix(in oklab, var(--ev) 16%, oklch(0.29 0.03 257));
+    background:
+        repeating-linear-gradient(
+            135deg,
+            color-mix(in oklab, var(--ev) 30%, transparent) 0 2px,
+            transparent 2px 7px
+        ),
+        var(--hold-base);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ev) 55%, transparent);
+}
+
+.bk-hold > span,
+.bk-hold .bk-label {
+    border-radius: 3px;
+    padding-inline: 3px;
+    background: var(--hold-base);
+}
+
+/* A booking that no longer holds its slot (rejected, cancelled): hollow,
+   outlined in its hue, title struck. Only its requester and reviewers see
+   it. */
+.bk-closed {
+    background: transparent;
+    box-shadow: none;
+    outline: 1px dashed
+        color-mix(in oklab, var(--ev) 75%, var(--foreground) 15%);
+    outline-offset: -1px;
+    color: var(--muted-foreground);
+}
+
+.bk-closed .bk-title {
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+
+/* Waiting minutes on the two-week strip: the same hatch in neutral ink. */
+.desk-hatch {
+    background:
+        repeating-linear-gradient(
+            135deg,
+            color-mix(in oklab, var(--muted-foreground) 70%, transparent) 0
+                1.5px,
+            transparent 1.5px 5px
+        ),
+        color-mix(in oklab, var(--muted-foreground) 14%, transparent);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .dark [data-slot='sidebar-inset'],
+    .dark [role='dialog'],
+    .dark [role='alertdialog'],
+    .dark [data-slot='select-content'],
+    .dark [data-slot='dropdown-menu-content'] {
+        background: var(--card);
+        backdrop-filter: none;
+    }
 }
 
 @layer base {

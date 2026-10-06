@@ -1,8 +1,18 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { Pencil, Search, ShieldBan, ShieldCheck, Trash2 } from '@lucide/vue';
-import { useDebounceFn } from '@vueuse/core';
-import { ref, watch } from 'vue';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import {
+    Pencil,
+    SearchX,
+    ShieldBan,
+    ShieldCheck,
+    Trash2,
+    Users,
+} from '@lucide/vue';
+import { computed, ref } from 'vue';
+import EmptyNote from '@/components/admin/EmptyNote.vue';
+import ListPagination from '@/components/admin/ListPagination.vue';
+import SearchField from '@/components/admin/SearchField.vue';
+import { iconButton, pillQuiet } from '@/components/desk/desk';
 import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,11 +38,13 @@ import {
     Table,
     TableBody,
     TableCell,
-    TableEmpty,
     TableHead,
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useAuth } from '@/composables/useAuth';
+import { useConfirm } from '@/composables/useConfirm';
+import { useServerFilters } from '@/composables/useServerFilters';
 import admin from '@/routes/admin';
 import adminUsers from '@/routes/admin/users';
 import type { AdminUser, Division, Paginated, Role } from '@/types';
@@ -50,26 +62,57 @@ const props = defineProps<{
     users: Paginated<AdminUser>;
     divisions: { data: Division[] };
     roles: { data: Role[] };
-    filters: { search?: string; division?: string; status?: string };
+    filters: {
+        search?: string;
+        division?: string;
+        status?: string;
+        role?: string;
+        sort?: string;
+    };
 }>();
 
-const search = ref(props.filters.search ?? '');
-const division = ref(props.filters.division ?? 'all');
-const status = ref(props.filters.status ?? 'all');
+// super_admin is granted by super admins only (the server enforces it too).
+const { user: authUser, hasPermission } = useAuth();
 
-const applyFilters = useDebounceFn(() => {
-    router.get(
-        adminUsers.index().url,
-        {
-            search: search.value || undefined,
-            division: division.value === 'all' ? undefined : division.value,
-            status: status.value === 'all' ? undefined : status.value,
-        },
-        { preserveState: true, replace: true },
-    );
-}, 300);
+// Approvers (users.approve) may browse the list; editing, suspending and
+// deleting need users.manage, which the server enforces too.
+const canManageUsers = computed(() => hasPermission('users.manage'));
+const assignableRoles = computed(() =>
+    props.roles.data.filter(
+        (role) => role.name !== 'super_admin' || authUser.value.is_super_admin,
+    ),
+);
 
-watch([search, division, status], applyFilters);
+const filters = useServerFilters(() => adminUsers.index().url, {
+    search: props.filters.search ?? '',
+    division: props.filters.division ?? 'all',
+    status: props.filters.status ?? 'all',
+    role: props.filters.role ?? 'all',
+    sort: props.filters.sort ?? 'name',
+});
+
+const SORTS: Record<string, string> = {
+    name: 'Name A–Z',
+    newest: 'Newest first',
+    division: 'By division',
+};
+
+// Sort is an ordering, not a filter: clearing filters keeps it.
+const filtered = computed(
+    () =>
+        filters.search !== '' ||
+        [filters.division, filters.status, filters.role].some(
+            (value) => value !== 'all',
+        ),
+);
+
+const clearFilters = () =>
+    Object.assign(filters, {
+        search: '',
+        division: 'all',
+        status: 'all',
+        role: 'all',
+    });
 
 const editing = ref<AdminUser | null>(null);
 
@@ -105,8 +148,26 @@ const toggleRole = (role: string, checked: boolean) => {
         : editForm.roles.filter((r) => r !== role);
 };
 
-const suspend = (user: AdminUser) =>
-    router.post(adminUsers.suspend(user.id).url, {}, { preserveScroll: true });
+const { confirm } = useConfirm();
+
+// Suspending locks the person out, so it asks first; reactivating does not.
+const suspend = async (user: AdminUser) => {
+    const confirmed = await confirm({
+        title: `Suspend ${user.name}?`,
+        description:
+            'They lose access to the calendar until you reactivate them. Their events and bookings stay.',
+        confirmLabel: 'Suspend',
+        destructive: true,
+    });
+
+    if (confirmed) {
+        router.post(
+            adminUsers.suspend(user.id).url,
+            {},
+            { preserveScroll: true },
+        );
+    }
+};
 
 const reactivate = (user: AdminUser) =>
     router.post(
@@ -130,16 +191,11 @@ const destroy = () => {
     });
 };
 
-const statusVariant = (value: AdminUser['status']) =>
-    ({ active: 'success', pending: 'secondary', suspended: 'destructive' })[
-        value
-    ] as 'success' | 'secondary' | 'destructive';
-
-const paginationLabel = (label: string) =>
-    label
-        .replace('&laquo;', '«')
-        .replace('&raquo;', '»')
-        .replace('&hellip;', '…');
+const statusDot: Record<AdminUser['status'], string> = {
+    active: 'bg-success',
+    pending: 'bg-warning',
+    suspended: 'bg-destructive',
+};
 </script>
 
 <template>
@@ -152,22 +208,18 @@ const paginationLabel = (label: string) =>
         />
 
         <div class="flex flex-wrap items-center gap-2">
-            <div class="relative max-w-xs flex-1">
-                <Search
-                    class="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                />
-                <Input
-                    v-model="search"
-                    type="search"
-                    placeholder="Search name or email…"
-                    class="pl-8"
-                    aria-label="Search users"
-                />
-            </div>
+            <SearchField
+                v-model="filters.search"
+                label="Search users"
+                placeholder="Search name or email…"
+            />
 
-            <Select v-model="division">
-                <SelectTrigger class="w-56" aria-label="Filter by division">
+            <Select v-model="filters.division">
+                <SelectTrigger
+                    size="sm"
+                    class="w-48"
+                    aria-label="Filter by division"
+                >
                     <SelectValue placeholder="All divisions" />
                 </SelectTrigger>
                 <SelectContent>
@@ -182,8 +234,32 @@ const paginationLabel = (label: string) =>
                 </SelectContent>
             </Select>
 
-            <Select v-model="status">
-                <SelectTrigger class="w-40" aria-label="Filter by status">
+            <Select v-model="filters.role">
+                <SelectTrigger
+                    size="sm"
+                    class="w-40"
+                    aria-label="Filter by role"
+                >
+                    <SelectValue placeholder="All roles" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All roles</SelectItem>
+                    <SelectItem
+                        v-for="role in roles.data"
+                        :key="role.id"
+                        :value="role.name"
+                    >
+                        {{ role.name }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+
+            <Select v-model="filters.status">
+                <SelectTrigger
+                    size="sm"
+                    class="w-36"
+                    aria-label="Filter by status"
+                >
                     <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -193,34 +269,85 @@ const paginationLabel = (label: string) =>
                     <SelectItem value="suspended">Suspended</SelectItem>
                 </SelectContent>
             </Select>
+
+            <button
+                v-if="filtered"
+                type="button"
+                :class="pillQuiet"
+                @click="clearFilters"
+            >
+                Clear filters
+            </button>
+
+            <Select v-model="filters.sort">
+                <SelectTrigger
+                    size="sm"
+                    class="w-40 sm:ml-auto"
+                    aria-label="Sort users"
+                >
+                    <SelectValue>{{
+                        SORTS[filters.sort ?? 'name']
+                    }}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem
+                        v-for="(label, value) in SORTS"
+                        :key="value"
+                        :value="value"
+                    >
+                        {{ label }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
         </div>
 
-        <div class="rounded-xl border">
+        <EmptyNote
+            v-if="users.data.length === 0 && filtered"
+            :icon="SearchX"
+            title="No users match these filters"
+        >
+            Try another division, role or status, or a shorter search.
+            <template #action>
+                <button type="button" :class="pillQuiet" @click="clearFilters">
+                    Clear filters
+                </button>
+            </template>
+        </EmptyNote>
+
+        <EmptyNote
+            v-else-if="users.data.length === 0"
+            :icon="Users"
+            title="No users yet"
+        >
+            People appear here once they register or accept an invitation.
+        </EmptyNote>
+
+        <div v-else class="border-y border-border">
             <Table>
                 <TableHeader>
-                    <TableRow>
+                    <TableRow class="hover:bg-transparent">
                         <TableHead>Name</TableHead>
                         <TableHead>Division</TableHead>
                         <TableHead>Roles</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead class="w-32 text-right">Actions</TableHead>
+                        <TableHead class="w-32 text-right">
+                            <span class="sr-only">Actions</span>
+                        </TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableEmpty v-if="users.data.length === 0" :colspan="5">
-                        No users match the current filters.
-                    </TableEmpty>
                     <TableRow v-for="user in users.data" :key="user.id">
-                        <TableCell>
+                        <TableCell class="py-3">
                             <div class="font-medium">{{ user.name }}</div>
-                            <div class="text-xs text-muted-foreground">
+                            <div class="text-[13px] text-muted-foreground">
                                 {{ user.email }}
                             </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell class="py-3">
                             <span
                                 v-if="user.division"
                                 class="inline-flex items-center gap-1.5"
+                                :title="user.division.name"
                             >
                                 <span
                                     class="size-2.5 rounded-full"
@@ -233,9 +360,9 @@ const paginationLabel = (label: string) =>
                                     user.division.acronym ?? user.division.name
                                 }}
                             </span>
-                            <span v-else class="text-muted-foreground">-</span>
+                            <span v-else class="text-muted-foreground">—</span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell class="py-3">
                             <div class="flex flex-wrap gap-1">
                                 <Badge
                                     v-for="role in user.roles"
@@ -246,48 +373,60 @@ const paginationLabel = (label: string) =>
                                 </Badge>
                             </div>
                         </TableCell>
-                        <TableCell>
-                            <Badge :variant="statusVariant(user.status)">
+                        <TableCell class="py-3">
+                            <span
+                                class="inline-flex items-center gap-1.5 text-[13px]"
+                            >
+                                <span
+                                    class="size-2 rounded-full"
+                                    :class="statusDot[user.status]"
+                                    aria-hidden="true"
+                                />
                                 {{ user.status_label }}
-                            </Badge>
+                            </span>
                         </TableCell>
-                        <TableCell class="text-right">
-                            <div class="flex justify-end gap-1">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
+                        <TableCell class="py-3 text-right">
+                            <div
+                                v-if="canManageUsers"
+                                class="flex justify-end gap-0.5"
+                            >
+                                <button
+                                    type="button"
+                                    :class="iconButton"
                                     :aria-label="`Edit ${user.name}`"
                                     @click="openEdit(user)"
                                 >
                                     <Pencil aria-hidden="true" />
-                                </Button>
-                                <Button
+                                </button>
+                                <button
                                     v-if="user.status === 'active'"
-                                    variant="ghost"
-                                    size="icon"
+                                    type="button"
+                                    :class="iconButton"
                                     :aria-label="`Suspend ${user.name}`"
                                     @click="suspend(user)"
                                 >
                                     <ShieldBan aria-hidden="true" />
-                                </Button>
-                                <Button
+                                </button>
+                                <button
                                     v-else-if="user.status === 'suspended'"
-                                    variant="ghost"
-                                    size="icon"
+                                    type="button"
+                                    :class="iconButton"
                                     :aria-label="`Reactivate ${user.name}`"
                                     @click="reactivate(user)"
                                 >
                                     <ShieldCheck aria-hidden="true" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    class="text-destructive hover:text-destructive"
+                                </button>
+                                <button
+                                    type="button"
+                                    :class="[
+                                        iconButton,
+                                        'text-destructive hover:bg-destructive/10 hover:text-destructive',
+                                    ]"
                                     :aria-label="`Delete ${user.name}`"
                                     @click="confirmingDelete = user"
                                 >
                                     <Trash2 aria-hidden="true" />
-                                </Button>
+                                </button>
                             </div>
                         </TableCell>
                     </TableRow>
@@ -295,32 +434,7 @@ const paginationLabel = (label: string) =>
             </Table>
         </div>
 
-        <div
-            v-if="users.meta.last_page > 1"
-            class="flex items-center justify-center gap-1"
-        >
-            <template v-for="(link, i) in users.meta.links" :key="i">
-                <Link
-                    v-if="link.url"
-                    :href="link.url"
-                    preserve-scroll
-                    class="rounded-md px-3 py-1.5 text-sm"
-                    :class="
-                        link.active
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-muted'
-                    "
-                >
-                    {{ paginationLabel(link.label) }}
-                </Link>
-                <span
-                    v-else
-                    class="px-3 py-1.5 text-sm text-muted-foreground/50"
-                >
-                    {{ paginationLabel(link.label) }}
-                </span>
-            </template>
-        </div>
+        <ListPagination :meta="users.meta" noun="users" />
 
         <Dialog
             :open="editing !== null"
@@ -388,7 +502,7 @@ const paginationLabel = (label: string) =>
                         <Label>Roles</Label>
                         <div class="grid gap-2">
                             <Label
-                                v-for="role in roles.data"
+                                v-for="role in assignableRoles"
                                 :key="role.id"
                                 class="flex items-center gap-2 font-normal"
                             >

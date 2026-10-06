@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T00:00:00Z",
+  "title": "Design System: FDCP Calendar System",
+  "extensions": {
+    "colorMeta": {
+      "canvas": { "role": "neutral", "displayName": "Warm Canvas", "canonical": "oklch(0.958 0.003 95)", "dark": "oklch(0.235 0.028 258)", "tonalRamp": ["oklch(0.15 0.003 95)", "oklch(0.27 0.003 95)", "oklch(0.39 0.003 95)", "oklch(0.51 0.003 95)", "oklch(0.63 0.003 95)", "oklch(0.75 0.003 95)", "oklch(0.87 0.003 95)", "oklch(0.958 0.003 95)"] },
+      "panel": { "role": "neutral", "displayName": "Paper Panel", "canonical": "oklch(0.993 0.002 95)", "dark": "oklch(0.275 0.03 257)" },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "oklch(0.22 0.008 90)", "dark": "oklch(0.96 0.008 255)" },
+      "ink-pill": { "role": "primary", "displayName": "Pill Ink", "canonical": "oklch(0.24 0.012 90)", "dark": "oklch(0.57 0.18 254)", "tonalRamp": ["oklch(0.15 0.012 90)", "oklch(0.24 0.012 90)", "oklch(0.36 0.012 90)", "oklch(0.48 0.012 90)", "oklch(0.6 0.012 90)", "oklch(0.72 0.012 90)", "oklch(0.84 0.012 90)", "oklch(0.95 0.012 90)"] },
+      "ink-pill-label": { "role": "primary", "displayName": "Pill Label", "canonical": "oklch(0.985 0.002 95)" },
+      "muted-surface": { "role": "neutral", "displayName": "Muted Surface", "canonical": "oklch(0.945 0.004 95)", "dark": "oklch(0.31 0.028 257)" },
+      "muted-ink": { "role": "neutral", "displayName": "Muted Ink", "canonical": "oklch(0.43 0.012 90)", "dark": "oklch(0.74 0.025 255)" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "oklch(0.907 0.004 95)", "dark": "oklch(0.9 0.02 255 / 0.1)" },
+      "input-stroke": { "role": "neutral", "displayName": "Input Stroke", "canonical": "oklch(0.885 0.005 95)", "dark": "oklch(0.9 0.02 255 / 0.14)" },
+      "mint-accent": { "role": "tertiary", "displayName": "Mint Accent", "canonical": "oklch(0.938 0.035 155)", "dark": "oklch(0.34 0.05 252)" },
+      "mint-accent-ink": { "role": "tertiary", "displayName": "Mint Accent Ink", "canonical": "oklch(0.31 0.045 155)" },
+      "destructive": { "role": "status", "displayName": "Destructive", "canonical": "oklch(0.55 0.18 27)", "dark": "oklch(0.66 0.2 25)" },
+      "success": { "role": "status", "displayName": "Success", "canonical": "oklch(0.58 0.11 160)", "dark": "oklch(0.72 0.15 160)" },
+      "warning": { "role": "status", "displayName": "Warning (fill)", "canonical": "oklch(0.66 0.14 65)", "dark": "oklch(0.78 0.15 70)" },
+      "warning-ink": { "role": "status", "displayName": "Warning Ink", "canonical": "oklch(0.5 0.115 62)", "dark": "oklch(0.83 0.13 75)" },
+      "night-field": { "role": "neutral", "displayName": "Night Field", "canonical": "oklch(0.235 0.028 258)" },
+      "night-panel": { "role": "neutral", "displayName": "Night Panel", "canonical": "oklch(0.275 0.03 257)" },
+      "night-blue": { "role": "primary", "displayName": "Night Blue", "canonical": "oklch(0.57 0.18 254)", "tonalRamp": ["oklch(0.2 0.18 254)", "oklch(0.3 0.18 254)", "oklch(0.4 0.18 254)", "oklch(0.5 0.18 254)", "oklch(0.57 0.18 254)", "oklch(0.7 0.14 252)", "oklch(0.82 0.08 252)", "oklch(0.94 0.03 252)"] },
+      "night-warning-ink": { "role": "status", "displayName": "Night Warning Ink", "canonical": "oklch(0.83 0.13 75)" },
+      "event-lemon": { "role": "tertiary", "displayName": "Lemon" },
+      "event-apricot": { "role": "tertiary", "displayName": "Apricot" },
+      "event-lavender": { "role": "tertiary", "displayName": "Lavender" },
+      "event-pink": { "role": "tertiary", "displayName": "Pink" },
+      "event-sky": { "role": "tertiary", "displayName": "Sky", "note": "Default for new calendars and event types." },
+      "event-mint": { "role": "tertiary", "displayName": "Mint" },
+      "event-coral": { "role": "tertiary", "displayName": "Coral" },
+      "event-violet": { "role": "tertiary", "displayName": "Violet" },
+      "event-unset": { "role": "neutral", "displayName": "Unset Gray", "note": "Fallback when a resource has no color." }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Page titles; on the admin desk the date is the title." },
+      "title": { "displayName": "Section Title", "purpose": "Sentence-case section titles followed by a muted tabular count." },
+      "body": { "displayName": "Body", "purpose": "Primary row text and form fields." },
+      "body-dense": { "displayName": "Body Dense", "purpose": "Row metadata, pills, filter tabs, notes. The product's working size." },
+      "label": { "displayName": "Label", "purpose": "Event block text and legends, tabular." },
+      "ruler": { "displayName": "Ruler", "purpose": "Hour ruler ticks and weekday initials, tabular." }
+    },
+    "shadows": [
+      { "name": "panel-rest", "value": "0 1px 2px oklch(0.3 0.03 250 / 0.06), 0 0 0 1px oklch(0.3 0.03 250 / 0.04)", "purpose": "Main panel in light." },
+      { "name": "popover", "value": "0 12px 32px -12px oklch(0.25 0.02 250 / 0.35), 0 0 0 1px var(--border)", "purpose": "Floating detail cards." },
+      { "name": "nav-active-glow", "value": "0 8px 22px -8px color-mix(in oklch, var(--sidebar-primary) 80%, transparent), inset 0 1px 0 oklch(1 0 0 / 0.22)", "purpose": "Active nav pill glowing in its own ink." },
+      { "name": "night-panel", "value": "inset 0 1px 0 oklch(1 0 0 / 0.06), 0 0 0 1px oklch(0.9 0.02 255 / 0.1), 0 24px 60px -24px oklch(0.12 0.04 262 / 0.7)", "purpose": "Frosted main panel in dark, with backdrop-filter: blur(24px) saturate(140%)." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Entrances, dark tile hover, parallax settle." },
+      { "name": "state-fast", "value": "150ms", "purpose": "Pill, row, and tab color and opacity changes." },
+      { "name": "state-slow", "value": "200ms", "purpose": "Loading dim, chevron rotation, list enter." },
+      { "name": "bar-grow", "value": "300ms", "purpose": "Two-week strip bar heights (motion-safe only)." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Pill",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one deciding action per row or form.",
+      "html": "<button class=\"ds-pill ds-pill-primary\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>Approve</button>",
+      "css": ".ds-pill { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 14px; border: 0; border-radius: 9999px; font: 500 13px/1 Poppins, ui-sans-serif, system-ui, sans-serif; white-space: nowrap; cursor: pointer; outline: none; transition: background-color 150ms, color 150ms, box-shadow 150ms, opacity 150ms; } .ds-pill:focus-visible { box-shadow: 0 0 0 2px var(--card, #fff), 0 0 0 4px color-mix(in oklch, var(--ring, oklch(0.24 0.012 90)) 60%, transparent); } .ds-pill-primary { background: var(--primary, oklch(0.24 0.012 90)); color: var(--primary-foreground, oklch(0.985 0.002 95)); } .ds-pill-primary:hover { background: color-mix(in oklch, var(--primary, oklch(0.24 0.012 90)) 85%, transparent); }"
+    },
+    {
+      "name": "Quiet Pill",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Secondary actions: Reject, Cancel, Today.",
+      "html": "<button class=\"ds-pill-quiet\">Reject</button>",
+      "css": ".ds-pill-quiet { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border: 0; border-radius: 9999px; background: transparent; color: color-mix(in oklch, var(--foreground, oklch(0.22 0.008 90)) 80%, transparent); box-shadow: inset 0 0 0 1px var(--border, oklch(0.907 0.004 95)); font: 500 13px/1 Poppins, ui-sans-serif, system-ui, sans-serif; cursor: pointer; outline: none; transition: background-color 150ms, color 150ms; } .ds-pill-quiet:hover { background: var(--muted, oklch(0.945 0.004 95)); color: var(--foreground, oklch(0.22 0.008 90)); } .ds-pill-quiet:focus-visible { box-shadow: inset 0 0 0 1px var(--border, oklch(0.907 0.004 95)), 0 0 0 2px color-mix(in oklch, var(--ring, oklch(0.24 0.012 90)) 60%, transparent); }"
+    },
+    {
+      "name": "Danger Pill",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Confirm step of a destructive action only.",
+      "html": "<button class=\"ds-pill-danger\">Reject request</button>",
+      "css": ".ds-pill-danger { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border: 0; border-radius: 9999px; background: var(--destructive, oklch(0.55 0.18 27)); color: var(--destructive-foreground, oklch(0.99 0.003 95)); font: 500 13px/1 Poppins, ui-sans-serif, system-ui, sans-serif; cursor: pointer; outline: none; transition: background-color 150ms; } .ds-pill-danger:hover { background: color-mix(in oklch, var(--destructive, oklch(0.55 0.18 27)) 90%, transparent); } .ds-pill-danger:focus-visible { box-shadow: 0 0 0 2px #fff, 0 0 0 4px color-mix(in oklch, var(--ring, oklch(0.24 0.012 90)) 60%, transparent); }"
+    },
+    {
+      "name": "Filter Tabs",
+      "kind": "chip",
+      "refersTo": "filter-tab",
+      "description": "Pressed-toggle tabs with tabular counts.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab is-active\" aria-pressed=\"true\">All <span class=\"ds-tab-n\">7</span></button><button class=\"ds-tab\" aria-pressed=\"false\">Bookings <span class=\"ds-tab-n\">4</span></button><button class=\"ds-tab\" aria-pressed=\"false\">Changes <span class=\"ds-tab-n\">2</span></button></div>",
+      "css": ".ds-tabs { display: flex; gap: 4px; } .ds-tab { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 9999px; background: transparent; color: var(--muted-foreground, oklch(0.43 0.012 90)); font: 400 13px/1 Poppins, ui-sans-serif, system-ui, sans-serif; cursor: pointer; outline: none; transition: background-color 150ms, color 150ms; } .ds-tab:hover { background: var(--muted, oklch(0.945 0.004 95)); color: var(--foreground, oklch(0.22 0.008 90)); } .ds-tab:focus-visible { box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring, oklch(0.24 0.012 90)) 60%, transparent); } .ds-tab.is-active { background: var(--primary, oklch(0.24 0.012 90)); color: var(--primary-foreground, oklch(0.985 0.002 95)); } .ds-tab-n { font-variant-numeric: tabular-nums; opacity: 0.7; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-text",
+      "description": "Inset-ringed field on the canvas tone.",
+      "html": "<textarea class=\"ds-field\" placeholder=\"Reason (optional)\"></textarea>",
+      "css": ".ds-field { width: 100%; min-height: 64px; padding: 8px 12px; border: 0; border-radius: 8px; background: var(--background, oklch(0.958 0.003 95)); color: var(--foreground, oklch(0.22 0.008 90)); box-shadow: inset 0 0 0 1px var(--input, oklch(0.885 0.005 95)); font: 400 14px/20px Poppins, ui-sans-serif, system-ui, sans-serif; outline: none; resize: vertical; } .ds-field::placeholder { color: var(--muted-foreground, oklch(0.43 0.012 90)); } .ds-field:focus { box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--ring, oklch(0.24 0.012 90)) 60%, transparent); } .ds-field[aria-invalid='true'] { box-shadow: inset 0 0 0 1px var(--destructive, oklch(0.55 0.18 27)); }"
+    },
+    {
+      "name": "Nav Rail",
+      "kind": "nav",
+      "description": "Floating translucent rail of pill items; active item is a glowing ink pill.",
+      "html": "<nav class=\"ds-rail\"><a class=\"ds-rail-item is-active\" href=\"#\"><span class=\"ds-rail-well\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/></svg></span>Calendar</a><a class=\"ds-rail-item\" href=\"#\"><span class=\"ds-rail-well\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M3 21h18M5 21V7l7-4 7 4v14\"/></svg></span>Resources</a></nav>",
+      "css": ".ds-rail { display: flex; flex-direction: column; gap: 2px; width: 220px; padding: 6px; border-radius: 29px; background: rgb(255 255 255 / 0.6); box-shadow: 0 6px 20px -10px rgb(15 40 60 / 0.25), inset 0 0 0 1px rgb(0 0 0 / 0.07); backdrop-filter: blur(12px); } .ds-rail-item { display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 16px 0 6px; border-radius: 9999px; color: color-mix(in oklch, var(--sidebar-foreground, oklch(0.27 0.01 90)) 85%, transparent); font: 500 14px/1 Poppins, ui-sans-serif, system-ui, sans-serif; text-decoration: none; outline: none; transition: background-color 150ms; } .ds-rail-item:hover { background: rgb(255 255 255 / 0.8); } .ds-rail-item:focus-visible { box-shadow: 0 0 0 2px var(--sidebar-ring, oklch(0.24 0.012 90)); } .ds-rail-well { display: flex; width: 34px; height: 34px; align-items: center; justify-content: center; border-radius: 9999px; background: color-mix(in oklch, var(--sidebar-foreground, oklch(0.27 0.01 90)) 8%, transparent); } .ds-rail-item.is-active { background: var(--sidebar-primary, oklch(0.24 0.012 90)); color: var(--sidebar-primary-foreground, oklch(0.985 0.002 95)); box-shadow: 0 8px 22px -8px color-mix(in oklch, var(--sidebar-primary, oklch(0.24 0.012 90)) 80%, transparent), inset 0 1px 0 oklch(1 0 0 / 0.22); } .ds-rail-item.is-active .ds-rail-well { background: rgb(255 255 255 / 0.18); }"
+    },
+    {
+      "name": "Ruled Section",
+      "kind": "card",
+      "description": "Hairline-ruled section with sentence-case title, muted count, and ruled rows. Replaces cards inside the panel.",
+      "html": "<section class=\"ds-section\"><div class=\"ds-section-head\"><h2 class=\"ds-section-title\">Waiting on you <span class=\"ds-count\">3</span></h2></div><ul class=\"ds-rows\"><li class=\"ds-row\"><span class=\"ds-row-main\">Board meeting</span><span class=\"ds-row-meta\">Today · 09:00–11:30</span></li><li class=\"ds-row\"><span class=\"ds-row-main\">Van to Intramuros</span><span class=\"ds-row-meta\">Tomorrow · 13:00–17:00</span></li></ul></section>",
+      "css": ".ds-section { border-top: 1px solid var(--border, oklch(0.907 0.004 95)); padding-top: 16px; font-family: Poppins, ui-sans-serif, system-ui, sans-serif; color: var(--foreground, oklch(0.22 0.008 90)); } .ds-section-head { display: flex; align-items: center; min-height: 32px; margin-bottom: 12px; } .ds-section-title { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.025em; } .ds-count { font-size: 14px; font-weight: 400; color: var(--muted-foreground, oklch(0.43 0.012 90)); font-variant-numeric: tabular-nums; } .ds-rows { margin: 0; padding: 0; list-style: none; border-block: 1px solid var(--border, oklch(0.907 0.004 95)); } .ds-row { display: flex; justify-content: space-between; gap: 24px; padding: 12px 8px; transition: background-color 150ms; } .ds-row + .ds-row { border-top: 1px solid var(--border, oklch(0.907 0.004 95)); } .ds-row:hover { background: color-mix(in oklch, var(--muted, oklch(0.945 0.004 95)) 45%, transparent); } .ds-row-main { font-size: 14px; font-weight: 500; } .ds-row-meta { font-size: 13px; color: var(--muted-foreground, oklch(0.43 0.012 90)); font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Event Wash and Hold",
+      "kind": "custom",
+      "refersTo": "event-block",
+      "description": "Approved: pastel vertical wash with dark ink. Pending: the same hue hatched. Conflict: destructive outline.",
+      "html": "<div class=\"ds-lane\"><span class=\"ds-block ds-wash\" style=\"--ev:#86C6F5\">09:00 Board meeting</span><span class=\"ds-block ds-hold\" style=\"--ev:#BFA8F5\"><span>Pending review</span></span><span class=\"ds-block ds-hold ds-clash\" style=\"--ev:#F5A6D8\"><span>Clash</span></span></div>",
+      "css": ".ds-lane { display: flex; gap: 8px; padding: 6px; border-radius: 6px; background: color-mix(in oklch, var(--muted, oklch(0.945 0.004 95)) 40%, transparent); } .ds-block { display: inline-flex; align-items: center; height: 28px; padding: 0 8px; border-radius: 6px; font: 500 12px/1 Poppins, ui-sans-serif, system-ui, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; transition: opacity 150ms, box-shadow 150ms; } .ds-wash { background: linear-gradient(180deg, color-mix(in oklab, var(--ev) 84%, white) 0%, var(--ev) 100%); color: color-mix(in oklch, var(--ev) 26%, oklch(0.18 0.035 250)); } .ds-hold { --hold-base: color-mix(in oklab, var(--ev) 22%, var(--card, #fff)); background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--ev) 45%, transparent) 0 2px, transparent 2px 7px), var(--hold-base); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ev) 75%, black 10%); color: var(--foreground, oklch(0.22 0.008 90)); } .ds-hold > span { padding-inline: 3px; border-radius: 3px; background: var(--hold-base); } .ds-clash { outline: 2px solid var(--destructive, oklch(0.55 0.18 27)); outline-offset: -1px; } .ds-block:hover { opacity: 0.9; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Call Sheet",
+    "overview": "A working calendar for a government film agency: a warm-gray canvas, one floating white panel, near-black ink, and pastel color that belongs only to the things being scheduled. Chrome stays neutral so a room's or event's hue is the loudest thing on screen, and it always means something. The film heritage stays quiet: frames, lanes, a now-line, never spectacle.\n\nDensity is office-grade. Rows are 13-14px Poppins with tabular times, sections are divided by hairlines rather than boxed, and the primary action is a black pill (a blue pill at night). Light is the default working context. Dark is \"night glass\": a slate-navy field with blue glows, frosted panels, and the same pastel hues turned into tinted glass.\n\nMotion is calm and short (150-200ms color and opacity, a 0.8s eased entrance on auth only) and every animation is gated on `prefers-reduced-motion`; frosted glass drops to an opaque panel under `prefers-reduced-transparency`.",
+    "keyCharacteristics": [
+      "Neutral chrome, pastel content: color is data, not decoration.",
+      "One floating rounded panel over a soft brand wash.",
+      "Pills for every action; the filled one decides.",
+      "Hairline-ruled sections and rows instead of nested cards.",
+      "Tabular numerals for every time, count, and date.",
+      "Two themes that share structure: paper by day, night glass by dark."
+    ],
+    "rules": [
+      { "name": "The Content Owns Color Rule", "body": "Chrome (navigation, headers, buttons, rules) is neutral ink on gray. Saturated color appears only when it names an event, a calendar, or a resource, or reports status.", "section": "colors" },
+      { "name": "The Ink-Not-Fill Warning Rule", "body": "Amber as text always uses warning-ink; the brighter warning is a dot or bar fill, never a label color.", "section": "colors" },
+      { "name": "The Tabular Time Rule", "body": "Every time, count, date number, and duration uses tabular numerals, in 24-hour `HH:mm–HH:mm` with an en dash.", "section": "typography" },
+      { "name": "The Sentence Case Rule", "body": "Titles and labels are sentence case. No uppercase tracked labels above headings.", "section": "typography" },
+      { "name": "The One Panel Rule", "body": "There is one raised surface per screen, the main panel. Content inside it is ruled, not boxed; only popovers and dialogs float above it.", "section": "elevation" },
+      { "name": "The Glass At Night Rule", "body": "Frosted glass is the dark theme's material and is limited to the main panel, dialogs, menus, and month tiles. Light mode has no glass except the sidebar nav rail.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep chrome neutral and let event, calendar, and resource hues carry all saturated color.",
+      "Do make the one deciding action a Pill Ink pill (Night Blue in dark); everything else is quiet.",
+      "Do separate sections with hairlines and rows with dividers inside the single main panel.",
+      "Do set every time, count, and date in tabular numerals, 24-hour, en dash ranges.",
+      "Do use warning-ink for amber text and reserve warning for dots and bars.",
+      "Do mark pending holds with the 135deg hatch in the resource hue, approved with the solid wash, conflicts with a 2px Destructive outline.",
+      "Do gate every animation on `prefers-reduced-motion` and drop glass under `prefers-reduced-transparency`."
+    ],
+    "donts": [
+      "Don't use vivid yellow, AI-purple gradients, or neon-on-dark as chrome (confirmed anti-references in PRODUCT.md).",
+      "Don't put glass on light-mode surfaces beyond the nav rail.",
+      "Don't introduce a display face, uppercase eyebrow labels above headings, or size jumps larger than the 24px headline.",
+      "Don't raise content inside the main panel with shadows or nest cards within it.",
+      "Don't use raw FDCP brand colors (blue, magenta) for chrome such as badges, links, or banners."
+    ]
+  }
+}

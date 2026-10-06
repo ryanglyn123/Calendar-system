@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { Pencil, Plus, Trash2 } from '@lucide/vue';
+import { Building2, Pencil, Plus, Trash2 } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import EmptyNote from '@/components/admin/EmptyNote.vue';
 import PageHeader from '@/components/PageHeader.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -16,16 +16,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableEmpty,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useConfirm } from '@/composables/useConfirm';
 import admin from '@/routes/admin';
 import adminDivisions from '@/routes/admin/divisions';
 import type { Division } from '@/types';
@@ -42,6 +34,52 @@ defineOptions({
 const props = defineProps<{
     divisions: { data: Division[] };
 }>();
+
+type Row = { division: Division; unit: boolean; last: boolean; units: number };
+
+/**
+ * Root divisions in the server's order, each followed by its units. A unit
+ * whose parent is missing from the list is shown as a root so it never hides.
+ */
+const rows = computed<Row[]>(() => {
+    const all = props.divisions.data;
+    const ids = new Set(all.map((d) => d.id));
+
+    return all
+        .filter((d) => d.parent_id == null || !ids.has(d.parent_id))
+        .flatMap((root) => {
+            const units = all.filter((d) => d.parent_id === root.id);
+
+            return [
+                {
+                    division: root,
+                    unit: false,
+                    last: false,
+                    units: units.length,
+                },
+                ...units.map((division, i) => ({
+                    division,
+                    unit: true,
+                    last: i === units.length - 1,
+                    units: 0,
+                })),
+            ];
+        });
+});
+
+const membersLabel = (count = 0) =>
+    count === 1 ? '1 member' : `${count} members`;
+
+/** Why a division can't be deleted (the server refuses the same cases). */
+const deleteBlock = (row: Row) => {
+    const members = row.division.users_count ?? 0;
+
+    if (members > 0) {
+        return `Move its ${membersLabel(members)} to another division first`;
+    }
+
+    return row.units > 0 ? 'Remove its units first' : null;
+};
 
 const editing = ref<Division | null>(null);
 const creating = ref(false);
@@ -99,18 +137,22 @@ const submit = () => {
     }
 };
 
-const deleting = ref<Division | null>(null);
+const { confirm } = useConfirm();
 
-const destroy = () => {
-    if (!deleting.value) {
+const destroy = async (division: Division) => {
+    const confirmed = await confirm({
+        title: `Delete ${division.name}?`,
+        description: 'Only divisions without members or units can be deleted.',
+        confirmLabel: 'Delete division',
+        destructive: true,
+    });
+
+    if (!confirmed) {
         return;
     }
 
-    router.delete(adminDivisions.destroy(deleting.value.id).url, {
+    router.delete(adminDivisions.destroy(division.id).url, {
         preserveScroll: true,
-        onSuccess: () => {
-            deleting.value = null;
-        },
     });
 };
 </script>
@@ -121,101 +163,137 @@ const destroy = () => {
     <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
         <PageHeader
             title="Divisions"
-            description="Divisions scope users, calendars and resources."
+            description="Divisions scope users, calendars and resources. Units sit under their division."
         >
             <template #actions>
-                <Button @click="openCreate">
+                <Button class="rounded-full" size="sm" @click="openCreate">
                     <Plus aria-hidden="true" />
                     New division
                 </Button>
             </template>
         </PageHeader>
 
-        <div class="rounded-xl border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Division</TableHead>
-                        <TableHead>Members</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead class="w-24 text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    <TableEmpty v-if="divisions.data.length === 0" :colspan="4">
-                        No divisions yet.
-                    </TableEmpty>
-                    <TableRow
-                        v-for="division in divisions.data"
-                        :key="division.id"
+        <EmptyNote
+            v-if="rows.length === 0"
+            :icon="Building2"
+            title="No divisions yet"
+        >
+            Create a division to group people, calendars and resources.
+            <template #action>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    class="rounded-full"
+                    @click="openCreate"
+                >
+                    New division
+                </Button>
+            </template>
+        </EmptyNote>
+
+        <ul v-else class="border-y border-border">
+            <li
+                v-for="row in rows"
+                :key="row.division.id"
+                class="relative"
+                :class="
+                    row.unit
+                        ? 'pl-6'
+                        : 'border-t border-border first:border-t-0'
+                "
+            >
+                <!-- Hairline guide: from the division's dot down to each unit. -->
+                <span
+                    v-if="!row.unit && row.units > 0"
+                    class="absolute top-[30px] bottom-0 left-3.5 border-l border-border"
+                    aria-hidden="true"
+                />
+                <template v-if="row.unit">
+                    <span
+                        class="absolute top-0 left-3.5 h-[22px] w-3.5 rounded-bl-md border-b border-l border-border"
+                        aria-hidden="true"
+                    />
+                    <span
+                        v-if="!row.last"
+                        class="absolute top-0 bottom-0 left-3.5 border-l border-border"
+                        aria-hidden="true"
+                    />
+                </template>
+
+                <div
+                    class="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-3 hover:bg-muted/40 motion-safe:transition-colors motion-safe:duration-150 md:grid md:grid-cols-[minmax(0,1fr)_8rem_5rem_auto]"
+                    :class="{ 'border-t border-border': row.unit }"
+                >
+                    <div
+                        class="flex w-full min-w-0 items-center gap-2.5 md:w-auto"
                     >
-                        <TableCell>
-                            <div class="flex items-center gap-2.5">
-                                <span
-                                    class="size-3 rounded-full"
-                                    :style="{
-                                        backgroundColor: division.color,
-                                    }"
-                                    aria-hidden="true"
-                                />
-                                <div>
-                                    <div
-                                        class="flex items-center gap-1.5 font-medium"
-                                    >
-                                        {{ division.name }}
-                                        <Badge
-                                            v-if="division.parent"
-                                            variant="outline"
-                                            class="font-normal"
-                                        >
-                                            Unit of {{ division.parent.name }}
-                                        </Badge>
-                                    </div>
-                                    <div
-                                        v-if="division.acronym"
-                                        class="text-xs text-muted-foreground"
-                                    >
-                                        {{ division.acronym }}
-                                    </div>
-                                </div>
-                            </div>
-                        </TableCell>
-                        <TableCell>{{ division.users_count ?? 0 }}</TableCell>
-                        <TableCell>
-                            <Badge
-                                :variant="
-                                    division.is_active ? 'success' : 'secondary'
-                                "
+                        <span
+                            class="size-3 shrink-0 rounded-full"
+                            :class="{ 'opacity-50': !row.division.is_active }"
+                            :style="{ backgroundColor: row.division.color }"
+                            aria-hidden="true"
+                        />
+                        <p
+                            class="min-w-0 truncate text-sm"
+                            :class="{
+                                'text-muted-foreground':
+                                    !row.division.is_active,
+                            }"
+                        >
+                            <span class="font-medium">
+                                {{ row.division.name }}
+                            </span>
+                            <span
+                                v-if="row.division.acronym"
+                                class="ml-1.5 text-[13px] text-muted-foreground"
                             >
-                                {{ division.is_active ? 'Active' : 'Inactive' }}
-                            </Badge>
-                        </TableCell>
-                        <TableCell class="text-right">
-                            <div class="flex justify-end gap-1">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    :aria-label="`Edit ${division.name}`"
-                                    @click="openEdit(division)"
-                                >
-                                    <Pencil aria-hidden="true" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    class="text-destructive hover:text-destructive"
-                                    :disabled="(division.users_count ?? 0) > 0"
-                                    :aria-label="`Delete ${division.name}`"
-                                    @click="deleting = division"
-                                >
-                                    <Trash2 aria-hidden="true" />
-                                </Button>
-                            </div>
-                        </TableCell>
-                    </TableRow>
-                </TableBody>
-            </Table>
-        </div>
+                                {{ row.division.acronym }}
+                            </span>
+                        </p>
+                    </div>
+
+                    <span
+                        class="text-[13px] text-muted-foreground tabular-nums"
+                    >
+                        {{ membersLabel(row.division.users_count) }}
+                    </span>
+
+                    <span>
+                        <span
+                            v-if="!row.division.is_active"
+                            class="rounded-full bg-muted px-2 py-px text-[11px] leading-4 font-medium text-muted-foreground"
+                        >
+                            Archived
+                        </span>
+                    </span>
+
+                    <div class="ml-auto flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            class="rounded-full text-muted-foreground"
+                            :aria-label="`Edit ${row.division.name}`"
+                            @click="openEdit(row.division)"
+                        >
+                            <Pencil aria-hidden="true" />
+                        </Button>
+                        <!-- Disabled buttons swallow hover, so the reason sits on a wrapper. -->
+                        <span :title="deleteBlock(row) ?? undefined">
+                            <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                class="rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                :disabled="deleteBlock(row) !== null"
+                                :aria-label="`Delete ${row.division.name}`"
+                                @click="destroy(row.division)"
+                            >
+                                <Trash2 aria-hidden="true" />
+                            </Button>
+                        </span>
+                    </div>
+                </div>
+            </li>
+        </ul>
 
         <Dialog
             :open="creating || editing !== null"
@@ -292,7 +370,10 @@ const destroy = () => {
                             v-model="form.parent_id"
                             class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                            <option class="bg-background text-foreground" :value="null">
+                            <option
+                                class="bg-background text-foreground"
+                                :value="null"
+                            >
                                 None — top-level division
                             </option>
                             <option
@@ -337,28 +418,6 @@ const destroy = () => {
                     <Button variant="outline" @click="close">Cancel</Button>
                     <Button :disabled="form.processing" @click="submit">
                         {{ editing ? 'Save changes' : 'Create division' }}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-
-        <Dialog
-            :open="deleting !== null"
-            @update:open="(open) => !open && (deleting = null)"
-        >
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Delete {{ deleting?.name }}?</DialogTitle>
-                    <DialogDescription>
-                        Only divisions without members can be deleted.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                    <Button variant="outline" @click="deleting = null">
-                        Cancel
-                    </Button>
-                    <Button variant="destructive" @click="destroy">
-                        Delete division
                     </Button>
                 </DialogFooter>
             </DialogContent>

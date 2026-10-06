@@ -29,12 +29,19 @@ class RoleController extends Controller
 
     public function store(StoreRoleRequest $request): RedirectResponse
     {
-        $role = Role::create([
+        $role = Role::query()->create([
             'name' => $request->validated('name'),
             'description' => $request->validated('description'),
         ]);
 
         $role->syncPermissions($request->validated('permissions', []));
+
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($role)
+            ->event('created')
+            ->withProperties(['permissions' => $request->validated('permissions', [])])
+            ->log("Created role {$role->name}");
 
         Toast::success("Role {$role->name} created.");
 
@@ -51,6 +58,13 @@ class RoleController extends Controller
 
         $role->syncPermissions($request->validated('permissions', []));
 
+        activity()
+            ->causedBy($request->user())
+            ->performedOn($role)
+            ->event('permissions-updated')
+            ->withProperties(['permissions' => $request->validated('permissions', [])])
+            ->log("Updated role {$role->name}");
+
         Toast::success("Role {$role->name} updated.");
 
         return back();
@@ -63,6 +77,12 @@ class RoleController extends Controller
         // Invariants that hold for every actor, super admins included.
         abort_if((bool) $role->is_system, 403, 'System roles cannot be deleted.');
         abort_if($role->users()->exists(), 403, 'Roles still assigned to users cannot be deleted.');
+
+        activity()
+            ->causedBy(request()->user())
+            ->performedOn($role)
+            ->event('deleted')
+            ->log("Deleted role {$role->name}");
 
         $role->delete();
 

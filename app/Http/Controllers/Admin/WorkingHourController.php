@@ -50,9 +50,9 @@ class WorkingHourController extends Controller
         $validated = $request->validate([
             'resource_id' => ['nullable', 'integer', Rule::exists('resources', 'id')],
             'days' => ['required', 'array', 'size:7'],
-            'days.*.day_of_week' => ['required', 'integer', 'min:0', 'max:6'],
+            'days.*.day_of_week' => ['required', 'integer', 'min:0', 'max:6', 'distinct'],
             'days.*.opens_at' => ['nullable', 'date_format:H:i'],
-            'days.*.closes_at' => ['nullable', 'date_format:H:i', 'required_with:days.*.opens_at'],
+            'days.*.closes_at' => ['nullable', 'date_format:H:i', 'required_with:days.*.opens_at', 'after:days.*.opens_at'],
         ]);
 
         foreach ($validated['days'] as $day) {

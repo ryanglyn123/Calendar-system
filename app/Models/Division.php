@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -23,11 +22,10 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string|null $acronym
  * @property string|null $description
  * @property string $color
- * @property string|null $chat_photo_path
  * @property bool $is_active
  * @property int $sort_order
  */
-#[Fillable(['parent_id', 'name', 'acronym', 'description', 'color', 'chat_photo_path', 'is_active', 'sort_order'])]
+#[Fillable(['parent_id', 'name', 'acronym', 'description', 'color', 'is_active', 'sort_order'])]
 #[ObservedBy(DivisionObserver::class)]
 class Division extends Model
 {
@@ -66,16 +64,6 @@ class Division extends Model
     public function isUnit(): bool
     {
         return $this->parent_id !== null;
-    }
-
-    /**
-     * The division's own group-chat room.
-     *
-     * @return HasOne<Conversation, $this>
-     */
-    public function conversation(): HasOne
-    {
-        return $this->hasOne(Conversation::class)->where('type', Conversation::TYPE_DIVISION);
     }
 
     /**

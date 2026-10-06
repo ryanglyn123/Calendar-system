@@ -1,3 +1,10 @@
+export type ColorLabel = {
+    color: string;
+    name: string | null;
+    /** Left out of the color menu. */
+    hidden: boolean;
+};
+
 export type AuthDivision = {
     id: number;
     name: string;
@@ -12,6 +19,8 @@ export type User = {
     avatar_path?: string | null;
     status: 'pending' | 'active' | 'suspended';
     timezone: string;
+    /** Their own names for event colors; null until first edited. */
+    color_labels?: ColorLabel[] | null;
     division: AuthDivision | null;
     roles: string[];
     permissions: string[];

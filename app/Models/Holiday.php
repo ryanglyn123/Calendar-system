@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Settings\GeneralSettings;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,37 @@ class Holiday extends Model
 
     public static function blockingOn(CarbonInterface $day): bool
     {
+        return static::blockingFor($day) !== null;
+    }
+
+    /**
+     * The first blocking holiday on any office day (the configured timezone) inside
+     * [start, end): an overnight trip that runs into a holiday is blocked,
+     * a booking that ends exactly at midnight before one is not.
+     */
+    public static function blockingWithin(CarbonInterface $start, CarbonInterface $end): ?self
+    {
+        $holidays = static::query()->where('blocks_bookings', true)->get();
+        $office = app(GeneralSettings::class)->timezone;
+        $day = $start->avoidMutation()->timezone($office)->startOfDay();
+        $last = $end->avoidMutation()->timezone($office);
+
+        for (; $day < $last; $day = $day->addDay()) {
+            $hit = $holidays->first(fn (self $holiday) => $holiday->recurs_annually
+                ? $holiday->date->month === $day->month && $holiday->date->day === $day->day
+                : $holiday->date->toDateString() === $day->toDateString());
+
+            if ($hit !== null) {
+                return $hit;
+            }
+        }
+
+        return null;
+    }
+
+    /** The holiday that blocks bookings on this day, if any. */
+    public static function blockingFor(CarbonInterface $day): ?self
+    {
         return static::query()
             ->where('blocks_bookings', true)
             ->where(fn ($query) => $query
@@ -37,6 +69,6 @@ class Holiday extends Model
                     ->where('recurs_annually', true)
                     ->whereMonth('date', $day->month)
                     ->whereDay('date', $day->day)))
-            ->exists();
+            ->first();
     }
 }

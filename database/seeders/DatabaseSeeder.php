@@ -30,13 +30,13 @@ class DatabaseSeeder extends Seeder
                 'status' => UserStatus::Active,
                 'email_verified_at' => now(),
                 'approved_at' => now(),
-                'division_id' => Division::query()->where('acronym', 'MIS')->value('id'),
+                'division_id' => Division::query()->where('acronym', 'ITU')->value('id'),
             ],
         );
 
         $superAdmin->syncRoles(['super_admin']);
 
         // Needs the super admin + approver roles to exist.
-        $this->call(ResourceSeeder::class);
+        $this->call([ResourceSeeder::class, FdcpRosterSeeder::class]);
     }
 }

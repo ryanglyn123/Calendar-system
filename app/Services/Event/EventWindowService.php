@@ -2,6 +2,7 @@
 
 namespace App\Services\Event;
 
+use App\Enums\BookingStatus;
 use App\Http\Resources\EventOccurrenceResource;
 use App\Models\Calendar;
 use App\Models\CalendarUserPreference;
@@ -18,6 +19,11 @@ use Illuminate\Http\Request;
  */
 class EventWindowService
 {
+    private const EAGER = [
+        'eventType', 'calendar', 'overrides', 'attendees.user', 'reminders',
+        'creator', 'booking.resource.type', 'booking.requester', 'booking.reviewer',
+    ];
+
     public function __construct(
         private readonly CalendarAccessService $access,
         private readonly OccurrenceExpander $expander,
@@ -28,6 +34,9 @@ class EventWindowService
      * calendar ids are intersected with the accessible set, so an
      * inaccessible id silently yields nothing rather than leaking existence.
      * Types and resource type narrow the set the same way for scoped pages.
+     *
+     * My Calendar (a scope with personal calendars and no resource ones)
+     * also carries the user's own room and vehicle bookings, in every state.
      *
      * @param  list<int>|null  $requestedCalendarIds
      * @param  list<string>|null  $types
@@ -53,18 +62,29 @@ class EventWindowService
                 $accessible->keys()->all(),
             ));
 
-        if ($calendarIds === []) {
+        $withOwnBookings = $types !== null && in_array('personal', $types, true) && ! in_array('resource', $types, true);
+
+        if ($calendarIds === [] && ! $withOwnBookings) {
             return [];
         }
 
         $roots = Event::query()
             ->whereIn('calendar_id', $calendarIds)
             ->windowRoots($start, $end)
-            ->with([
-                'eventType', 'calendar', 'overrides', 'attendees.user', 'reminders',
-                'creator', 'booking.resource.type', 'booking.requester', 'booking.reviewer',
-            ])
-            ->get();
+            ->with(self::EAGER)
+            ->get()
+            ->reject(fn (Event $event) => $this->hidesClosedBooking($user, $event));
+
+        if ($withOwnBookings) {
+            $roots = $roots->concat(
+                Event::query()
+                    ->whereNotIn('calendar_id', $calendarIds)
+                    ->whereHas('booking', fn ($query) => $query->where('requested_by', $user->id))
+                    ->windowRoots($start, $end)
+                    ->with(self::EAGER)
+                    ->get(),
+            );
+        }
 
         $preferences = CalendarUserPreference::query()
             ->where('user_id', $user->id)
@@ -83,5 +103,20 @@ class EventWindowService
             ))->toArray($request),
             $this->expander->expand($roots, $start, $end),
         );
+    }
+
+    /**
+     * Someone else's rejected or cancelled booking is their business: it no
+     * longer holds the slot, so only the requester and the type's reviewers
+     * see it.
+     */
+    private function hidesClosedBooking(User $user, Event $event): bool
+    {
+        $booking = $event->booking;
+
+        return $booking !== null
+            && in_array($booking->status, [BookingStatus::Rejected, BookingStatus::Cancelled], true)
+            && $booking->requested_by !== $user->id
+            && ! $user->can('approve', $booking);
     }
 }

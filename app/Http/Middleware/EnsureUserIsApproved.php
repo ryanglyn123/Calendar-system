@@ -17,6 +17,9 @@ class EnsureUserIsApproved
         $user = $request->user();
 
         if ($user !== null && ! $user->isActive()) {
+            // The calendar fetch client cannot follow an HTML redirect.
+            abort_if($request->expectsJson(), 403, 'Your account is not active.');
+
             return redirect()->route('approval.pending');
         }
 

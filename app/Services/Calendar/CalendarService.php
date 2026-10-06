@@ -39,6 +39,33 @@ class CalendarService
     }
 
     /**
+     * The user's own calendar (Google's "My calendars" entry): one per user,
+     * named after them, created the first time their calendar list is built.
+     */
+    public function ensurePrimaryCalendar(User $owner): Calendar
+    {
+        $calendar = Calendar::query()->firstOrCreate(
+            [
+                'type' => CalendarType::Personal->value,
+                'owner_id' => $owner->id,
+                'is_default' => true,
+            ],
+            [
+                'name' => $owner->name,
+                'color' => '#039BE5',
+                'division_id' => null,
+                'created_by' => $owner->id,
+            ],
+        );
+
+        if ($calendar->wasRecentlyCreated) {
+            $this->access->forgetFor($owner);
+        }
+
+        return $calendar;
+    }
+
+    /**
      * Expects FormRequest-validated attributes (name, description, color,
      * icon, division_id, is_default, is_active, sort_order).
      *

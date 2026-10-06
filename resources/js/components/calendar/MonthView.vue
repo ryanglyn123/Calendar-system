@@ -2,8 +2,17 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { layoutWeekLanes } from '@/components/calendar/monthLanes';
+import { peekClose, peekEnter, peekFocus } from '@/composables/useEventPeek';
+import {
+    bookingTone,
+    chipFill,
+    chipIcon,
+    chipState,
+    isShown,
+} from '@/lib/bookingDisplay';
 import {
     addDays,
+    addMonths,
     eventInk,
     eventWash,
     format,
@@ -20,12 +29,13 @@ import { useCalendarListStore } from '@/stores/calendarList';
 import type { EventOccurrence } from '@/types/calendar';
 
 const MAX_LANES = 2;
-const LANE_HEIGHT = 24;
+const LANE_HEIGHT = 24; // bar (22, Google's pill height) + 2 gap
 
 // The chip cap is measured, not fixed: show as many timed chips as the cell's
 // height fits. Heights in px — tuning knobs if chip/label styling changes.
-const CHIP_HEIGHT = 22; // chip (20) + gap-0.5 (2)
+const CHIP_HEIGHT = 24; // chip (22) + gap-0.5 (2)
 const LABEL_HEIGHT = 32; // day-number block
+const WEEKDAY_HEIGHT = 20; // weekday label atop the first row's cells (h-5)
 const CELL_PAD = 4; // pb-1
 const MIN_ROW_HEIGHT = 112; // min-h-28 floor — the pre-measure seed
 
@@ -41,18 +51,25 @@ const list = useCalendarListStore();
 
 const days = computed(() => monthGridDays(grid.focusDate, grid.weekStartsOn));
 
+// Without weekends each row is the five weekdays (they stay contiguous, as
+// weekends sit at the ends of the week).
 const weeks = computed(() =>
-    Array.from({ length: 6 }, (_, w) => days.value.slice(w * 7, w * 7 + 7)),
+    Array.from({ length: 6 }, (_, w) =>
+        days.value
+            .slice(w * 7, w * 7 + 7)
+            .filter((d) => grid.showWeekends || ![0, 6].includes(d.getDay())),
+    ),
 );
 
 const visible = computed(() => {
     const start = days.value[0];
     const end = addDays(days.value[41], 1);
     const visibleIds = new Set(list.visibleCalendarIds);
+    const listedIds = new Set(list.calendars.map((c) => c.id));
 
     return grid
         .occurrencesBetween(start, end)
-        .filter((o) => visibleIds.has(o.calendar_id));
+        .filter((o) => isShown(o, visibleIds, listedIds));
 });
 
 type WeekLayout = {
@@ -162,9 +179,16 @@ onMounted(() => {
 
 onBeforeUnmount(() => rowObserver?.disconnect());
 
-const maxChips = (laneCount: number): number => {
+/** The first row also carries the weekday labels, like Google's grid. */
+const weekdayOffset = (w: number) => (w === 0 ? WEEKDAY_HEIGHT : 0);
+
+const maxChips = (laneCount: number, w: number): number => {
     const avail =
-        rowHeight.value - LABEL_HEIGHT - laneCount * LANE_HEIGHT - CELL_PAD;
+        rowHeight.value -
+        LABEL_HEIGHT -
+        weekdayOffset(w) -
+        laneCount * LANE_HEIGHT -
+        CELL_PAD;
 
     return Math.max(1, Math.floor(avail / CHIP_HEIGHT));
 };
@@ -174,8 +198,8 @@ type ChipPlan = { shown: EventOccurrence[]; hiddenCount: number };
 // Per week: how many chips to render per day and the "+N more" remainder,
 // reserving the last row for the more-link whenever anything overflows.
 const chipPlans = computed<Map<string, ChipPlan>[]>(() =>
-    weekLayouts.value.map((week) => {
-        const budget = maxChips(week.laneCount);
+    weekLayouts.value.map((week, w) => {
+        const budget = maxChips(week.laneCount, w);
         const plans = new Map<string, ChipPlan>();
 
         for (const [key, chips] of week.chipsByDay) {
@@ -205,10 +229,6 @@ const chipPlans = computed<Map<string, ChipPlan>[]>(() =>
 
         return plans;
     }),
-);
-
-const weekdayHeaders = computed(() =>
-    days.value.slice(0, 7).map((d) => format(d, 'EEE')),
 );
 
 const onCellClick = (day: Date, event: MouseEvent) => {
@@ -337,6 +357,11 @@ function onDragKeydown(event: KeyboardEvent): void {
     }
 }
 
+/** The pill being dragged dims, as in the week view, while its target cell lights. */
+const isDragSource = (occurrence: EventOccurrence) =>
+    monthDrag.value?.active === true &&
+    monthDrag.value.occurrence.occurrence_id === occurrence.occurrence_id;
+
 function teardownDrag(): void {
     monthDrag.value = null;
     dropTargetKey.value = null;
@@ -346,6 +371,70 @@ function teardownDrag(): void {
 }
 
 onBeforeUnmount(teardownDrag);
+
+/* ------------------------------------------------------------------ */
+/* Wheel pages months, like Google Calendar: one gesture, one month.   */
+/* ------------------------------------------------------------------ */
+
+const WHEEL_THRESHOLD = 50; // px of scroll before a gesture counts
+const WHEEL_IDLE = 200; // ms of quiet that ends a gesture (eats trackpad inertia)
+
+let wheelSum = 0;
+let wheelLocked = false;
+let wheelTimer: number | undefined;
+
+// A scrollable ancestor (e.g. the page on a short screen) scrolls first.
+function ancestorCanScroll(from: Element | null, dy: number): boolean {
+    for (let el = from; el; el = el.parentElement) {
+        const scrollable =
+            el === document.scrollingElement ||
+            /auto|scroll/.test(getComputedStyle(el).overflowY);
+
+        if (
+            scrollable &&
+            (dy > 0
+                ? el.scrollTop + el.clientHeight < el.scrollHeight - 1
+                : el.scrollTop > 0)
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function onWheel(event: WheelEvent): void {
+    // Line/page-mode wheels (Firefox) report small numbers; scale to px.
+    const dy = event.deltaMode ? event.deltaY * 40 : event.deltaY;
+
+    if (
+        // Resource sections (Boardroom, Carpool) keep plain scrolling.
+        grid.scope?.resourceTypeId != null ||
+        event.ctrlKey ||
+        Math.abs(dy) < Math.abs(event.deltaX) ||
+        ancestorCanScroll(event.target as Element, dy)
+    ) {
+        return;
+    }
+
+    event.preventDefault();
+    window.clearTimeout(wheelTimer);
+    wheelTimer = window.setTimeout(() => {
+        wheelSum = 0;
+        wheelLocked = false;
+    }, WHEEL_IDLE);
+
+    if (wheelLocked) {
+        return;
+    }
+
+    wheelSum += dy;
+
+    if (Math.abs(wheelSum) >= WHEEL_THRESHOLD) {
+        wheelLocked = true;
+        grid.setFocusDate(addMonths(grid.focusDate, Math.sign(wheelSum)));
+    }
+}
 
 const onChipClick = (occurrence: EventOccurrence): void => {
     if (suppressNextClick) {
@@ -357,26 +446,20 @@ const onChipClick = (occurrence: EventOccurrence): void => {
 </script>
 
 <template>
-    <div class="flex h-full flex-col" role="grid" aria-label="Month view">
-        <div
-            class="grid grid-cols-7 border-b text-center text-xs font-medium text-muted-foreground"
-            role="row"
-        >
-            <div
-                v-for="label in weekdayHeaders"
-                :key="label"
-                class="py-1.5"
-                role="columnheader"
-            >
-                {{ label }}
-            </div>
-        </div>
-
+    <div
+        class="flex h-full flex-col"
+        role="grid"
+        aria-label="Month view"
+        @wheel="onWheel"
+    >
         <div ref="gridEl" class="grid flex-1 auto-rows-fr">
             <div
                 v-for="(week, w) in weeks"
                 :key="w"
-                class="relative grid grid-cols-7 border-b last:border-b-0"
+                class="month-row relative grid border-b last:border-b-0"
+                :style="{
+                    gridTemplateColumns: `repeat(${week.length}, minmax(0, 1fr))`,
+                }"
                 role="row"
             >
                 <!-- Spanning lane bars -->
@@ -385,28 +468,46 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                     :key="`${segment.occurrence.occurrence_id}-${segment.startCol}`"
                     type="button"
                     data-event
-                    class="absolute z-10 truncate rounded-md px-2 text-left text-xs leading-5 font-medium transition-opacity hover:opacity-90"
-                    :class="{
-                        'rounded-l-none': segment.continuesBefore,
-                        'rounded-r-none': segment.continuesAfter,
-                        'line-through opacity-70':
-                            segment.occurrence.status === 'cancelled',
-                    }"
+                    class="ev-pill absolute z-10 flex items-center gap-1 truncate rounded-[6px] px-2 text-left text-xs leading-5 font-medium"
+                    :class="[
+                        chipFill(segment.occurrence),
+                        {
+                            'opacity-40': isDragSource(segment.occurrence),
+                            'rounded-l-none': segment.continuesBefore,
+                            'rounded-r-none': segment.continuesAfter,
+                            'line-through opacity-70':
+                                segment.occurrence.status === 'cancelled' &&
+                                !segment.occurrence.booking,
+                        },
+                    ]"
                     :style="{
-                        left: `calc(${(segment.startCol / 7) * 100}% + 4px)`,
-                        width: `calc(${(segment.span / 7) * 100}% - 8px)`,
-                        top: `${28 + segment.lane * LANE_HEIGHT}px`,
-                        height: '20px',
-                        background: eventWash(segment.occurrence.color),
-                        color: eventInk(segment.occurrence.color),
+                        left: `calc(${(segment.startCol / week.length) * 100}% + 4px)`,
+                        width: `calc(${(segment.span / week.length) * 100}% - 8px)`,
+                        top: `${weekdayOffset(w) + 28 + segment.lane * LANE_HEIGHT}px`,
+                        height: '22px',
+                        '--wash': eventWash(bookingTone(segment.occurrence)),
+                        '--ink': eventInk(bookingTone(segment.occurrence)),
+                        '--ev': bookingTone(segment.occurrence) ?? '#d4d8dd',
                     }"
-                    :aria-label="`${segment.occurrence.title}, ${format(new Date(segment.occurrence.starts_at), 'MMM d')}`"
+                    :aria-label="`${chipState(segment.occurrence)}${segment.occurrence.title}, ${format(new Date(segment.occurrence.starts_at), 'MMM d')}`"
                     @pointerdown="
                         (e) => onChipPointerDown(e, segment.occurrence)
                     "
                     @click="onChipClick(segment.occurrence)"
+                    @pointerenter="(e) => peekEnter(e, segment.occurrence)"
+                    @pointerleave="peekClose()"
+                    @focus="(e) => peekFocus(e, segment.occurrence)"
+                    @blur="peekClose()"
                 >
-                    {{ segment.occurrence.title }}
+                    <component
+                        :is="chipIcon(segment.occurrence)"
+                        v-if="chipIcon(segment.occurrence)"
+                        class="size-3 shrink-0"
+                        aria-hidden="true"
+                    />
+                    <span class="bk-title truncate">{{
+                        segment.occurrence.title
+                    }}</span>
                 </button>
 
                 <!-- Day cells -->
@@ -414,8 +515,11 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                     v-for="day in week"
                     :key="day.toISOString()"
                     role="gridcell"
-                    class="flex min-h-28 cursor-pointer flex-col border-r px-1 pb-1 transition-colors last:border-r-0 hover:bg-muted/40"
+                    class="month-cell flex min-h-28 cursor-pointer flex-col border-r px-1 pb-1 transition-colors last:border-r-0 hover:bg-muted/40"
                     :class="{
+                        'is-today': isSameDay(day, today),
+                        'is-outside': !isSameMonth(day, grid.focusDate),
+                        'is-drop': dropTargetKey === format(day, 'yyyy-MM-dd'),
                         'bg-muted/20 text-muted-foreground': !isSameMonth(
                             day,
                             grid.focusDate,
@@ -424,10 +528,17 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                             dropTargetKey === format(day, 'yyyy-MM-dd'),
                     }"
                     :data-daycell="format(day, 'yyyy-MM-dd')"
-                    :aria-label="format(day, 'MMMM d, yyyy')"
+                    :aria-label="format(day, 'EEEE, MMMM d, yyyy')"
                     @click="(e) => onCellClick(day, e)"
                 >
-                    <div class="flex justify-center py-1">
+                    <div
+                        v-if="w === 0"
+                        class="flex h-5 items-end justify-center text-[11px] leading-none font-medium text-muted-foreground uppercase"
+                        aria-hidden="true"
+                    >
+                        {{ format(day, 'EEE') }}
+                    </div>
+                    <div class="month-daynum flex justify-center py-1">
                         <span
                             class="flex size-6 items-center justify-center rounded-full text-xs"
                             :class="
@@ -448,7 +559,9 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                         aria-hidden="true"
                     />
 
-                    <div class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+                    <div
+                        class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden"
+                    >
                         <button
                             v-for="occurrence in chipPlans[w].get(
                                 format(day, 'yyyy-MM-dd'),
@@ -456,22 +569,35 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                             :key="occurrence.occurrence_id"
                             type="button"
                             data-event
-                            class="flex items-center gap-1.5 truncate rounded-md px-1.5 py-0.5 text-left text-xs transition-opacity hover:opacity-90"
-                            :class="{
-                                'line-through opacity-70':
-                                    occurrence.status === 'cancelled',
-                            }"
+                            class="ev-chip ev-pill relative flex h-[22px] shrink-0 items-center gap-1.5 truncate rounded-[6px] px-1.5 text-left text-xs"
+                            :class="[
+                                chipFill(occurrence),
+                                {
+                                    'opacity-40': isDragSource(occurrence),
+                                    'line-through opacity-70':
+                                        occurrence.status === 'cancelled' &&
+                                        !occurrence.booking,
+                                },
+                            ]"
                             :style="{
-                                background: eventWash(occurrence.color),
-                                color: eventInk(occurrence.color),
+                                '--wash': eventWash(bookingTone(occurrence)),
+                                '--ink': eventInk(bookingTone(occurrence)),
+                                '--ev': bookingTone(occurrence) ?? '#d4d8dd',
                             }"
-                            :aria-label="`${occurrence.title}, ${format(new Date(occurrence.starts_at), 'h:mm a')}`"
+                            :aria-label="`${chipState(occurrence)}${occurrence.title}, ${format(new Date(occurrence.starts_at), 'h:mm a')}`"
                             @pointerdown="
                                 (e) => onChipPointerDown(e, occurrence)
                             "
                             @click="onChipClick(occurrence)"
+                            @pointerenter="(e) => peekEnter(e, occurrence)"
+                            @pointerleave="peekClose()"
+                            @focus="(e) => peekFocus(e, occurrence)"
+                            @blur="peekClose()"
                         >
-                            <span class="shrink-0 text-[10px] opacity-75">
+                            <span
+                                data-peek-lead
+                                class="shrink-0 text-[10px] opacity-75"
+                            >
                                 {{
                                     format(
                                         new Date(occurrence.starts_at),
@@ -479,7 +605,13 @@ const onChipClick = (occurrence: EventOccurrence): void => {
                                     )
                                 }}
                             </span>
-                            <span class="truncate font-medium">
+                            <component
+                                :is="chipIcon(occurrence)"
+                                v-if="chipIcon(occurrence)"
+                                class="size-3 shrink-0"
+                                aria-hidden="true"
+                            />
+                            <span class="bk-title truncate font-medium">
                                 {{ occurrence.title }}
                             </span>
                         </button>

@@ -15,7 +15,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * Units are real divisions one level under a parent division (own members
- * and calendar; they share the parent's chat room). Admins manage them in
+ * and calendar). Admins manage them in
  * Settings > Divisions; these routes let division members manage the units
  * of their OWN division: explicit division checks, with divisions.manage
  * passing admins (Gate::before covers super admins).

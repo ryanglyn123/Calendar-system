@@ -35,7 +35,7 @@ class DashboardController extends Controller
 
         return Inertia::render('Dashboard', [
             'eventTypes' => EventTypeResource::collection(
-                EventType::query()->active()->orderBy('sort_order')->get(),
+                EventType::query()->active()->visibleTo($request->user())->orderBy('sort_order')->get(),
             ),
             'weekStartsOn' => $settings->week_starts_on,
             // Calendars and the current three-month event window ride along

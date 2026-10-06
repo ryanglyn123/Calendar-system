@@ -1,30 +1,25 @@
 <script setup lang="ts">
 import {
     AlignLeft,
-    Ban,
     Bell,
     CalendarDays,
     Check,
     CircleHelp,
     Clock,
-    DoorOpen,
-    FileText,
     Lock,
     MapPin,
     MessageSquareText,
-    MessagesSquare,
     Pencil,
     Repeat,
     Send,
-    ShieldCheck,
     Trash2,
-    UserCheck,
     Users,
     Video,
     X,
 } from '@lucide/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import BookingPanel from '@/components/booking/BookingPanel.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/composables/useAuth';
+import { useColorLabels } from '@/composables/useColorLabels';
 import { getInitials } from '@/composables/useInitials';
 import { api, ApiError } from '@/lib/api';
 import { format, isSameDay, parseISO } from '@/lib/calendarMath';
@@ -49,17 +45,24 @@ import {
 import { rsvp as eventsRsvp } from '@/routes/api/events';
 import eventComments from '@/routes/api/events/comments';
 import { useCalendarListStore } from '@/stores/calendarList';
-import { useChatStore } from '@/stores/chat';
 import type { EventOccurrence, RsvpStatus } from '@/types/calendar';
 
 const props = defineProps<{
     occurrence: EventOccurrence | null;
+    /** Separate from `occurrence`, which stays set while the card animates out. */
+    open: boolean;
+    /** Viewport centre of the pill that opened the card. */
+    origin?: { x: number; y: number } | null;
 }>();
+
+const { labelOf } = useColorLabels();
 
 const emit = defineEmits<{
     close: [];
     edit: [occurrence: EventOccurrence];
     delete: [occurrence: EventOccurrence];
+    /** A booking decision landed (or was refused as stale): reload it. */
+    bookingChanged: [];
 }>();
 
 const list = useCalendarListStore();
@@ -152,12 +155,6 @@ const peopleCount = computed(() => {
     return (
         (props.occurrence.organizer ? 1 : 0) + props.occurrence.attendees.length
     );
-});
-
-const reviewedAt = computed(() => {
-    const at = props.occurrence?.booking?.reviewed_at;
-
-    return at ? format(parseISO(at), 'MMM d, yyyy · HH:mm') : null;
 });
 
 const createdLabel = computed(() => {
@@ -284,50 +281,39 @@ const removeComment = async (comment: CommentItem) => {
     }
 };
 
-const chat = useChatStore();
-
-// Open the new-group dialog seeded with this event and its people, so the
-// creator lands on an event-linked chat with attendees pre-added.
-const discussInGroup = () => {
-    if (!props.occurrence) {
-        return;
-    }
-
-    const seed = [
-        props.occurrence.organizer,
-        ...props.occurrence.attendees,
-    ]
-        .filter(
-            (person): person is NonNullable<typeof person> =>
-                person != null && person.user_id != null,
-        )
-        .map((person) => ({
-            id: person.user_id as number,
-            name: person.name,
-            avatar_path: person.avatar_path,
-        }));
-
-    chat.openNewGroup({
-        eventId: props.occurrence.event_id,
-        eventTitle: props.occurrence.title,
-        seed,
-    });
-};
-
 const commentTime = (iso: string) => format(parseISO(iso), 'MMM d, HH:mm');
+
+/* Aim the card's zoom at its pill, so it opens out of that pill and closes
+   back into it. Runs once per opening, before the first frame paints.
+   offsetLeft/Top ignore the running transform; the overlay sits at 0,0. */
+const header = useTemplateRef<HTMLElement>('header');
+
+watch(
+    header,
+    (el) => {
+        const card = el?.closest<HTMLElement>('[role="dialog"]');
+
+        if (card && props.origin) {
+            card.style.transformOrigin = `${props.origin.x - card.offsetLeft}px ${props.origin.y - card.offsetTop}px`;
+        }
+    },
+    { flush: 'post' },
+);
 </script>
 
 <template>
-    <Dialog
-        :open="occurrence !== null"
-        @update:open="(open) => !open && emit('close')"
-    >
+    <Dialog :open="open" @update:open="(open) => !open && emit('close')">
         <DialogScrollContent
             v-if="occurrence"
-            class="max-w-lg gap-0 overflow-hidden p-0"
+            data-quick-view
+            class="max-w-lg gap-0 overflow-hidden p-0 ease-[cubic-bezier(0.16,1,0.3,1)] data-[state=closed]:animate-out data-[state=closed]:duration-150 data-[state=closed]:ease-in data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:duration-[260ms] data-[state=open]:fade-in-0 data-[state=open]:zoom-in-90"
         >
             <!-- Header: soft event-color wash carries timing and status -->
-            <header class="border-b px-6 pt-6 pb-5" :style="headerStyle">
+            <header
+                ref="header"
+                class="border-b px-6 pt-6 pb-5"
+                :style="headerStyle"
+            >
                 <div class="mb-3 flex flex-wrap items-center gap-1.5">
                     <span
                         v-if="timing"
@@ -362,6 +348,19 @@ const commentTime = (iso: string) => format(parseISO(iso), 'MMM d, HH:mm');
                     >
                         <Lock class="size-3" aria-hidden="true" />
                         Private
+                    </Badge>
+                    <!-- The viewer's own name for this color, if they gave it one. -->
+                    <Badge
+                        v-if="labelOf(occurrence.color)"
+                        variant="outline"
+                        class="gap-1.5 bg-card/70 font-normal"
+                    >
+                        <span
+                            class="size-2 rounded-full"
+                            :style="{ backgroundColor: occurrence.color }"
+                            aria-hidden="true"
+                        />
+                        {{ labelOf(occurrence.color) }}
                     </Badge>
                 </div>
 
@@ -467,165 +466,14 @@ const commentTime = (iso: string) => format(parseISO(iso), 'MMM d, HH:mm');
                     </div>
                 </div>
 
-                <!-- Resource booking -->
-                <section
+                <!-- Resource booking: state, details and decisions -->
+                <BookingPanel
                     v-if="occurrence.booking"
-                    class="qv-reveal overflow-hidden rounded-xl border"
+                    class="qv-reveal"
                     style="--i: 2"
-                >
-                    <div
-                        class="flex items-center justify-between gap-3 border-b bg-muted/40 px-3.5 py-2.5"
-                    >
-                        <div class="flex items-center gap-2 font-medium">
-                            <DoorOpen
-                                class="size-4 text-muted-foreground"
-                                aria-hidden="true"
-                            />
-                            Resource booking
-                        </div>
-                        <span
-                            class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium"
-                            :style="{
-                                backgroundColor: mix(
-                                    occurrence.booking.status_color,
-                                    18,
-                                ),
-                                borderColor: mix(
-                                    occurrence.booking.status_color,
-                                    40,
-                                ),
-                            }"
-                        >
-                            <span
-                                class="size-1.5 rounded-full"
-                                :style="{
-                                    backgroundColor:
-                                        occurrence.booking.status_color,
-                                }"
-                                aria-hidden="true"
-                            />
-                            {{ occurrence.booking.status_label }}
-                        </span>
-                    </div>
-
-                    <dl class="grid gap-2.5 px-3.5 py-3">
-                        <div class="flex items-baseline justify-between gap-3">
-                            <dt class="text-muted-foreground">Resource</dt>
-                            <dd class="text-right font-medium">
-                                {{ occurrence.booking.resource ?? '—' }}
-                                <span
-                                    v-if="occurrence.booking.resource_type"
-                                    class="font-normal text-muted-foreground"
-                                >
-                                    · {{ occurrence.booking.resource_type }}
-                                </span>
-                            </dd>
-                        </div>
-
-                        <div
-                            v-if="
-                                occurrence.booking.attendee_count ||
-                                occurrence.booking.capacity
-                            "
-                            class="flex items-baseline justify-between gap-3"
-                        >
-                            <dt
-                                class="flex items-center gap-1.5 text-muted-foreground"
-                            >
-                                <Users class="size-3.5" aria-hidden="true" />
-                                Attendees
-                            </dt>
-                            <dd class="text-right font-medium">
-                                <span v-if="occurrence.booking.attendee_count">
-                                    {{ occurrence.booking.attendee_count }}
-                                </span>
-                                <span v-else>—</span>
-                                <span
-                                    v-if="occurrence.booking.capacity"
-                                    class="font-normal text-muted-foreground"
-                                >
-                                    / {{ occurrence.booking.capacity }} seats
-                                </span>
-                            </dd>
-                        </div>
-
-                        <div
-                            v-if="occurrence.booking.purpose"
-                            class="flex items-start justify-between gap-3"
-                        >
-                            <dt
-                                class="flex shrink-0 items-center gap-1.5 text-muted-foreground"
-                            >
-                                <FileText class="size-3.5" aria-hidden="true" />
-                                Purpose
-                            </dt>
-                            <dd class="text-right">
-                                {{ occurrence.booking.purpose }}
-                            </dd>
-                        </div>
-
-                        <div
-                            v-if="occurrence.booking.requested_by"
-                            class="flex items-baseline justify-between gap-3"
-                        >
-                            <dt
-                                class="flex items-center gap-1.5 text-muted-foreground"
-                            >
-                                <UserCheck
-                                    class="size-3.5"
-                                    aria-hidden="true"
-                                />
-                                Requested by
-                            </dt>
-                            <dd class="text-right font-medium">
-                                {{ occurrence.booking.requested_by }}
-                            </dd>
-                        </div>
-
-                        <div
-                            v-if="occurrence.booking.reviewed_by"
-                            class="flex items-baseline justify-between gap-3"
-                        >
-                            <dt
-                                class="flex items-center gap-1.5 text-muted-foreground"
-                            >
-                                <ShieldCheck
-                                    class="size-3.5"
-                                    aria-hidden="true"
-                                />
-                                Reviewed by
-                            </dt>
-                            <dd class="text-right font-medium">
-                                {{ occurrence.booking.reviewed_by }}
-                                <span
-                                    v-if="reviewedAt"
-                                    class="block text-xs font-normal text-muted-foreground"
-                                >
-                                    {{ reviewedAt }}
-                                </span>
-                            </dd>
-                        </div>
-
-                        <p
-                            v-if="
-                                occurrence.booking.rejection_reason ||
-                                occurrence.booking.cancellation_reason
-                            "
-                            class="flex items-start gap-1.5 rounded-lg bg-destructive/10 px-2.5 py-2 text-xs text-destructive"
-                        >
-                            <Ban
-                                class="mt-0.5 size-3.5 shrink-0"
-                                aria-hidden="true"
-                            />
-                            <span>
-                                {{
-                                    occurrence.booking.rejection_reason ??
-                                    occurrence.booking.cancellation_reason
-                                }}
-                            </span>
-                        </p>
-                    </dl>
-                </section>
+                    :occurrence="occurrence"
+                    @changed="emit('bookingChanged')"
+                />
 
                 <!-- People -->
                 <section
@@ -778,35 +626,21 @@ const commentTime = (iso: string) => format(parseISO(iso), 'MMM d, HH:mm');
                     class="qv-reveal space-y-3 border-t pt-4"
                     style="--i: 6"
                 >
-                    <div class="flex items-center justify-between gap-2">
-                        <h3
-                            class="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                    <h3
+                        class="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                    >
+                        <MessageSquareText
+                            class="size-3.5"
+                            aria-hidden="true"
+                        />
+                        Discussion
+                        <span
+                            v-if="comments.length"
+                            class="font-normal normal-case"
                         >
-                            <MessageSquareText
-                                class="size-3.5"
-                                aria-hidden="true"
-                            />
-                            Discussion
-                            <span
-                                v-if="comments.length"
-                                class="font-normal normal-case"
-                            >
-                                · {{ comments.length }}
-                            </span>
-                        </h3>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            class="h-7 text-xs text-muted-foreground"
-                            @click="discussInGroup"
-                        >
-                            <MessagesSquare
-                                class="size-3.5"
-                                aria-hidden="true"
-                            />
-                            Group chat
-                        </Button>
-                    </div>
+                            · {{ comments.length }}
+                        </span>
+                    </h3>
 
                     <ul v-if="comments.length" class="space-y-3">
                         <li
@@ -888,9 +722,8 @@ const commentTime = (iso: string) => format(parseISO(iso), 'MMM d, HH:mm');
                 class="flex justify-end gap-2 border-t px-6 py-4"
             >
                 <Button
-                    variant="outline"
+                    variant="destructive"
                     size="sm"
-                    class="text-destructive"
                     @click="emit('delete', occurrence)"
                 >
                     <Trash2 aria-hidden="true" />

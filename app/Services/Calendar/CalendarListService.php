@@ -2,6 +2,7 @@
 
 namespace App\Services\Calendar;
 
+use App\Enums\CalendarType;
 use App\Http\Resources\CalendarResource;
 use App\Models\Calendar;
 use App\Models\CalendarUserPreference;
@@ -16,6 +17,7 @@ class CalendarListService
 {
     public function __construct(
         private readonly CalendarAccessService $access,
+        private readonly CalendarService $calendars,
     ) {}
 
     /**
@@ -28,6 +30,10 @@ class CalendarListService
         ?array $types = null,
         ?int $resourceTypeId = null,
     ): array {
+        if ($types === null || in_array(CalendarType::Personal->value, $types, true)) {
+            $this->calendars->ensurePrimaryCalendar($user);
+        }
+
         $calendars = $this->access
             ->scoped($this->access->accessibleCalendars($user), $types, $resourceTypeId)
             ->loadMissing('division');

@@ -81,7 +81,11 @@ class EventCommentController extends Controller
 
     private function assertCanView(User $user, Event $event): void
     {
-        abort_unless($this->access->canView($user, $event->calendar), 403);
+        abort_unless($this->access->canView($user, $event->calendar), 403, 'You cannot view this event.');
+
+        // Private events are masked to "Busy" for everyone else; the thread
+        // must not leak what the mask hides.
+        abort_if($event->visibility === 'private' && $event->created_by !== $user->id, 403, 'This event is private.');
     }
 
     /**

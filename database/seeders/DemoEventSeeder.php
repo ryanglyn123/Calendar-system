@@ -19,14 +19,14 @@ class DemoEventSeeder extends Seeder
 
         $personal = Calendar::query()->firstOrCreate(
             ['type' => 'personal', 'owner_id' => $admin->id, 'name' => 'My Projects'],
-            ['color' => '#A8D8F0', 'is_default' => false, 'is_active' => true],
+            ['color' => '#4285F4', 'is_default' => false, 'is_active' => true],
         );
 
         $fdcp = Calendar::query()->where('name', 'FDCP Events')->firstOrFail();
         $training = Calendar::query()->where('name', 'Trainings & Workshops')->firstOrFail();
         $mis = Calendar::query()
             ->where('type', 'division')
-            ->whereHas('division', fn ($q) => $q->where('acronym', 'MIS'))
+            ->whereHas('division', fn ($q) => $q->where('acronym', 'ITU'))
             ->firstOrFail();
 
         $monday = Carbon::now('Asia/Manila')->startOfWeek();

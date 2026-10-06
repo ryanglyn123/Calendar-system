@@ -17,6 +17,13 @@ class ValidRrule implements ValidationRule
             return;
         }
 
+        // Sub-daily rules are valid RFC 5545 but expand to the per-window cap every time.
+        if (preg_match('/(?:^|;)FREQ=(SECONDLY|MINUTELY|HOURLY)(?:;|$)/i', $value)) {
+            $fail('Recurrence must be daily, weekly, monthly or yearly.');
+
+            return;
+        }
+
         try {
             new RRule($value, new \DateTime('2026-01-01 09:00:00'));
         } catch (Throwable) {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\DivisionResource;
 use App\Models\Announcement;
 use App\Models\Division;
+use App\Services\Admin\AdminDashboard;
 use App\Support\Toast;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,8 @@ class AnnouncementController extends Controller
         abort_unless(request()->user()->can('announcements.manage'), 403);
 
         return Inertia::render('admin/announcements/Index', [
-            'announcements' => Announcement::query()
+            // Not 'announcements': that key is the shared banner prop.
+            'rows' => Announcement::query()
                 ->with('division')
                 ->orderByDesc('starts_at')
                 ->get()
@@ -37,6 +39,8 @@ class AnnouncementController extends Controller
                     'is_active' => $announcement->is_active,
                 ]),
             'divisions' => DivisionResource::collection(Division::query()->active()->orderBy('name')->get()),
+            // The office's date, so the page can tell live from scheduled and ended.
+            'today' => now(AdminDashboard::timezone())->toDateString(),
         ]);
     }
 

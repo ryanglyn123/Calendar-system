@@ -123,3 +123,49 @@ test('rejecting a change keeps the booking untouched', function () {
     expect($editRequest->refresh()->status)->toBe(EditRequestStatus::Rejected)
         ->and($this->booking->refresh()->starts_at->toIso8601String())->toBe($originalStart);
 });
+
+test('the review page shows a moved slot against its day, clash included', function () {
+    $held = Booking::factory()->approved()->create([
+        'resource_id' => $this->resource->id,
+        'starts_at' => Carbon::parse('+6 days 13:00'),
+        'ends_at' => Carbon::parse('+6 days 15:00'),
+    ]);
+
+    $editRequest = $this->booking->editRequests()->create([
+        'requested_by' => $this->requester->id,
+        'proposed_starts_at' => Carbon::parse('+6 days 13:30'),
+        'proposed_ends_at' => Carbon::parse('+6 days 14:30'),
+        'note' => 'Speaker lands late',
+    ]);
+
+    $this->actingAs($this->approver)
+        ->get(route('admin.edit-requests.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('admin/edit-requests/Index')
+            ->has('today')
+            ->has('pending', 1)
+            ->where('pending.0.id', $editRequest->id)
+            ->where('pending.0.booking_id', $this->booking->id)
+            ->where('pending.0.note', 'Speaker lands late')
+            ->where('pending.0.passed', false)
+            ->where('pending.0.clash.status', 'approved')
+            ->where('pending.0.clash.starts_at', $held->starts_at->toIso8601String())
+            ->where('pending.0.day.bookings', fn ($bookings) => collect($bookings)->pluck('id')->contains($held->id)));
+});
+
+test('a change that only rewords the purpose has no clash to report', function () {
+    $this->booking->editRequests()->create([
+        'requested_by' => $this->requester->id,
+        'proposed_purpose' => 'A clearer purpose',
+    ]);
+
+    $this->actingAs($this->approver)
+        ->get(route('admin.edit-requests.index'))
+        ->assertInertia(fn ($page) => $page
+            ->where('pending.0.proposed.purpose', 'A clearer purpose')
+            ->where('pending.0.proposed.starts_at', null)
+            ->where('pending.0.clash', null)
+            ->where('pending.0.passed', false)
+            ->where('pending.0.day.bookings.0.id', $this->booking->id));
+});

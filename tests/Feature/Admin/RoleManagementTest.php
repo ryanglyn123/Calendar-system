@@ -93,3 +93,18 @@ test('empty custom roles can be deleted', function () {
 
     expect(Role::query()->where('name', 'disposable_role')->exists())->toBeFalse();
 });
+
+test('the matrix can resave a custom role with its own name and new permissions', function () {
+    $role = Role::query()->where('name', 'vehicle_approver')->firstOrFail();
+
+    $this->actingAs($this->admin)
+        ->patch(route('admin.roles.update', $role), [
+            'name' => 'vehicle_approver',
+            'description' => null,
+            'permissions' => ['admin.access'],
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect($role->refresh()->permissions->pluck('name')->all())->toBe(['admin.access']);
+});

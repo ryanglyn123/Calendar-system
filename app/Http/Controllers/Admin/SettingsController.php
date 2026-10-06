@@ -52,8 +52,16 @@ class SettingsController extends Controller
             'registration.require_approval' => ['required', 'boolean'],
         ]);
 
+        $before = ['general' => $general->toArray(), 'registration' => $registration->toArray()];
+
         $general->fill($validated['general'])->save();
         $registration->fill($validated['registration'])->save();
+
+        activity()
+            ->causedBy($request->user())
+            ->event('settings-updated')
+            ->withProperties(['old' => $before, 'attributes' => $validated])
+            ->log('Updated system settings');
 
         Toast::success('Settings saved.');
 

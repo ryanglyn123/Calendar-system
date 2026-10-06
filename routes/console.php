@@ -18,8 +18,5 @@ if (! function_exists('pcntl_fork')) {
     DevCommands::except('logs');
 }
 
-// The chat's websocket server rides along with `composer dev`.
-DevCommands::artisan('reverb:start', 'reverb');
-
 Schedule::job(new SendDueReminders)->everyMinute();
 Schedule::job(new PruneExpiredInvitations)->daily();

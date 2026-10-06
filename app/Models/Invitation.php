@@ -49,7 +49,8 @@ class Invitation extends Model
     /** @return BelongsTo<User, $this> */
     public function inviter(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'invited_by');
+        // An archived admin's invitations still name who sent them.
+        return $this->belongsTo(User::class, 'invited_by')->withTrashed();
     }
 
     public function isExpired(): bool

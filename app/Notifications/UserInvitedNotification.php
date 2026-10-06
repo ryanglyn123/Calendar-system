@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Invitation;
+use App\Settings\GeneralSettings;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -28,10 +29,12 @@ class UserInvitedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $calendar = app(GeneralSettings::class)->organization_acronym.' Calendar';
+
         return (new MailMessage)
-            ->subject('You are invited to the FDCP Calendar')
+            ->subject("You are invited to the {$calendar}")
             ->greeting('Hello,')
-            ->line("{$this->invitation->inviter->name} has invited you to join the FDCP Calendar.")
+            ->line("{$this->invitation->inviter->name} has invited you to join the {$calendar}.")
             ->action('Accept invitation', route('invitation.show', $this->invitation->token))
             ->line("This invitation expires {$this->invitation->expires_at->toFormattedDateString()}.");
     }

@@ -94,6 +94,17 @@ class EventOccurrenceController extends Controller
 
             $attributes['starts_at'] = $event->starts_at->avoidMutation()->addSeconds($deltaSeconds);
             $attributes['ends_at'] = $attributes['starts_at']->avoidMutation()->addSeconds($duration);
+
+            // Overrides are keyed by the slot they replace; the slots moved,
+            // so the keys move with them (ordered to dodge the unique index).
+            $event->overrides()
+                ->orderBy('original_starts_at', $deltaSeconds > 0 ? 'desc' : 'asc')
+                ->get()
+                ->each(fn (Event $override) => $override->update([
+                    'original_starts_at' => $override->original_starts_at->avoidMutation()->addSeconds($deltaSeconds),
+                    'starts_at' => $override->starts_at->avoidMutation()->addSeconds($deltaSeconds),
+                    'ends_at' => $override->ends_at->avoidMutation()->addSeconds($deltaSeconds),
+                ]));
         }
 
         $this->events->update($event, $attributes);

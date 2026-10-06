@@ -54,7 +54,9 @@ class Announcement extends Model
             ->where('is_active', true)
             ->where('starts_at', '<=', now())
             ->where(fn (Builder $q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', now()))
-            ->where(fn (Builder $q) => $q->whereNull('division_id')->orWhere('division_id', $user->division_id))
+            // Units belong to their parent division, so its announcements reach them too.
+            ->where(fn (Builder $q) => $q->whereNull('division_id')
+                ->orWhereIn('division_id', array_filter([$user->division_id, $user->division?->parent_id])))
             ->whereDoesntHave('dismissals', fn ($q) => $q->where('user_id', $user->id));
     }
 

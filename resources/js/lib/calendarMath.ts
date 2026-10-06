@@ -99,6 +99,11 @@ export function coveredDayCount(startsAt: Date, endsAt: Date): number {
     return Math.max(0, differenceInCalendarDays(effectiveEnd, startsAt)) + 1;
 }
 
+/** A day that is already over; new events can't be added to it. */
+export function isPastDay(date: Date): boolean {
+    return startOfDay(date) < startOfDay(new Date());
+}
+
 /** Minutes since midnight, for time-grid positioning. */
 export function minutesIntoDay(date: Date): number {
     return date.getHours() * 60 + date.getMinutes();

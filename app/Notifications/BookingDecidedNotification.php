@@ -5,22 +5,34 @@ namespace App\Notifications;
 use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Models\User;
+use App\Notifications\Concerns\WritesInAppCopyNow;
+use App\Settings\GeneralSettings;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
+/**
+ * Tells a requester how their booking turned out (or that a reviewer
+ * cancelled it), and takes them straight to that booking, where an
+ * approved one can be printed.
+ */
 class BookingDecidedNotification extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, WritesInAppCopyNow;
+
+    /** The outcome as it was decided, kept even if the booking changes later. */
+    private readonly BookingStatus $outcome;
 
     public function __construct(
         public readonly Booking $booking,
-    ) {}
+    ) {
+        $this->outcome = $booking->status;
+    }
 
     public function key(): string
     {
-        return match ($this->booking->status) {
+        return match ($this->outcome) {
             BookingStatus::Approved => 'booking.approved',
             BookingStatus::Rejected => 'booking.rejected',
             default => 'booking.cancelled',
@@ -35,34 +47,58 @@ class BookingDecidedNotification extends Notification implements ShouldQueue
         return $notifiable->notificationChannelsFor($this->key());
     }
 
-    private function summary(): string
+    private function title(): string
     {
-        $when = $this->booking->starts_at->timezone('Asia/Manila')->format('M j, H:i');
-
-        return match ($this->booking->status) {
-            BookingStatus::Approved => "Your booking of {$this->booking->resource?->name} on {$when} was approved.",
-            BookingStatus::Rejected => "Your booking of {$this->booking->resource?->name} on {$when} was rejected: {$this->booking->rejection_reason}",
-            default => "Your booking of {$this->booking->resource?->name} on {$when} was cancelled.",
+        return match ($this->outcome) {
+            BookingStatus::Approved => 'Booking approved',
+            BookingStatus::Rejected => 'Booking rejected',
+            default => 'Booking cancelled by a reviewer',
         };
     }
 
-    /** The booking's own section page (Boardroom, Carpool, ...). */
-    private function sectionPath(): string
+    /** "Mezzanine Board Room · Thu, Oct 22 · 09:00–11:00" */
+    private function slot(): string
     {
-        $slug = $this->booking->resource?->type?->slug;
+        $tz = app(GeneralSettings::class)->timezone;
+        $start = $this->booking->starts_at->copy()->timezone($tz);
+        $end = $this->booking->ends_at->copy()->timezone($tz);
 
-        return $slug === null
-            ? route('dashboard', absolute: false)
-            : route('resources.section', $slug, absolute: false);
+        $when = $start->isSameDay($end)
+            ? $start->format('D, M j').' · '.$start->format('H:i').'–'.$end->format('H:i')
+            : $start->format('D, M j, H:i').' – '.$end->format('D, M j, H:i');
+
+        return ($this->booking->resource?->name ?? 'Your booking').' · '.$when;
+    }
+
+    private function summary(): string
+    {
+        $reason = match ($this->outcome) {
+            BookingStatus::Rejected => $this->booking->rejection_reason,
+            BookingStatus::Cancelled => $this->booking->cancellation_reason,
+            default => null,
+        };
+
+        return $this->slot().($reason ? ". Reason: {$reason}" : '');
+    }
+
+    private function bookingPath(): string
+    {
+        return route('bookings.show', $this->booking, absolute: false);
     }
 
     public function toMail(User $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('Booking '.$this->booking->status->label())
+        $mail = (new MailMessage)
+            ->subject("{$this->title()}: {$this->slot()}")
             ->greeting("Hello {$notifiable->name},")
-            ->line($this->summary())
-            ->action('View my bookings', url($this->sectionPath()));
+            ->line("{$this->title()} ({$this->booking->reference()}).")
+            ->line($this->summary());
+
+        if ($this->outcome === BookingStatus::Approved) {
+            $mail->line('Open the booking to print its form for everyone to sign on the day.');
+        }
+
+        return $mail->action('Open the booking', url($this->bookingPath()));
     }
 
     /**
@@ -72,10 +108,12 @@ class BookingDecidedNotification extends Notification implements ShouldQueue
     {
         return [
             'key' => $this->key(),
-            'title' => 'Booking '.$this->booking->status->label(),
+            'title' => $this->title(),
             'message' => $this->summary(),
-            'action_url' => $this->sectionPath(),
+            'action_url' => $this->bookingPath(),
             'booking_id' => $this->booking->id,
+            'reference' => $this->booking->reference(),
+            'resource_type' => $this->booking->resource?->type?->slug,
         ];
     }
 }

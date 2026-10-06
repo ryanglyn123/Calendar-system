@@ -18,23 +18,33 @@ export type LayoutBox = {
     width: number;
     startMinutes: number;
     endMinutes: number;
+    /** Set on a "+N" box: the keys of the items folded into it. */
+    folded?: string[];
 };
 
 const MIN_RENDER_MINUTES = 30;
 
 function overlaps(a: LayoutInput, b: LayoutInput): boolean {
-    return (
-        renderEnd(a) > b.startMinutes && a.startMinutes < renderEnd(b)
-    );
+    return renderEnd(a) > b.startMinutes && a.startMinutes < renderEnd(b);
 }
 
 function renderEnd(item: LayoutInput): number {
     return Math.max(item.endMinutes, item.startMinutes + MIN_RENDER_MINUTES);
 }
 
-export function layoutDayColumn(items: LayoutInput[]): LayoutBox[] {
+/**
+ * @param maxColumns how many side-by-side columns stay readable at the
+ *                   current width. A cluster that needs more keeps the first
+ *                   maxColumns - 1 and folds the rest into one "+N" box in the
+ *                   last slot, instead of slicing every event into a sliver.
+ */
+export function layoutDayColumn(
+    items: LayoutInput[],
+    maxColumns = Infinity,
+): LayoutBox[] {
     const sorted = [...items].sort(
-        (a, b) => a.startMinutes - b.startMinutes || b.endMinutes - a.endMinutes,
+        (a, b) =>
+            a.startMinutes - b.startMinutes || b.endMinutes - a.endMinutes,
     );
 
     // 1. Sweep into collision clusters (connected components of overlap).
@@ -83,14 +93,27 @@ export function layoutDayColumn(items: LayoutInput[]): LayoutBox[] {
             }
         }
 
-        const columnCount = columns.length;
+        let columnCount = columns.length;
+        let folded: LayoutInput[] = [];
+
+        if (columnCount > maxColumns) {
+            const kept = Math.max(0, maxColumns - 1);
+
+            folded = columns.splice(kept).flat();
+            columnCount = maxColumns;
+        }
 
         // 3. Expand each item rightward while the next columns are free.
         for (const item of cluster) {
             const col = columnOf.get(item.key)!;
+
+            if (col >= columns.length) {
+                continue; // folded
+            }
+
             let span = 1;
 
-            for (let next = col + 1; next < columnCount; next++) {
+            for (let next = col + 1; next < columns.length; next++) {
                 const blocked = columns[next].some((other) =>
                     overlaps(item, other),
                 );
@@ -108,6 +131,17 @@ export function layoutDayColumn(items: LayoutInput[]): LayoutBox[] {
                 width: span / columnCount,
                 startMinutes: item.startMinutes,
                 endMinutes: renderEnd(item),
+            });
+        }
+
+        if (folded.length > 0) {
+            boxes.push({
+                key: `fold:${folded[0].key}`,
+                left: columns.length / columnCount,
+                width: 1 / columnCount,
+                startMinutes: Math.min(...folded.map((i) => i.startMinutes)),
+                endMinutes: Math.max(...folded.map(renderEnd)),
+                folded: folded.map((i) => i.key),
             });
         }
     }
