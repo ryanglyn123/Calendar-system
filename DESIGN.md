@@ -281,7 +281,7 @@ Drawn around the things being booked: one ruled row per room or vehicle, never s
 - **Day:** hour lanes over office hours (07:00–19:00, stretched to fit), 40px blocks with title over `HH:mm–HH:mm · who` ("You" for the viewer's own). Elapsed time is veiled; hovering open time shows a dashed one-hour ghost, and a click books that resource at that time.
 - **Week:** seven cells per row, each with a 6px office-hours occupancy strip (neutral solid booked, neutral hatch waiting) above up to three chips; trips over several days read `08:00 →` and `→ 17:00`.
 - **Narrow containers** (under 42rem, decided by the schedule's own width): the focused day as a list per resource, with a seven-day strip and tappable "Free HH:mm–HH:mm" gaps.
-- Rooms open on Day (booked by the hour), vehicles on Week (booked by the trip). Other people's bookings are neutral gray for staff, so the viewer's own keep their hue.
+- Both open on Week by default; a view the viewer picks is remembered per type and role. Other people's bookings are neutral gray for staff, so the viewer's own keep their hue.
 
 ## Do's and Don'ts
 

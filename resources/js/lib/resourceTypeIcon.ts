@@ -44,16 +44,12 @@ export function resourceTypeIcon(type: {
 
 /**
  * What a type's resources are called in copy ("Book a room", "3 of 5
- * vehicles free") and the view its calendar opens in, which differs by
- * role. Rooms are booked by the hour, so both sides open on a day of
- * lanes. Vehicles are booked by the trip: staff plan a week ahead, while
- * the fleet's approver opens on the month to see the whole fleet's load.
+ * vehicles free").
  */
 export function resourceNouns(type: { icon?: string | null; name: string }): {
     one: string;
     many: string;
     action: string;
-    view: { manage: BookingView; book: BookingView };
 } {
     const icon = resourceTypeIcon(type);
 
@@ -62,7 +58,6 @@ export function resourceNouns(type: { icon?: string | null; name: string }): {
             one: 'vehicle',
             many: 'vehicles',
             action: 'Book a vehicle',
-            view: { manage: 'month', book: 'week' },
         };
     }
 
@@ -71,7 +66,6 @@ export function resourceNouns(type: { icon?: string | null; name: string }): {
             one: 'room',
             many: 'rooms',
             action: 'Book a room',
-            view: { manage: 'day', book: 'day' },
         };
     }
 
@@ -79,7 +73,6 @@ export function resourceNouns(type: { icon?: string | null; name: string }): {
         one: 'item',
         many: 'items',
         action: 'New booking',
-        view: { manage: 'week', book: 'week' },
     };
 }
 

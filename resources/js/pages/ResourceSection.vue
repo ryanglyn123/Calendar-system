@@ -99,8 +99,8 @@ const askedDate = parseISO(query.get('date') ?? '');
 
 grid.setScope(scope.value, {
     view:
-        [query.get('view'), props.rememberedView].find(isBookingView) ??
-        nouns.value.view[role],
+        // Every booking calendar opens on the week unless told otherwise.
+        [query.get('view'), props.rememberedView].find(isBookingView) ?? 'week',
     date:
         /^\d{4}-\d{2}-\d{2}$/.test(query.get('date') ?? '') &&
         isValid(askedDate)
