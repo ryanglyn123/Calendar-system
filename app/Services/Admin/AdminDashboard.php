@@ -4,24 +4,20 @@ namespace App\Services\Admin;
 
 use App\Enums\BookingStatus;
 use App\Enums\EditRequestStatus;
-use App\Enums\UserStatus;
-use App\Http\Resources\ActivityResource;
-use App\Models\Announcement;
 use App\Models\Booking;
 use App\Models\BookingEditRequest;
-use App\Models\Invitation;
+use App\Models\Resource;
 use App\Models\ResourceType;
 use App\Models\User;
 use App\Settings\GeneralSettings;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Spatie\Activitylog\Models\Activity;
 
 /**
- * Everything the admin desk shows, each part shaped for its panel. Callers
- * decide who may see what; the queue additionally scopes itself to the
- * decisions this user may actually take.
+ * What a reviewer's desk shows for one resource type (Boardroom, Carpool):
+ * the requests waiting on them and each room's or vehicle's bookings on a
+ * day. Callers pick types from ReviewQueue::typesFor(), so nobody gets a
+ * desk for a type they don't review.
  */
 class AdminDashboard
 {
@@ -35,245 +31,37 @@ class AdminDashboard
     }
 
     /**
-     * Decisions waiting on this user: booking requests, change requests and
-     * sign-ups, each carrying what is needed to decide without leaving.
+     * The desk switcher: every type this person reviews and what waits there.
+     *
+     * @param  Collection<int, ResourceType>  $types
+     * @return list<array{slug: string, name: string, icon: string|null, waiting: int}>
+     */
+    public function tabs(Collection $types): array
+    {
+        // ponytail: two count queries per type; there are two types.
+        return array_values($types->map(fn (ResourceType $type) => [
+            'slug' => $type->slug,
+            'name' => $type->name,
+            'icon' => $type->icon,
+            'waiting' => Booking::query()
+                ->where('status', BookingStatus::Pending->value)
+                ->whereHas('resource', fn ($query) => $query->where('resource_type_id', $type->id))
+                ->count()
+                + BookingEditRequest::query()
+                    ->where('status', EditRequestStatus::Pending->value)
+                    ->whereHas('booking.resource', fn ($query) => $query->where('resource_type_id', $type->id))
+                    ->count(),
+        ])->all());
+    }
+
+    /**
+     * Booking and change requests in one type that this user may decide.
      *
      * @return list<array<string, mixed>>
      */
-    public function queue(User $user): array
+    public function requests(User $user, ResourceType $type): array
     {
-        $items = [];
-
-        if ($user->can('bookings.approve')) {
-            $items = $this->bookingRequests($user);
-
-            $changes = BookingEditRequest::query()
-                ->where('status', EditRequestStatus::Pending->value)
-                ->with(['booking.resource.type', 'booking.resource.calendar:id,color', 'booking.event:id,title', 'requester:id,name'])
-                ->orderBy('created_at')
-                ->get()
-                ->filter(fn (BookingEditRequest $change) => $user->can('approve', $change->booking));
-
-            foreach ($changes as $change) {
-                $booking = $change->booking;
-
-                $items[] = [
-                    'key' => "change-{$change->id}",
-                    'kind' => 'change',
-                    'id' => $change->id,
-                    'booking_id' => $booking->id,
-                    'title' => $booking->event->title ?? $booking->purpose ?? 'Booking',
-                    ...$this->resourceFields($booking),
-                    'requester' => $change->requester?->name,
-                    'starts_at' => ($change->proposed_starts_at ?? $booking->starts_at)->toIso8601String(),
-                    'ends_at' => ($change->proposed_ends_at ?? $booking->ends_at)->toIso8601String(),
-                    'current' => [
-                        'starts_at' => $booking->starts_at->toIso8601String(),
-                        'ends_at' => $booking->ends_at->toIso8601String(),
-                        'purpose' => $booking->purpose,
-                    ],
-                    'proposed_purpose' => $change->proposed_purpose,
-                    'note' => $change->note,
-                    'requested_at' => $change->created_at?->toIso8601String(),
-                ];
-            }
-        }
-
-        if ($user->can('viewAny', User::class)) {
-            $signUps = User::query()->pending()->with('division:id,name,acronym')->orderBy('created_at')->get();
-
-            foreach ($signUps as $signUp) {
-                $items[] = [
-                    'key' => "registration-{$signUp->id}",
-                    'kind' => 'registration',
-                    'id' => $signUp->id,
-                    'title' => $signUp->name,
-                    'email' => $signUp->email,
-                    'division' => $signUp->division?->acronym ?? $signUp->division?->name,
-                    'requested_at' => $signUp->created_at?->toIso8601String(),
-                ];
-            }
-        }
-
-        return $items;
-    }
-
-    /**
-     * Every active room and vehicle with its pending and approved bookings
-     * on one office day.
-     *
-     * @return array<string, mixed>
-     */
-    public function schedule(User $user, CarbonImmutable $day): array
-    {
-        $from = $day->startOfDay();
-        $to = $from->addDay();
-
-        $bookings = Booking::query()
-            ->whereIn('status', [BookingStatus::Pending->value, BookingStatus::Approved->value])
-            ->where('starts_at', '<', $to->utc())
-            ->where('ends_at', '>', $from->utc())
-            ->with(['event:id,title', 'requester:id,name', 'resource.type'])
-            ->orderBy('starts_at')
-            ->get()
-            ->groupBy('resource_id');
-
-        $types = ResourceType::query()
-            ->active()
-            ->with(['resources' => fn ($query) => $query->active()->with('calendar:id,color')->orderBy('sort_order')->orderBy('name')])
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get();
-
-        return [
-            'date' => $from->toDateString(),
-            'types' => $types->map(fn (ResourceType $type) => [
-                'id' => $type->id,
-                'name' => $type->name,
-                'slug' => $type->slug,
-                'icon' => $type->icon,
-                'resources' => $type->resources->map(fn ($resource) => [
-                    'id' => $resource->id,
-                    'name' => $resource->name,
-                    'location' => $resource->location,
-                    'color' => $resource->calendar?->color,
-                    'bookings' => ($bookings->get($resource->id) ?? collect())
-                        ->map(function (Booking $booking) use ($user) {
-                            // Same rule as the calendar (EventOccurrenceResource):
-                            // purpose and headcount only for the requester and
-                            // the booking's own reviewers.
-                            $canReview = $user->can('approve', $booking);
-                            $full = $canReview || $booking->requested_by === $user->id;
-
-                            return [
-                                'id' => $booking->id,
-                                'title' => $booking->event?->title ?? ($full ? $booking->purpose : null) ?? 'Booking',
-                                'requester' => $booking->requester?->name,
-                                'starts_at' => $booking->starts_at->toIso8601String(),
-                                'ends_at' => $booking->ends_at->toIso8601String(),
-                                'status' => $booking->status->value,
-                                'purpose' => $full ? $booking->purpose : null,
-                                'attendee_count' => $full ? $booking->attendee_count : null,
-                                'can_approve' => $booking->status === BookingStatus::Pending && $canReview,
-                            ];
-                        })->values(),
-                ])->values(),
-            ])->values(),
-        ];
-    }
-
-    /**
-     * Booked minutes per office day for the next two weeks, split by status,
-     * so busy days stand out before they arrive.
-     *
-     * @return list<array{date: string, approved: int, pending: int, count: int}>
-     */
-    public function demand(int $days = 14): array
-    {
-        $first = CarbonImmutable::now(self::timezone())->startOfDay();
-        $last = $first->addDays($days);
-
-        $bookings = Booking::query()
-            ->whereIn('status', [BookingStatus::Pending->value, BookingStatus::Approved->value])
-            ->where('starts_at', '<', $last->utc())
-            ->where('ends_at', '>', $first->utc())
-            ->get(['starts_at', 'ends_at', 'status']);
-
-        return collect(range(0, $days - 1))
-            ->map(function (int $offset) use ($first, $bookings) {
-                $dayStart = $first->addDays($offset);
-                $dayEnd = $dayStart->addDay();
-                $totals = ['approved' => 0, 'pending' => 0, 'count' => 0];
-
-                foreach ($bookings as $booking) {
-                    $start = max($booking->starts_at->getTimestamp(), $dayStart->getTimestamp());
-                    $end = min($booking->ends_at->getTimestamp(), $dayEnd->getTimestamp());
-
-                    if ($end <= $start) {
-                        continue;
-                    }
-
-                    $totals[$booking->status === BookingStatus::Approved ? 'approved' : 'pending'] += intdiv($end - $start, 60);
-                    $totals['count']++;
-                }
-
-                return ['date' => $dayStart->toDateString(), ...$totals];
-            })
-            ->all();
-    }
-
-    /**
-     * Account counts that point at work: people waiting, invitations going
-     * stale, accounts missing a division.
-     *
-     * @return array<string, int>
-     */
-    public function people(): array
-    {
-        $openInvitations = Invitation::query()->whereNull('accepted_at')->where('expires_at', '>', now());
-
-        return [
-            'active' => User::query()->active()->count(),
-            'pending' => User::query()->pending()->count(),
-            'suspended' => User::query()->where('status', UserStatus::Suspended->value)->count(),
-            'without_division' => User::query()->active()->whereNull('division_id')->count(),
-            'invitations_open' => (clone $openInvitations)->count(),
-            'invitations_expiring' => (clone $openInvitations)->where('expires_at', '<=', now()->addDays(3))->count(),
-        ];
-    }
-
-    /**
-     * What is showing on everyone's calendar right now, plus what is queued.
-     *
-     * @return array{live: list<array<string, mixed>>, scheduled: int}
-     */
-    public function announcements(): array
-    {
-        $live = Announcement::query()
-            ->where('is_active', true)
-            ->where('starts_at', '<=', now())
-            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
-            ->with('division:id,name,acronym')
-            ->orderByDesc('starts_at')
-            ->limit(5)
-            ->get();
-
-        return [
-            'live' => $live->map(fn (Announcement $announcement) => [
-                'id' => $announcement->id,
-                'title' => $announcement->title,
-                'level' => $announcement->level,
-                'audience' => $announcement->division?->acronym ?? $announcement->division?->name,
-                'ends_at' => $announcement->ends_at?->toIso8601String(),
-            ])->values()->all(),
-            'scheduled' => Announcement::query()
-                ->where('is_active', true)
-                ->where('starts_at', '>', now())
-                ->count(),
-        ];
-    }
-
-    /** @return Collection<int, array<string, mixed>> */
-    public function activity(int $limit = 8): Collection
-    {
-        // People's actions only; seeders and system jobs would drown them.
-        return Activity::query()
-            ->whereNotNull('causer_id')
-            ->with('causer')
-            ->latest()
-            ->latest('id')
-            ->limit($limit)
-            ->get()
-            ->map(fn (Activity $activity) => (new ActivityResource($activity))->resolve());
-    }
-
-    /** @return array{failed: int, queued: int} */
-    public function health(): array
-    {
-        return [
-            'failed' => DB::table('failed_jobs')->count(),
-            'queued' => DB::table('jobs')->count(),
-        ];
+        return [...$this->bookingRequests($user, $type), ...$this->changeRequests($user, $type)];
     }
 
     /**
@@ -282,11 +70,12 @@ class AdminDashboard
      *
      * @return list<array<string, mixed>>
      */
-    public function bookingRequests(User $user): array
+    public function bookingRequests(User $user, ?ResourceType $type = null): array
     {
         $bookings = Booking::query()
             ->where('status', BookingStatus::Pending->value)
-            ->with(['resource.type', 'resource.calendar:id,color', 'requester:id,name', 'event:id,title'])
+            ->when($type, fn ($query) => $query->whereHas('resource', fn ($resource) => $resource->where('resource_type_id', $type->id)))
+            ->with(['resource.type', 'resource.calendar:id,color', 'requester.division:id,name,acronym', 'event:id,title'])
             ->orderBy('starts_at')
             ->get()
             ->filter(fn (Booking $booking) => $user->can('approve', $booking));
@@ -309,6 +98,7 @@ class AdminDashboard
                 'title' => $booking->event->title ?? $booking->purpose ?? 'Booking',
                 ...$this->resourceFields($booking),
                 'requester' => $booking->requester?->name,
+                'division' => $this->divisionOf($booking->requester),
                 'starts_at' => $booking->starts_at->toIso8601String(),
                 'ends_at' => $booking->ends_at->toIso8601String(),
                 'purpose' => $booking->purpose,
@@ -327,6 +117,146 @@ class AdminDashboard
         return $items;
     }
 
+    /**
+     * Pending change requests in one type that this user may decide, oldest
+     * first, with the booking as it stands so the change reads as a diff.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function changeRequests(User $user, ResourceType $type): array
+    {
+        return array_values(BookingEditRequest::query()
+            ->where('status', EditRequestStatus::Pending->value)
+            ->whereHas('booking.resource', fn ($query) => $query->where('resource_type_id', $type->id))
+            ->with(['booking.resource.type', 'booking.resource.calendar:id,color', 'booking.event:id,title', 'requester.division:id,name,acronym'])
+            ->orderBy('created_at')
+            ->get()
+            ->filter(fn (BookingEditRequest $change) => $user->can('approve', $change->booking))
+            ->map(function (BookingEditRequest $change) {
+                $booking = $change->booking;
+
+                return [
+                    'key' => "change-{$change->id}",
+                    'kind' => 'change',
+                    'id' => $change->id,
+                    'booking_id' => $booking->id,
+                    'title' => $booking->event->title ?? $booking->purpose ?? 'Booking',
+                    ...$this->resourceFields($booking),
+                    'requester' => $change->requester?->name,
+                    'division' => $this->divisionOf($change->requester),
+                    'starts_at' => ($change->proposed_starts_at ?? $booking->starts_at)->toIso8601String(),
+                    'ends_at' => ($change->proposed_ends_at ?? $booking->ends_at)->toIso8601String(),
+                    'current' => [
+                        'starts_at' => $booking->starts_at->toIso8601String(),
+                        'ends_at' => $booking->ends_at->toIso8601String(),
+                        'purpose' => $booking->purpose,
+                        'attendee_count' => $booking->attendee_count,
+                    ],
+                    'proposed_purpose' => $change->proposed_purpose,
+                    'proposed_attendee_count' => $change->proposed_attendee_count,
+                    'note' => $change->note,
+                    'requested_at' => $change->created_at?->toIso8601String(),
+                ];
+            })
+            ->all());
+    }
+
+    /**
+     * Every active room and vehicle (of one type, when given) with its
+     * pending and approved bookings on one office day.
+     *
+     * @return array<string, mixed>
+     */
+    public function schedule(User $user, CarbonImmutable $day, ?ResourceType $only = null): array
+    {
+        $from = $day->startOfDay();
+        $to = $from->addDay();
+
+        $bookings = Booking::query()
+            ->whereIn('status', [BookingStatus::Pending->value, BookingStatus::Approved->value])
+            ->where('starts_at', '<', $to->utc())
+            ->where('ends_at', '>', $from->utc())
+            ->when($only, fn ($query) => $query->whereHas('resource', fn ($resource) => $resource->where('resource_type_id', $only->id)))
+            ->with(['event:id,title', 'requester:id,name', 'resource.type'])
+            ->orderBy('starts_at')
+            ->get()
+            ->groupBy('resource_id');
+
+        $types = ResourceType::query()
+            ->active()
+            ->when($only, fn ($query) => $query->whereKey($only->id))
+            ->with(['resources' => fn ($query) => $query->active()->with('calendar:id,color')->orderBy('sort_order')->orderBy('name')])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        return [
+            'date' => $from->toDateString(),
+            'types' => $types->map(fn (ResourceType $type) => [
+                'id' => $type->id,
+                'name' => $type->name,
+                'slug' => $type->slug,
+                'icon' => $type->icon,
+                'resources' => $type->resources->map(fn (Resource $resource) => [
+                    'id' => $resource->id,
+                    'name' => $resource->name,
+                    'location' => $resource->location,
+                    'color' => $resource->calendar?->color,
+                    'bookings' => ($bookings->get($resource->id) ?? collect())
+                        ->map(function (Booking $booking) use ($user) {
+                            // Same rule as the calendar (EventOccurrenceResource):
+                            // purpose and headcount only for the requester and
+                            // the booking's own reviewers.
+                            $canReview = $user->can('approve', $booking);
+                            $full = $canReview || $booking->requested_by === $user->id;
+
+                            return [
+                                'id' => $booking->id,
+                                'title' => $booking->event->title ?? ($full ? $booking->purpose : null) ?? 'Booking',
+                                'requester' => $booking->requester?->name,
+                                'starts_at' => $booking->starts_at->toIso8601String(),
+                                'ends_at' => $booking->ends_at->toIso8601String(),
+                                'status' => $booking->status->value,
+                                'purpose' => $full ? $booking->purpose : null,
+                                'attendee_count' => $full ? $booking->attendee_count : null,
+                                'can_approve' => $booking->status === BookingStatus::Pending && $canReview,
+                            ];
+                        })->values()->all(),
+                ])->values()->all(),
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * Seven office days from `$from` with how many bookings each holds and
+     * how many of those still wait for a decision.
+     *
+     * @return list<array{date: string, bookings: int, waiting: int}>
+     */
+    public function week(ResourceType $type, CarbonImmutable $from): array
+    {
+        $to = $from->addDays(7);
+
+        $bookings = Booking::query()
+            ->whereIn('status', [BookingStatus::Pending->value, BookingStatus::Approved->value])
+            ->whereHas('resource', fn ($query) => $query->where('resource_type_id', $type->id))
+            ->where('starts_at', '<', $to->utc())
+            ->where('ends_at', '>', $from->utc())
+            ->get(['starts_at', 'ends_at', 'status']);
+
+        return array_map(function (int $offset) use ($from, $bookings) {
+            $start = $from->addDays($offset);
+            $end = $start->addDay();
+            $that = $bookings->filter(fn (Booking $booking) => $booking->starts_at < $end && $booking->ends_at > $start);
+
+            return [
+                'date' => $start->toDateString(),
+                'bookings' => $that->count(),
+                'waiting' => $that->where('status', BookingStatus::Pending)->count(),
+            ];
+        }, range(0, 6));
+    }
+
     /** @return array{resource: string, color: string|null, type: string} */
     private function resourceFields(Booking $booking): array
     {
@@ -335,5 +265,10 @@ class AdminDashboard
             'color' => $booking->resource->calendar?->color,
             'type' => $booking->resource->type->name,
         ];
+    }
+
+    private function divisionOf(?User $user): ?string
+    {
+        return $user->division->acronym ?? $user->division->name ?? null;
     }
 }

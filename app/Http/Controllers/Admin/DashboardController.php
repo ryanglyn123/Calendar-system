@@ -3,28 +3,41 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ResourceType;
 use App\Models\User;
 use App\Services\Admin\AdminDashboard;
+use App\Services\Booking\ReviewQueue;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The admin desk: what waits on this user, how the rooms and vehicles are
- * used, and the few signals worth watching. Each panel appears only for
- * people allowed to act on it. `date` moves the schedule board; the page
- * reloads just that prop when it changes.
+ * The admin desk, one per resource type: Boardroom and Carpool reviewers
+ * each get only their own; super admins switch between them (`type`).
+ * `date` moves the bookings list; the page reloads just those props.
  */
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, AdminDashboard $dashboard): Response
+    public function __invoke(Request $request, AdminDashboard $dashboard, ReviewQueue $reviews): Response
     {
         $validated = $request->validate([
+            'type' => ['nullable', 'string', 'max:100'],
             'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
         $user = $request->user();
+        $types = $reviews->typesFor($user);
+
+        /** @var ResourceType|null $type */
+        $type = isset($validated['type'])
+            ? $types->firstWhere('slug', $validated['type'])
+            : $types->first();
+
+        // Someone else's desk, or a type that doesn't exist.
+        abort_if(isset($validated['type']) && $type === null, 403);
+
         $today = CarbonImmutable::now(AdminDashboard::timezone())->startOfDay();
         $day = isset($validated['date'])
             ? CarbonImmutable::parse($validated['date'], AdminDashboard::timezone())->startOfDay()
@@ -32,13 +45,13 @@ class DashboardController extends Controller
 
         return Inertia::render('admin/Dashboard', [
             'today' => $today->toDateString(),
-            'queue' => fn () => $dashboard->queue($user),
-            'schedule' => fn () => $dashboard->schedule($user, $day),
-            'demand' => fn () => $dashboard->demand(),
-            'people' => fn () => $user->can('viewAny', User::class) ? $dashboard->people() : null,
-            'notices' => fn () => $user->can('announcements.manage') ? $dashboard->announcements() : null,
-            'activity' => fn () => $user->can('audit.view') ? $dashboard->activity() : null,
-            'health' => fn () => $user->can('settings.manage') ? $dashboard->health() : null,
+            'date' => $day->toDateString(),
+            'tabs' => fn () => $dashboard->tabs($types),
+            'type' => $type === null ? null : $type->only(['slug', 'name', 'icon']),
+            'requests' => fn () => $type === null ? [] : $dashboard->requests($user, $type),
+            'resources' => fn () => $type === null ? [] : ($dashboard->schedule($user, $day, $type)['types'][0]['resources'] ?? []),
+            'week' => fn () => $type === null ? [] : $dashboard->week($type, $day->startOfWeek(CarbonInterface::MONDAY)),
+            'signups' => fn () => $user->can('viewAny', User::class) ? User::query()->pending()->count() : null,
         ]);
     }
 }

@@ -12,6 +12,8 @@ type DeskResourceFields = {
     color: string | null;
     type: string;
     requester: string | null;
+    /** The requester's division, acronym when it has one. */
+    division: string | null;
     starts_at: string;
     ends_at: string;
 };
@@ -28,30 +30,41 @@ export type DeskBookingRequest = DeskResourceFields & {
     clash: DeskClash | null;
 };
 
+/** `starts_at`/`ends_at` are the proposed times; `current` is the booking now. */
 export type DeskChangeRequest = DeskResourceFields & {
     key: string;
     kind: 'change';
     id: number;
     booking_id: number;
     title: string;
-    current: { starts_at: string; ends_at: string; purpose: string | null };
+    current: {
+        starts_at: string;
+        ends_at: string;
+        purpose: string | null;
+        attendee_count: number | null;
+    };
     proposed_purpose: string | null;
+    proposed_attendee_count: number | null;
     note: string | null;
     requested_at: string | null;
 };
 
-export type DeskRegistration = {
-    key: string;
-    kind: 'registration';
-    id: number;
-    title: string;
-    email: string;
-    division: string | null;
-    requested_at: string | null;
+export type DeskRequest = DeskBookingRequest | DeskChangeRequest;
+
+/** One desk in the super admin's switcher. */
+export type DeskTab = {
+    slug: string;
+    name: string;
+    icon: string | null;
+    waiting: number;
 };
 
-export type DeskQueueItem =
-    DeskBookingRequest | DeskChangeRequest | DeskRegistration;
+/** One day in the desk's week strip. */
+export type DeskWeekDay = {
+    date: string;
+    bookings: number;
+    waiting: number;
+};
 
 export type DeskBooking = {
     id: number;
@@ -85,45 +98,6 @@ export type DeskSchedule = {
     date: string;
     types: DeskResourceType[];
 };
-
-export type DeskDemandDay = {
-    date: string;
-    approved: number;
-    pending: number;
-    count: number;
-};
-
-export type DeskPeople = {
-    active: number;
-    pending: number;
-    suspended: number;
-    without_division: number;
-    invitations_open: number;
-    invitations_expiring: number;
-};
-
-export type DeskAnnouncements = {
-    live: {
-        id: number;
-        title: string;
-        level: 'info' | 'warning' | 'critical';
-        audience: string | null;
-        ends_at: string | null;
-    }[];
-    scheduled: number;
-};
-
-export type DeskActivity = {
-    id: number;
-    description: string;
-    event: string | null;
-    causer: string | null;
-    subject_type: string | null;
-    subject_id: number | null;
-    created_at: string;
-};
-
-export type DeskHealth = { failed: number; queued: number };
 
 /* ---- Booking review ---------------------------------------------------- */
 
