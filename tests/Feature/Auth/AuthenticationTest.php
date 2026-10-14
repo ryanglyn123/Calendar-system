@@ -19,9 +19,10 @@ class AuthenticationTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_users_can_authenticate_using_the_login_screen()
+    public function test_admins_can_authenticate_using_the_login_screen()
     {
         $user = User::factory()->create();
+        $user->assignRole('division_admin');
 
         $response = $this->post(route('login.store'), [
             'email' => $user->email,
@@ -42,6 +43,7 @@ class AuthenticationTest extends TestCase
         ]);
 
         $user = User::factory()->withTwoFactor()->create();
+        $user->assignRole('division_admin');
 
         $response = $this->post(route('login'), [
             'email' => $user->email,
@@ -50,6 +52,19 @@ class AuthenticationTest extends TestCase
 
         $response->assertRedirect(route('two-factor.login'));
         $response->assertSessionHas('login.id', $user->id);
+        $this->assertGuest();
+    }
+
+    public function test_staff_must_sign_in_with_sso_even_with_the_right_password()
+    {
+        $user = User::factory()->create();
+        $user->assignRole('staff');
+
+        $this->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertSessionHasErrors(['email' => 'Please sign in with FDCP SSO. Email sign-in is for administrators.']);
+
         $this->assertGuest();
     }
 

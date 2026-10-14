@@ -17,12 +17,13 @@ Route::middleware(['auth', 'approved'])->group(function () {
 Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    // Only admins sign in with a password; everyone else uses FDCP SSO.
     Route::get('settings/security', [SecurityController::class, 'edit'])
-        ->middleware(RequirePassword::class)
+        ->middleware(['can:admin.access', RequirePassword::class])
         ->name('security.edit');
 
     Route::put('settings/password', [SecurityController::class, 'update'])
-        ->middleware('throttle:6,1')
+        ->middleware(['can:admin.access', 'throttle:6,1'])
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
@@ -41,10 +42,3 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::patch('settings/google-calendar/calendars/{calendar}', [GoogleCalendarController::class, 'updateCalendar'])
         ->whereNumber('calendar')->name('google-calendar.calendars.update');
 });
-
-Route::get('.well-known/passkey-endpoints', function () {
-    return response()->json([
-        'enroll' => route('security.edit'),
-        'manage' => route('security.edit'),
-    ]);
-})->name('well-known.passkeys');

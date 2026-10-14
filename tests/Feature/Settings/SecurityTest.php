@@ -13,6 +13,30 @@ class SecurityTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Only admins sign in with a password, so only they manage one. */
+    private function admin(): User
+    {
+        return tap(User::factory()->create(), fn (User $user) => $user->assignRole('division_admin'));
+    }
+
+    public function test_staff_signed_in_through_sso_have_no_security_page()
+    {
+        $staff = User::factory()->create();
+
+        $this->actingAs($staff)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->get(route('security.edit'))
+            ->assertForbidden();
+
+        $this->actingAs($staff)
+            ->put(route('user-password.update'), [
+                'current_password' => 'password',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+            ])
+            ->assertForbidden();
+    }
+
     public function test_security_page_is_displayed()
     {
         $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
@@ -21,19 +45,14 @@ class SecurityTest extends TestCase
             'confirm' => true,
             'confirmPassword' => true,
         ]);
-        Features::passkeys([
-            'confirmPassword' => true,
-        ]);
 
-        $user = User::factory()->create();
+        $user = $this->admin();
 
         $this->actingAs($user)
             ->withSession(['auth.password_confirmed_at' => time()])
             ->get(route('security.edit'))
             ->assertInertia(fn (Assert $page) => $page
                 ->component('settings/Security')
-                ->where('canManagePasskeys', true)
-                ->where('passkeys', [])
                 ->where('canManageTwoFactor', true)
                 ->where('twoFactorEnabled', false),
             );
@@ -43,7 +62,7 @@ class SecurityTest extends TestCase
     {
         $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
 
-        $user = User::factory()->create();
+        $user = $this->admin();
 
         Features::twoFactorAuthentication([
             'confirm' => true,
@@ -62,7 +81,7 @@ class SecurityTest extends TestCase
 
         config(['fortify.features' => []]);
 
-        $user = User::factory()->create();
+        $user = $this->admin();
 
         $this->actingAs($user)
             ->withSession(['auth.password_confirmed_at' => time()])
@@ -70,8 +89,6 @@ class SecurityTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('settings/Security')
-                ->where('canManagePasskeys', false)
-                ->where('passkeys', [])
                 ->where('canManageTwoFactor', false)
                 ->missing('twoFactorEnabled')
                 ->missing('requiresConfirmation'),
@@ -80,7 +97,7 @@ class SecurityTest extends TestCase
 
     public function test_password_can_be_updated()
     {
-        $user = User::factory()->create();
+        $user = $this->admin();
 
         $response = $this
             ->actingAs($user)
@@ -100,7 +117,7 @@ class SecurityTest extends TestCase
 
     public function test_correct_password_must_be_provided_to_update_password()
     {
-        $user = User::factory()->create();
+        $user = $this->admin();
 
         $response = $this
             ->actingAs($user)

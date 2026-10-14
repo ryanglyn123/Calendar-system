@@ -9,6 +9,7 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/composables/useAuth';
 import { edit } from '@/routes/profile';
 import { send } from '@/routes/verification';
 
@@ -25,6 +26,8 @@ defineOptions({
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+// Deleting asks for the password, which only admins have.
+const { hasPermission } = useAuth();
 </script>
 
 <template>
@@ -101,5 +104,5 @@ const user = computed(() => page.props.auth.user);
         </Form>
     </div>
 
-    <DeleteUser />
+    <DeleteUser v-if="hasPermission('admin.access')" />
 </template>

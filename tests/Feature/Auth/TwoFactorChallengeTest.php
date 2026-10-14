@@ -34,6 +34,7 @@ class TwoFactorChallengeTest extends TestCase
         ]);
 
         $user = User::factory()->withTwoFactor()->create();
+        $user->assignRole('division_admin');
 
         $this->post(route('login'), [
             'email' => $user->email,

@@ -625,20 +625,21 @@ test('ISS-032: a profile email change cannot leave the allowed domain', function
     expect($user->refresh()->name)->toBe('Someone Else');
 });
 
-test('ISS-032: Google sign-in for an archived account fails cleanly instead of creating a twin', function () {
+test('ISS-032: SSO sign-in for an archived account fails cleanly instead of creating a twin', function () {
     $archived = User::factory()->create(['email' => 'gone@fdcp.gov.ph']);
     $archived->delete();
 
-    $googleUser = (new SocialiteUser)->map([
-        'id' => 'google-123',
+    Socialite::shouldReceive('driver->user')->andReturn((new SocialiteUser)->setRaw([
+        'sub' => 'sso-123',
         'name' => 'Gone Person',
         'email' => 'gone@fdcp.gov.ph',
-    ]);
-    Socialite::shouldReceive('driver->user')->andReturn($googleUser);
+        'is_active' => true,
+        'apps' => ['calendar' => ['role' => 'staff']],
+    ]));
 
-    $this->get(route('google.callback'))
+    $this->get(route('sso.callback'))
         ->assertRedirect(route('login'))
-        ->assertSessionHasErrors('email');
+        ->assertSessionHasErrors('sso');
 
     expect(User::withTrashed()->where('email', 'gone@fdcp.gov.ph')->count())->toBe(1)
         ->and(auth()->check())->toBeFalse();

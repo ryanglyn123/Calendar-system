@@ -16,7 +16,7 @@ use App\Http\Controllers\Api\GoogleCalendarController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ResourceBrowserController;
 use App\Http\Controllers\Api\UserSearchController;
-use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\Auth\FdcpAccountsController;
 use App\Http\Controllers\Auth\InvitationAcceptanceController;
 use App\Http\Controllers\BookingPageController;
 use App\Http\Controllers\Calendar\CalendarShareController;
@@ -34,8 +34,10 @@ use Inertia\Inertia;
 Route::redirect('/', '/dashboard')->name('home');
 
 Route::middleware('guest')->group(function () {
-    Route::get('auth/google/redirect', [GoogleAuthController::class, 'redirect'])->name('google.redirect');
-    Route::get('auth/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');
+    Route::get('auth/fdcp/redirect', [FdcpAccountsController::class, 'redirect'])
+        ->middleware('throttle:10,1')->name('sso.redirect');
+    Route::get('auth/fdcp/callback', [FdcpAccountsController::class, 'callback'])
+        ->middleware('throttle:10,1')->name('sso.callback');
 
     Route::get('invitation/{token}', [InvitationAcceptanceController::class, 'show'])->name('invitation.show');
     Route::post('invitation/{token}', [InvitationAcceptanceController::class, 'store'])

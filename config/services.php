@@ -35,14 +35,23 @@ return [
         ],
     ],
 
+    // FDCP SSO (fdcp-accounts): the sign-in for everyone but admins.
+    'fdcp_accounts' => [
+        'client_id' => env('FDCP_ACCOUNTS_CLIENT_ID'),
+        'client_secret' => env('FDCP_ACCOUNTS_CLIENT_SECRET'),
+        'redirect' => env('FDCP_ACCOUNTS_REDIRECT_URI', '/auth/fdcp/callback'),
+        'base_url' => env('FDCP_ACCOUNTS_URL', 'https://sso.fdcp.ph'),
+        // Socialite hands these to Guzzle, so a hung SSO server cannot hold
+        // PHP workers for the default 30s+.
+        'guzzle' => ['connect_timeout' => 5, 'timeout' => 10],
+    ],
+
+    // Google is used only for the Google Calendar connection. Socialite
+    // requires 'redirect'; the connection passes calendar_redirect itself.
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-        'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
-
-        // Google Calendar integration (same OAuth client as sign-in). The
-        // calendar connection has its own callback because sign-in routes
-        // are guest-only.
+        'redirect' => env('GOOGLE_CALENDAR_REDIRECT_URI', '/settings/google-calendar/callback'),
         'calendar_redirect' => env('GOOGLE_CALENDAR_REDIRECT_URI', '/settings/google-calendar/callback'),
         // Push notifications need a public HTTPS address; without one the
         // app falls back to polling with sync tokens.

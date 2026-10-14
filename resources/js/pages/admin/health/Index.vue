@@ -136,7 +136,7 @@ const retryAll = () =>
                 class="grid gap-x-8 gap-y-3 rounded-xl border bg-card px-6 py-5 text-sm sm:grid-cols-2"
             >
                 <div class="flex justify-between gap-4">
-                    <dt class="text-muted-foreground">Sign-in credentials</dt>
+                    <dt class="text-muted-foreground">OAuth credentials</dt>
                     <dd
                         :class="
                             google.oauth_configured ? '' : 'text-destructive'

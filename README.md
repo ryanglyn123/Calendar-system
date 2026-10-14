@@ -10,7 +10,7 @@ Internal calendar and resource booking platform for the Film Development Council
 - Attendees with RSVP, per-event reminders (in-app and email), and a queued notification center with per-user channel preferences.
 - Resource booking for admin-defined resource types (board rooms, vehicles, and anything else) with approval workflows, edit requests, conflict detection, working hours, holiday blocking, and per-type booking rules.
 - Super Admin panel: users, pending registrations, invitations, divisions, roles and permissions, calendars, event types, resource types, resources, booking approvals, change requests, working hours, holidays, announcements, audit log, system health, and typed settings. All configurable without code changes.
-- Sign in with password (Fortify, with 2FA and passkeys) or Google (Socialite). Self-registration and unknown Google accounts land in a pending queue for admin approval.
+- Sign in with FDCP SSO (fdcp-accounts). Email and password (Fortify, with 2FA) is for administrators only. Self-registration lands in a pending queue for admin approval.
 
 ## Requirements
 
@@ -86,9 +86,17 @@ All seeded accounts use the password `password`.
 | vehicle.approver@fdcp.gov.ph | Vehicle Approver (demo) |
 | pending@fdcp.gov.ph | Pending registration (demo) |
 
-### Google sign-in
+### FDCP SSO
 
-Create OAuth 2.0 credentials in the Google Cloud console with the redirect URI `APP_URL/auth/google/callback`, then set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. Unknown Google emails create pending accounts that an admin approves. An allowed email domain can be enforced under Admin, Settings.
+Staff sign in through FDCP SSO (the `fdcp-accounts` app). On the SSO server, register the calendar as a client:
+
+```bash
+php artisan app:register-client calendar --redirect="https://YOUR-CALENDAR-DOMAIN/auth/fdcp/callback"
+```
+
+Put the printed client ID and secret in `.env` as `FDCP_ACCOUNTS_CLIENT_ID` and `FDCP_ACCOUNTS_CLIENT_SECRET`, and set `FDCP_ACCOUNTS_URL` to the SSO address. In FDCP Accounts, give each person access to "FDCP Calendar". On their first sign-in the calendar links their existing account by email, or creates a staff account. Roles stay managed here, under Admin, Users. Signing out of the calendar also signs out of FDCP SSO.
+
+Email and password sign-in works only for accounts that can open the admin panel, so administrators can still get in if SSO is down.
 
 ## Deploying to Ubuntu on AWS (step by step)
 

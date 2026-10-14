@@ -51,14 +51,14 @@ You need: the app's public base URL (`APP_URL`, e.g. `https://calendar.fdcp.gov.
 
 ### 1. Project
 
-1. Go to <https://console.cloud.google.com/> and create a project (e.g. "FDCP Calendar"), or reuse the one that already holds the sign-in client.
+1. Go to <https://console.cloud.google.com/> and create a project (e.g. "FDCP Calendar").
 2. If `fdcp.gov.ph` is a Google Workspace domain, create the project **inside the fdcp.gov.ph organization**. That allows the "Internal" audience below, which needs no Google verification.
 
 ### 2. Enable the API
 
 APIs & Services → Library → **Google Calendar API** → Enable.
 
-That is the only API needed. Google sign-in uses OAuth/OpenID and needs no extra API.
+That is the only API needed.
 
 ### 3. OAuth consent screen (Google Auth Platform)
 
@@ -90,19 +90,17 @@ https://www.googleapis.com/auth/calendar.freebusy
 
 ### 4. OAuth client (Web application)
 
-Google Auth Platform → **Clients** → Create client → Application type **Web application**. One client serves both sign-in and the calendar connection.
+Google Auth Platform → **Clients** → Create client → Application type **Web application**. (People sign in to the app with FDCP SSO; this client is only for connecting Google Calendar.)
 
 **Authorized redirect URIs** (exact match, including scheme and port):
 
 ```
-https://YOUR-DOMAIN/auth/google/callback
 https://YOUR-DOMAIN/settings/google-calendar/callback
 ```
 
-For local development, add these too:
+For local development, add this too:
 
 ```
-http://localhost:8000/auth/google/callback
 http://localhost:8000/settings/google-calendar/callback
 ```
 
@@ -126,7 +124,6 @@ In the server's `.env`:
 ```
 GOOGLE_CLIENT_ID=...apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=...
-GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
 GOOGLE_CALENDAR_REDIRECT_URI="${APP_URL}/settings/google-calendar/callback"
 GOOGLE_CALENDAR_WEBHOOK_URL="${APP_URL}/webhooks/google-calendar"
 GOOGLE_CALENDAR_API_KEY=...
@@ -170,7 +167,7 @@ If Workspace API controls restrict third-party apps, a Workspace admin must allo
 
 ### 11. Check it works
 
-1. Admin → System Health → "Google Calendar": sign-in credentials **Set**; the redirect URI shown there must match the one in step 4.
+1. Admin → System Health → "Google Calendar": OAuth credentials **Set**; the redirect URI shown there must match the one in step 4.
 2. Settings → Google Calendar → **Connect Google Calendar** → consent → back on the page, calendars appear within a few seconds.
 3. Create an event in Google Calendar; it appears on My Calendar within moments with push, or within 10 minutes without.
 4. Approve a test booking for yourself; it appears in "FDCP Bookings" in Google. Cancel it; it disappears.
