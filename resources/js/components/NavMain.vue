@@ -66,7 +66,7 @@ const lit = (item: NavItem) =>
                     as-child
                     :is-active="lit(item)"
                     :tooltip="item.title"
-                    class="group/orbit h-[46px] gap-3 py-0 pr-4 pl-1.5 font-medium text-sidebar-foreground/85 hover:bg-white/80 dark:text-sidebar-foreground/75 dark:hover:bg-sidebar-foreground/6"
+                    class="group/orbit h-[46px] gap-2.5 py-0 pr-3 pl-1.5 text-[13px] font-medium text-sidebar-foreground/85 hover:bg-white/80 dark:text-sidebar-foreground/75 dark:hover:bg-sidebar-foreground/6"
                 >
                     <!-- Hover prefetch: the page request starts before the
                          click, which hides most of the server round trip. -->

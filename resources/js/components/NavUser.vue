@@ -32,7 +32,7 @@ const { isMobile, state } = useSidebar();
                          circle with the avatar centred on the icon axis. -->
                     <SidebarMenuButton
                         size="lg"
-                        class="h-auto bg-white/60 p-[9px] pr-3 shadow-[0_6px_20px_-10px_rgb(15_40_60/0.25)] inset-ring inset-ring-black/7 backdrop-blur-md data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground dark:bg-sidebar-foreground/4 dark:shadow-none dark:inset-ring-sidebar-foreground/10 [&_[data-slot=avatar-fallback]]:rounded-full [&_[data-slot=avatar]]:size-10 [&_[data-slot=avatar]]:rounded-full [&_[data-slot=avatar]]:ring-2 [&_[data-slot=avatar]]:ring-sidebar-primary"
+                        class="h-auto bg-white/60 p-[9px] pr-3 shadow-[0_6px_20px_-10px_rgb(15_40_60/0.25)] inset-ring inset-ring-black/7 backdrop-blur-md data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground dark:bg-sidebar-foreground/4 dark:shadow-none dark:inset-ring-sidebar-foreground/10 [&_[data-sidebar-fade]]:text-[13px] [&_[data-sidebar-fade]>span]:line-clamp-2 [&_[data-sidebar-fade]>span]:whitespace-normal [&_[data-slot=avatar-fallback]]:rounded-full [&_[data-slot=avatar]]:size-10 [&_[data-slot=avatar]]:rounded-full [&_[data-slot=avatar]]:ring-2 [&_[data-slot=avatar]]:ring-sidebar-primary"
                         data-test="sidebar-menu-button"
                     >
                         <UserInfo :user="user" />
