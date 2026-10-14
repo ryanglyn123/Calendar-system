@@ -55,7 +55,7 @@ const lit = (item: NavItem) =>
     <SidebarGroup class="px-4 py-0">
         <SidebarGroupLabel class="sr-only">{{ label }}</SidebarGroupLabel>
         <SidebarMenu
-            class="rounded-[29px] bg-white/60 p-1.5 shadow-[0_6px_20px_-10px_rgb(15_40_60/0.25)] inset-ring inset-ring-black/7 dark:bg-sidebar-foreground/4 dark:shadow-none dark:inset-ring-sidebar-foreground/10"
+            class="gap-0.5 rounded-[24px] bg-white/60 p-1.5 shadow-[0_6px_20px_-10px_rgb(15_40_60/0.25)] inset-ring inset-ring-black/7 dark:bg-sidebar-foreground/4 dark:shadow-none dark:inset-ring-sidebar-foreground/10"
         >
             <SidebarMenuItem
                 v-for="item in items"
@@ -66,7 +66,7 @@ const lit = (item: NavItem) =>
                     as-child
                     :is-active="lit(item)"
                     :tooltip="item.title"
-                    class="group/orbit h-[46px] gap-2.5 py-0 pr-3 pl-1.5 text-[13px] font-medium text-sidebar-foreground/85 hover:bg-white/80 dark:text-sidebar-foreground/75 dark:hover:bg-sidebar-foreground/6"
+                    class="group/orbit h-9 gap-2.5 py-0 pr-3 pl-1 text-[13px] font-medium text-sidebar-foreground/85 hover:bg-white/80 dark:text-sidebar-foreground/75 dark:hover:bg-sidebar-foreground/6"
                 >
                     <!-- Hover prefetch: the page request starts before the
                          click, which hides most of the server round trip. -->
@@ -77,9 +77,9 @@ const lit = (item: NavItem) =>
                         :aria-current="isCurrent(item) ? 'page' : undefined"
                     >
                         <span
-                            class="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-sidebar-foreground/8 group-data-[active=true]/orbit:bg-white/18 dark:bg-sidebar-foreground/6"
+                            class="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-foreground/8 group-data-[active=true]/orbit:bg-white/18 dark:bg-sidebar-foreground/6"
                         >
-                            <component :is="item.icon" class="size-[18px]" />
+                            <component :is="item.icon" class="size-4" />
                         </span>
                         <!-- Faded, not removed, in the rail: the link keeps
                              its accessible name. -->

@@ -144,7 +144,7 @@ const adminNavItems = computed<NavItem[]>(() => {
 
 <template>
     <Sidebar collapsible="icon" variant="sidebar" class="!border-r-0">
-        <SidebarHeader class="px-4 pt-4">
+        <SidebarHeader class="px-4 pt-3 pb-1">
             <SidebarMenu>
                 <SidebarMenuItem>
                     <!-- One reel mark for both states: it glides between the
@@ -160,20 +160,20 @@ const adminNavItems = computed<NavItem[]>(() => {
                             data-sidebar-fade
                             class="[clip-path:inset(0_0_0_29px)]"
                         />
-                        <!-- 9px in from the link = centred on the rail's
-                             45px icon axis. -->
+                        <!-- 4px in from the link = centred on the rail's
+                             40px icon axis. -->
                         <img
                             :src="logoOnly"
                             alt=""
                             data-sidebar-mark
-                            class="pointer-events-none absolute inset-y-0 left-[9px] my-auto size-10 object-contain"
+                            class="pointer-events-none absolute inset-y-0 left-1 my-auto size-10 object-contain"
                         />
                     </Link>
                 </SidebarMenuItem>
             </SidebarMenu>
         </SidebarHeader>
 
-        <SidebarContent class="relative isolate gap-4 pt-2">
+        <SidebarContent class="relative isolate gap-2.5 pt-1">
             <!-- The liquid pill: one for every group, under the labels and
                  over the capsules (useLiquidNav). -->
             <span
@@ -195,7 +195,7 @@ const adminNavItems = computed<NavItem[]>(() => {
             />
         </SidebarContent>
 
-        <SidebarFooter class="px-4 pb-4">
+        <SidebarFooter class="px-4 pb-3">
             <NavUser />
         </SidebarFooter>
     </Sidebar>

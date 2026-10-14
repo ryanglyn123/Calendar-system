@@ -380,7 +380,7 @@
    tween (power3.out opening, power2.inOut closing). */
 [data-sidebar-mark] {
     transform-origin: top left;
-    transform: translate(-7.5px, 3.7px) scale(0.81);
+    transform: translate(-2.5px, 3.7px) scale(0.81);
     transition: transform 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 

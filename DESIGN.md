@@ -262,7 +262,7 @@ Pills, all 32px tall, 13px 500, 14px side padding, 14px icons with 6px gap.
 - **Error:** ring turns Destructive; message below in 13px Destructive.
 
 ### Navigation
-Sidebar nav is a floating rail (29px radius, translucent white, soft shadow) holding 46px pill items with a 34px round icon well. Active item is a solid Pill Ink pill with its own glow; in dark it is Night Blue. Collapses to 48px icon-only pills.
+Sidebar nav is a floating rail (24px radius, translucent white, soft shadow) holding compact 36px pill items (28px round icon well, 13px labels) in a 14rem sidebar. Active item is a solid Pill Ink pill with its own glow; in dark it is Night Blue. Collapses to an 80px rail of 36px icon circles.
 
 ### Event wash (signature)
 Events and approved bookings render as a pastel vertical wash with hue-matched dark ink, 6px radius, 12px 500 text, a tabular time prefix shown only when the block is wide enough. In dark the wash becomes tinted glass (the hue at 24% over the panel with a 1px hue ring); timed month chips drop the fill for a 2px color tick.

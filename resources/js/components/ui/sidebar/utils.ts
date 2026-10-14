@@ -7,7 +7,7 @@ export const SIDEBAR_WIDTH = "14rem"
 export const SIDEBAR_WIDTH_MOBILE = "18rem"
 // 90px: centres the 34px nav icons, the 40px avatar and the logo mark on one
 // 45px axis, so nothing shifts sideways when the panel collapses.
-export const SIDEBAR_WIDTH_ICON = "5.625rem"
+export const SIDEBAR_WIDTH_ICON = "5rem"
 export const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 export const [useSidebar, provideSidebarContext] = createContext<{
